@@ -1,0 +1,14 @@
+# 로컬 개발 전용 — docker compose up 시 자동으로 적용됨
+# 파일 저장 시 컨테이너에 즉시 반영 (재빌드 불필요)
+
+services:
+  frontend:
+    volumes:
+      - ../frontend/src:/app/src
+      - ../frontend/public:/app/public
+
+  backend:
+    volumes:
+      - ../backend/app:/app/app
+    environment:
+      - DEBUG=true

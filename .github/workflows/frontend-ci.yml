@@ -1,0 +1,56 @@
+name: Frontend CI
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+      - develop
+    paths:
+      - "frontend/**"
+  pull_request:
+    branches:
+      - main
+      - staging
+      - develop
+    paths:
+      - "frontend/**"
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Test (Vitest)
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: frontend/coverage
+          flags: frontend
+
+      - name: Build check
+        run: npm run build
