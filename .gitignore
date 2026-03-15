@@ -1,7 +1,8 @@
 # ─── Environment ───────────────────────────────────────────────
-.env.example
+.env
 .env.*
-!.env.example
+docker/.env
+docker/.env.*
 
 # ─── Frontend ──────────────────────────────────────────────────
 frontend/node_modules/
@@ -32,3 +33,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# ─── Python venv ───────────────────────────────────────────────
+backend/venv/
