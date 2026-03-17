@@ -1,0 +1,25 @@
+# Web Framework
+fastapi
+uvicorn[standard]
+
+# Database
+sqlalchemy
+pymysql
+cryptography
+
+# Validation
+pydantic-settings
+
+# Auth
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Test
+pytest
+pytest-cov
+pytest-asyncio
+httpx
+
+# Code Quality
+ruff
+mypy
