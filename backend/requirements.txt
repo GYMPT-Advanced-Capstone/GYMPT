@@ -23,3 +23,4 @@ httpx
 # Code Quality
 ruff
 mypy
+
