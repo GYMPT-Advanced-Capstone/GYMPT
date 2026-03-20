@@ -5,6 +5,7 @@ from app.models.exercise import Exercise
 
 router = APIRouter()
 
+
 # DB 세션 생성
 def get_db():
     db = SessionLocal()
@@ -21,10 +22,8 @@ def get_exercises(db: Session = Depends(get_db)):
 
     result = []
     for exercise in exercises:
-        result.append({
-            "no": exercise.no,
-            "name": exercise.name,
-            "imagepath": exercise.imagepath
-        })
+        result.append(
+            {"no": exercise.no, "name": exercise.name, "imagepath": exercise.imagepath}
+        )
 
     return result

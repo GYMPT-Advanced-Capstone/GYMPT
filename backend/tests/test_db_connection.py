@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from app.core.database import SessionLocal
 
+
 def test_db_connection():
     db = SessionLocal()
     try:
