@@ -17,3 +17,12 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def test_get_db():
+    gen = get_db()
+    db = next(gen)
+
+    assert db is not None
+
+    gen.close()
