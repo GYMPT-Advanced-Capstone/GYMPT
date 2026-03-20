@@ -1,7 +1,4 @@
-from fastapi import FastAPI, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app.core.database import get_db
+from fastapi import FastAPI
 from app.routers import exercise_router
 
 app = FastAPI()
