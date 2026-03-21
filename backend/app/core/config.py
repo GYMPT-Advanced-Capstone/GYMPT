@@ -1,36 +1,31 @@
-from pathlib import Path
-
+from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import URL
-
-
-BASE_DIR = Path(__file__).resolve().parents[3]
-ENV_FILE = BASE_DIR / "docker" / ".env"
 
 
 class Settings(BaseSettings):
     MYSQL_HOST: str
-    MYSQL_PORT: int = 4000
-    MYSQL_DATABASE: str
+    MYSQL_PORT: int
     MYSQL_USER: str
     MYSQL_PASSWORD: str
-
-    model_config = SettingsConfigDict(
-        env_file=ENV_FILE,
-        extra="ignore",
-    )
+    MYSQL_DATABASE: str
 
     @property
     def database_url(self) -> str:
-        return URL.create(
-            drivername="mysql+pymysql",
-            username=self.MYSQL_USER,
-            password=self.MYSQL_PASSWORD,
-            host=self.MYSQL_HOST,
-            port=self.MYSQL_PORT,
-            database=self.MYSQL_DATABASE,
-            query={"ssl_verify_cert": "true"},
-        ).render_as_string(hide_password=False)
+        base = (
+            f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
+            f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
+        )
+
+        # ✅ 로컬 환경에서는 SSL 제거
+        if self.MYSQL_HOST in ("localhost", "127.0.0.1"):
+            return base
+
+        # ✅ 클라우드 DB(TiDB)에서는 SSL 사용
+        return base + "?ssl_verify_cert=true"
+
+    model_config = SettingsConfigDict(extra="ignore")
 
 
-settings = Settings()  # type: ignore[call-arg]
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]

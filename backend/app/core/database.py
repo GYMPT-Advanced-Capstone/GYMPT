@@ -1,30 +1,32 @@
-from typing import Generator
-
+from functools import lru_cache
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-
-from app.core.config import settings
-
-
-class Base(DeclarativeBase):
-    pass
+from sqlalchemy.orm import sessionmaker, declarative_base
+from app.core.config import get_settings
 
 
-engine = create_engine(
-    settings.database_url,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-)
+Base = declarative_base()
 
 
-SessionLocal: sessionmaker[Session] = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False,
-)
+@lru_cache
+def get_engine():
+    settings = get_settings()
+    return create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        pool_recycle=3600,
+    )
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_session_local():
+    return sessionmaker(
+        autocommit=False,
+        autoflush=False,
+        bind=get_engine(),
+    )
+
+
+def get_db():
+    SessionLocal = get_session_local()
     db = SessionLocal()
     try:
         yield db
