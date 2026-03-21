@@ -1,4 +1,5 @@
 from app.core.config import get_settings
+from app.core.database import get_engine
 
 
 def test_database_url_localhost(mock_env_vars):
@@ -31,3 +32,13 @@ def test_database_url_with_ssl(mock_env_vars, monkeypatch):
     )
 
     assert settings.database_url == expected_url
+
+
+def test_get_engine_creates_engine(mock_env_vars):
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+
+    engine = get_engine()
+
+    assert engine is not None
+    assert "mysql+pymysql://" in str(engine.url)
