@@ -8,12 +8,15 @@ app = FastAPI(
     version="0.1.0",
 )
 
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=get_engine())
 
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
 
 app.include_router(auth_router)
