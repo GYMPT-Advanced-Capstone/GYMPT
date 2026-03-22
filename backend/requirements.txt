@@ -9,10 +9,12 @@ cryptography
 
 # Validation
 pydantic-settings
+email-validator
 
 # Auth
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==4.0.1
 
 # Test
 pytest
