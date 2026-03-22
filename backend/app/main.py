@@ -1,4 +1,7 @@
 from fastapi import FastAPI
+from app.routers import user_router
+from app.core.database import get_engine, Base
+import app.models.user
 
 app = FastAPI(
     title="GYMPT API",
@@ -6,6 +9,9 @@ app = FastAPI(
     version="0.1.0",
 )
 
+Base.metadata.create_all(bind=get_engine())
+
+app.include_router(user_router.router)
 
 @app.get("/health")
 async def health_check():
