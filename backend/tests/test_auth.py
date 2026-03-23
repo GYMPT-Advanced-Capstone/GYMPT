@@ -196,7 +196,7 @@ def test_logout_blacklisted_token(client, mock_redis_client):
     assert response.json()["detail"] == "로그아웃된 토큰입니다."
 
 
-# sub 없는 토큰 → 유효하지 않은 토큰
+# type이 access가 아닌 토큰 → 유효하지 않은 토큰
 def test_logout_invalid_token_payload(client):
     test_client, _ = client
     from app.auth.utils import create_token
