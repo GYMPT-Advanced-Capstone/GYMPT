@@ -1,8 +1,9 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.database import get_db
+
 
 
 @pytest.fixture
@@ -54,11 +55,10 @@ def test_signup_success(client):
 
 def test_signup_already_registered(client):
     test_client, mock_db = client
-    from app.auth.models import User
+    from sqlalchemy.exc import IntegrityError
 
-    mock_db.query.return_value.filter.return_value.first.return_value = User(
-        email="202014746@kyonggi.ac.kr"
-    )
+    # 핵심: db.commit()을 실행할 때 IntegrityError가 터지도록 가짜(Mock) 설정!
+    mock_db.commit.side_effect = IntegrityError("mock error", params={}, orig=Exception())
 
     response = test_client.post(
         "/api/v1/auth/signup",
@@ -139,10 +139,27 @@ def test_login_failure_user_not_found(client):
 
 def test_logout_success(client):
     test_client, mock_db = client
+    from app.auth.models import User
+    from app.auth.utils import create_token
+    from datetime import timedelta, datetime
+    
+    fake_user = User(
+        id=1,
+        email="test@email.com",
+        name="최인규",
+        nickname="짐피티",
+        created_at=datetime.now(timezone.utc)
+    )
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+    mock_db.query.return_value.filter_by.return_value.first.return_value = fake_user
 
+    access_token = create_token({"sub": "test@email.com", "type": "access"}, timedelta(minutes=15))
+    refresh_token = create_token({"sub": "test@email.com", "type": "refresh"}, timedelta(days=7))
+    
     response = test_client.post(
         "/api/v1/auth/logout",
-        json={"refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.fake_token"},
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"refresh_token": refresh_token},
     )
-
+    
     assert response.status_code == 204
