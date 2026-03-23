@@ -5,15 +5,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
 from app.auth.models import User
-from app.auth.schemas import UserCreate, UserLogin, UserLogout, TokenResponse, UserResponse
-from app.auth.utils import (
-    get_password_hash,
-    verify_password,
-    create_token,
-    store_refresh_token,
-    verify_access_token,
-    revoke_tokens,
-)
+from app.auth.schemas import UserCreate, UserLogin, TokenResponse, UserResponse
+from app.auth.utils import get_password_hash, verify_password, create_token, store_refresh_token, verify_access_token, revoke_tokens
+
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
@@ -41,7 +35,7 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenResponse)
 def login(user_data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data.email).first()
-    if not user or not verify_password(user_data.pw, user.pw):
+    if not user or not verify_password(user_data.pw, str(user.pw)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이메일 또는 비밀번호가 올바르지 않습니다."
