@@ -19,6 +19,7 @@ from app.auth.utils import (
     store_refresh_token,
     verify_access_token,
     revoke_tokens,
+    revoke_refresh_token,
 )
 
 

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
 import logging
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -89,25 +90,50 @@ def verify_access_token(
         )
 
 
-def revoke_tokens(access_token: str, refresh_token: str, email: str) -> None:
+def revoke_refresh_token(token: str, expected_sub: str | None = None) -> None:
+    """Validates and revokes a refresh token by writing it to the denylist.
+
+    If expected_sub is provided, the token's sub claim must match it.
+    """
     settings = get_settings()
     redis_client = get_redis_client()
-    masked_email = mask_email(email)
 
     try:
         payload = jwt.decode(
-            refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        if payload.get("type") == "refresh" and payload.get("sub") == email:
-            redis_client.delete(f"RT:{email}")
-        else:
-            logger.warning(
-                f"Invalid refresh token attempt for email: {masked_email}. Payload type or sub mismatch."
-            )
     except JWTError as e:
-        logger.error(
-            f"JWTError during refresh token revocation for {masked_email}: {str(e)}"
-        )
+        logger.warning(f"Invalid refresh token during revocation: {str(e)}")
+        return
+
+    token_type = payload.get("type")
+    email = payload.get("sub")
+    exp = payload.get("exp")
+
+    if token_type != "refresh" or not isinstance(email, str):
+        logger.warning("Refresh token revocation failed: invalid type or missing sub")
+        return
+
+    if expected_sub is not None and email != expected_sub:
+        logger.warning("Refresh token revocation failed: sub mismatch")
+        return
+
+    redis_client.delete(f"RT:{email}")
+
+    if exp is not None:
+        now = datetime.now(timezone.utc).timestamp()
+        ttl = int(exp - now)
+        if ttl > 0:
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            redis_client.setex(f"RT_BL:{token_hash}", ttl, "revoked")
+
+
+def revoke_tokens(access_token: str, refresh_token: str, email: str) -> None:
+    masked_email = mask_email(email)
+    settings = get_settings()
+    redis_client = get_redis_client()
+
+    revoke_refresh_token(refresh_token, expected_sub=email)
 
     try:
         payload = jwt.decode(
