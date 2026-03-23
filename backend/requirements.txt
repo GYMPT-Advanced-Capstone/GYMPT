@@ -28,3 +28,5 @@ httpx
 # Code Quality
 ruff
 mypy
+types-python-jose
+types-passlib

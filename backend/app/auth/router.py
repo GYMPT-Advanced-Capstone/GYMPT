@@ -67,7 +67,7 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
         data={"sub": user.email, "type": "refresh"}, expires_delta=refresh_token_expires
     )
 
-    store_refresh_token(user.email, refresh_token, refresh_token_expires)
+    store_refresh_token(str(user.email), refresh_token, refresh_token_expires)
 
     return TokenResponse(
         success=True,
