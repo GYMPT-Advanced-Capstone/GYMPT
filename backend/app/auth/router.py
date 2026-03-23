@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
 from app.auth.models import User
-from app.auth.schemas import UserCreate, UserLogin, TokenResponse, UserResponse
+from app.auth.schemas import UserCreate, UserLogin, UserLogout, TokenResponse, UserResponse
 from app.auth.utils import get_password_hash, verify_password, create_token, store_refresh_token, verify_access_token, revoke_tokens
 
 
@@ -65,8 +65,9 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
+    logout_data: UserLogout,
     token_data: tuple[str, str] = Depends(verify_access_token) 
 ):
     email, access_token = token_data
-    revoke_tokens(access_token, email)
+    revoke_tokens(access_token, logout_data.refresh_token, email)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

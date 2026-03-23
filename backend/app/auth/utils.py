@@ -60,8 +60,16 @@ def verify_access_token(credentials: HTTPAuthorizationCredentials = Depends(secu
             detail="유효하지 않거나 만료된 토큰입니다."
         )
 
-def revoke_tokens(access_token: str, email: str):
-    redis_client.delete(f"RT:{email}")
+def revoke_tokens(access_token: str, refresh_token: str, email: str):
+    
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("type") != "refresh" or payload.get("sub") != email:
+            raise JWTError("Invalid refresh token")
+            
+        redis_client.delete(f"RT:{email}")
+    except JWTError:
+        pass
 
     try:
         payload = jwt.decode(access_token, SECRET_KEY, algorithms=[ALGORITHM])
