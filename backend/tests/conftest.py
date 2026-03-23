@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 
 @pytest.fixture
@@ -14,7 +14,11 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.fixture(autouse=True)
-def mock_redis_client(monkeypatch: pytest.MonkeyPatch):
-    mock_redis = MagicMock()
-    mock_redis.get.return_value = None
-    monkeypatch.setattr("app.auth.utils.get_redis_client", lambda: mock_redis)
+def mock_redis_client():
+    fake_redis = MagicMock()
+    fake_redis.get.return_value = None
+    fake_redis.setex.return_value = True
+    fake_redis.delete.return_value = 1
+
+    with patch("app.auth.utils.get_redis_client", return_value=fake_redis):
+        yield fake_redis
