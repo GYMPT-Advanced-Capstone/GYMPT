@@ -52,10 +52,10 @@ def verify_access_token(
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
+        email = payload.get("sub")
 
-        token_type: str = payload.get("type")
-        if email is None or token_type != "access":
+        token_type = payload.get("type")
+        if not isinstance(email, str) or token_type != "access":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="유효하지 않은 토큰입니다.",
