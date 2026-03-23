@@ -70,7 +70,6 @@ def verify_access_token(
 
 
 def revoke_tokens(access_token: str, refresh_token: str, email: str) -> None:
-
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
 
