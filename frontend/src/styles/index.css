@@ -1,0 +1,12 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  background-color: #111111;
+  overscroll-behavior: none;
+}
