@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     MYSQL_USER: str
     MYSQL_PASSWORD: str
     MYSQL_DATABASE: str
+    SECRET_KEY: str
+    ALGORITHM: str = "HS256"
+    REDIS_HOST: str = "redis"
+    REDIS_PORT: int = 6379
 
     @property
     def database_url(self) -> str:
