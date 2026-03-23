@@ -19,8 +19,6 @@ def client(mock_env_vars):
 
 
 # Signup
-
-
 def test_signup_success(client):
     test_client, mock_db = client
 
@@ -75,8 +73,6 @@ def test_signup_already_registered(client):
 
 
 # Login
-
-
 def test_login_success(client):
     test_client, mock_db = client
     from app.auth.models import User
@@ -136,8 +132,6 @@ def test_login_failure_user_not_found(client):
 
 
 # Logout
-
-
 def test_logout_success(client):
     test_client, mock_db = client
     from app.auth.models import User
@@ -168,3 +162,108 @@ def test_logout_success(client):
     )
 
     assert response.status_code == 204
+
+
+# mask_email
+def test_mask_email():
+    from app.auth.utils import mask_email
+
+    assert mask_email("202014746@kyonggi.ac.kr") == "20*******@kyonggi.ac.kr"
+    assert mask_email("ab@test.com") == "ab*@test.com"
+    assert mask_email("") == "unknown"
+    assert mask_email("invalid") == "unknown"
+
+
+# 블랙리스트 토큰 → 401
+def test_logout_blacklisted_token(client, mock_redis_client):
+    test_client, _ = client
+    from app.auth.utils import create_token
+    from datetime import timedelta
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    mock_redis_client.get.return_value = "logout"
+
+    response = test_client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"refresh_token": "dummy"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "로그아웃된 토큰입니다."
+
+
+# sub 없는 토큰 → 유효하지 않은 토큰
+def test_logout_invalid_token_payload(client):
+    test_client, _ = client
+    from app.auth.utils import create_token
+    from datetime import timedelta
+
+    bad_token = create_token(
+        {"sub": "test@email.com", "type": "refresh"}, timedelta(minutes=15)
+    )
+
+    response = test_client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {bad_token}"},
+        json={"refresh_token": "dummy"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "유효하지 않은 토큰입니다."
+
+
+# 잘못된 JWT → JWTError
+def test_logout_malformed_token(client):
+    test_client, _ = client
+
+    response = test_client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": "Bearer this.is.invalid"},
+        json={"refresh_token": "dummy"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "유효하지 않거나 만료된 토큰입니다."
+
+
+# revoke_tokens — refresh token sub 불일치 (warning 경로)
+def test_revoke_tokens_refresh_token_mismatch(mock_redis_client, mock_env_vars):
+    from app.auth.utils import create_token, revoke_tokens
+    from datetime import timedelta
+
+    access_token = create_token(
+        {"sub": "user@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+    refresh_token = create_token(
+        {"sub": "other@email.com", "type": "refresh"}, timedelta(days=7)
+    )
+
+    revoke_tokens(access_token, refresh_token, "user@email.com")
+    mock_redis_client.delete.assert_not_called()
+
+
+# exp 없는 access token
+def test_revoke_tokens_no_exp(mock_redis_client, mock_env_vars):
+    from app.auth.utils import revoke_tokens
+    from app.core.config import get_settings
+    from jose import jwt
+
+    settings = get_settings()
+
+    no_exp_token = jwt.encode(
+        {"sub": "user@email.com", "type": "access"},
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+    refresh_token_dummy = jwt.encode(
+        {"sub": "user@email.com", "type": "refresh"},
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+
+    revoke_tokens(no_exp_token, refresh_token_dummy, "user@email.com")
+    mock_redis_client.setex.assert_not_called()
