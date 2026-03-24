@@ -1,7 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date
+from app.auth.utils import create_token
 from app.core.database import get_db
 
 
@@ -50,13 +51,28 @@ def test_signup_success(client):
     assert "created_at" in data
 
 
+def test_signup_password_too_short(client):
+    test_client, _ = client
+
+    response = test_client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "202014746@kyonggi.ac.kr",
+            "pw": "short",
+            "name": "최인규",
+            "nickname": "짐피티",
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_signup_already_registered(client):
     test_client, mock_db = client
     from sqlalchemy.exc import IntegrityError
 
-    # 핵심: db.commit()을 실행할 때 IntegrityError가 터지도록 가짜(Mock) 설정!
     mock_db.commit.side_effect = IntegrityError(
-        "mock error", params={}, orig=Exception()
+        "mock error", params={}, orig=Exception("UNIQUE constraint failed: user.email")
     )
 
     response = test_client.post(
@@ -135,8 +151,6 @@ def test_login_failure_user_not_found(client):
 def test_logout_success(client):
     test_client, mock_db = client
     from app.auth.models import User
-    from app.auth.utils import create_token
-    from datetime import timedelta, datetime
 
     fake_user = User(
         id=1,
@@ -146,7 +160,6 @@ def test_logout_success(client):
         created_at=datetime.now(timezone.utc),
     )
     mock_db.query.return_value.filter.return_value.first.return_value = fake_user
-    mock_db.query.return_value.filter_by.return_value.first.return_value = fake_user
 
     access_token = create_token(
         {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
@@ -177,8 +190,6 @@ def test_mask_email():
 # 블랙리스트 토큰 → 401
 def test_logout_blacklisted_token(client, mock_redis_client):
     test_client, _ = client
-    from app.auth.utils import create_token
-    from datetime import timedelta
 
     access_token = create_token(
         {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
@@ -199,8 +210,6 @@ def test_logout_blacklisted_token(client, mock_redis_client):
 # type이 access가 아닌 토큰 → 유효하지 않은 토큰
 def test_logout_invalid_token_payload(client):
     test_client, _ = client
-    from app.auth.utils import create_token
-    from datetime import timedelta
 
     bad_token = create_token(
         {"sub": "test@email.com", "type": "refresh"}, timedelta(minutes=15)
@@ -230,10 +239,147 @@ def test_logout_malformed_token(client):
     assert response.json()["detail"] == "유효하지 않거나 만료된 토큰입니다."
 
 
+# Birth Date Update
+def test_update_birth_date_success(client):
+    test_client, mock_db = client
+    from app.auth.models import User
+
+    fake_user = User(
+        id=1,
+        email="test@email.com",
+        name="최인규",
+        nickname="짐피티",
+        birth_date=None,
+        weekly_target=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+
+    def mock_refresh(instance):
+        instance.birth_date = date(2000, 1, 1)
+
+    mock_db.refresh.side_effect = mock_refresh
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    response = test_client.patch(
+        "/api/v1/auth/me/birth-date",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"birth_date": "2000-01-01"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["birth_date"] == "2000-01-01"
+
+
+def test_update_birth_date_user_not_found(client):
+    test_client, mock_db = client
+
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    response = test_client.patch(
+        "/api/v1/auth/me/birth-date",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"birth_date": "2000-01-01"},
+    )
+
+    assert response.status_code == 404
+
+
+# Weekly Target Update
+def test_update_weekly_target_success(client):
+    test_client, mock_db = client
+    from app.auth.models import User
+
+    fake_user = User(
+        id=1,
+        email="test@email.com",
+        name="최인규",
+        nickname="짐피티",
+        birth_date=None,
+        weekly_target=None,
+        created_at=datetime.now(timezone.utc),
+    )
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+
+    def mock_refresh(instance):
+        instance.weekly_target = 3
+
+    mock_db.refresh.side_effect = mock_refresh
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    response = test_client.patch(
+        "/api/v1/auth/me/weekly-target",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"weekly_target": 3},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["weekly_target"] == 3
+
+
+def test_update_weekly_target_invalid_range(client):
+    test_client, _ = client
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    response = test_client.patch(
+        "/api/v1/auth/me/weekly-target",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"weekly_target": 8},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_weekly_target_below_min(client):
+    test_client, _ = client
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    response = test_client.patch(
+        "/api/v1/auth/me/weekly-target",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"weekly_target": 0},
+    )
+
+    assert response.status_code == 422
+
+
+def test_update_weekly_target_user_not_found(client):
+    test_client, mock_db = client
+
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    response = test_client.patch(
+        "/api/v1/auth/me/weekly-target",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"weekly_target": 3},
+    )
+
+    assert response.status_code == 404
+
+
 # revoke_tokens — refresh token sub 불일치 (warning 경로)
 def test_revoke_tokens_refresh_token_mismatch(mock_redis_client, mock_env_vars):
-    from app.auth.utils import create_token, revoke_tokens
-    from datetime import timedelta
+    from app.auth.utils import revoke_tokens
 
     access_token = create_token(
         {"sub": "user@email.com", "type": "access"}, timedelta(minutes=15)

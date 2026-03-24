@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.core.database import get_db
+from app.core.config import get_settings
 from app.auth.models import User
 from app.auth.schemas import (
     UserCreate,
@@ -11,6 +12,8 @@ from app.auth.schemas import (
     UserLogout,
     TokenResponse,
     UserResponse,
+    BirthDateUpdate,
+    WeeklyTargetUpdate,
 )
 from app.auth.utils import (
     get_password_hash,
@@ -41,10 +44,15 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_user)
         return new_user
-    except IntegrityError:
+    except IntegrityError as e:
         db.rollback()
+        if "email" in str(e.orig).lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="이미 가입된 이메일입니다."
+            )
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail="이미 가입된 이메일입니다."
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="서버 오류가 발생했습니다.",
         )
 
 
@@ -57,8 +65,9 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
             detail="이메일 또는 비밀번호가 올바르지 않습니다.",
         )
 
-    access_token_expires = timedelta(minutes=30)
-    refresh_token_expires = timedelta(days=14)
+    settings = get_settings()
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
     access_token = create_token(
         data={"sub": user.email, "type": "access"}, expires_delta=access_token_expires
@@ -76,6 +85,42 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
         refresh_token=refresh_token,
         token_type="Bearer",
     )
+
+
+@router.patch("/me/birth-date", response_model=UserResponse)
+def update_birth_date(
+    data: BirthDateUpdate,
+    token_data: tuple[str, str] = Depends(verify_access_token),
+    db: Session = Depends(get_db),
+):
+    email, _ = token_data
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="유저를 찾을 수 없습니다."
+        )
+    user.birth_date = data.birth_date
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.patch("/me/weekly-target", response_model=UserResponse)
+def update_weekly_target(
+    data: WeeklyTargetUpdate,
+    token_data: tuple[str, str] = Depends(verify_access_token),
+    db: Session = Depends(get_db),
+):
+    email, _ = token_data
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="유저를 찾을 수 없습니다."
+        )
+    user.weekly_target = data.weekly_target
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

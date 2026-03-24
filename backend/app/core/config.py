@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     REDIS_HOST: str = "redis"
     REDIS_PORT: int = 6379
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
 
     @property
     def database_url(self) -> str:

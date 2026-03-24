@@ -63,7 +63,8 @@ def verify_access_token(
     redis_client = get_redis_client()
     token = credentials.credentials
 
-    is_blacklisted = redis_client.get(f"AT:{token}")
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    is_blacklisted = redis_client.get(f"AT:{token_hash}")
     if is_blacklisted:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="로그아웃된 토큰입니다."
@@ -91,10 +92,6 @@ def verify_access_token(
 
 
 def revoke_refresh_token(token: str, expected_sub: str | None = None) -> None:
-    """Validates and revokes a refresh token by writing it to the denylist.
-
-    If expected_sub is provided, the token's sub claim must match it.
-    """
     settings = get_settings()
     redis_client = get_redis_client()
 
@@ -151,7 +148,8 @@ def revoke_tokens(access_token: str, refresh_token: str, email: str) -> None:
         ttl = int(exp - now)
 
         if ttl > 0:
-            redis_client.setex(f"AT:{access_token}", ttl, "logout")
+            token_hash = hashlib.sha256(access_token.encode()).hexdigest()
+            redis_client.setex(f"AT:{token_hash}", ttl, "logout")
     except JWTError as e:
         logger.error(
             f"JWTError during access token blacklisting for {masked_email}: {str(e)}"
