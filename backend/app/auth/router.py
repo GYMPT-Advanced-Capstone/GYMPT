@@ -99,7 +99,7 @@ def update_birth_date(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="유저를 찾을 수 없습니다."
         )
-    user.birth_date = data.birth_date
+    user.birth_date = data.birth_date  # type: ignore[assignment]
     db.commit()
     db.refresh(user)
     return user
@@ -117,7 +117,7 @@ def update_weekly_target(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="유저를 찾을 수 없습니다."
         )
-    user.weekly_target = data.weekly_target
+    user.weekly_target = data.weekly_target  # type: ignore[assignment]
     db.commit()
     db.refresh(user)
     return user
