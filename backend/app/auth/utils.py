@@ -25,7 +25,9 @@ def get_redis_client():
 def mask_email(email: str) -> str:
     if not email or "@" not in email:
         return "unknown"
-    user_part, domain = email.split("@")
+    user_part, domain = email.rsplit("@", 1)
+    if not user_part or not domain:
+        return "unknown"
     masked_user = (
         user_part[:2] + "*" * (len(user_part) - 2)
         if len(user_part) > 2
