@@ -1,8 +1,10 @@
+import hashlib
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
 from datetime import datetime, timezone, timedelta, date
-from app.auth.utils import create_token
+from app.auth.models import User
+from app.auth.utils import create_token, get_password_hash, mask_email
 from app.core.database import get_db
 
 
@@ -91,8 +93,6 @@ def test_signup_already_registered(client):
 # Login
 def test_login_success(client):
     test_client, mock_db = client
-    from app.auth.models import User
-    from app.auth.utils import get_password_hash
 
     hashed_pw = get_password_hash("1q2w3e4r")
     fake_user = User(
@@ -119,8 +119,6 @@ def test_login_success(client):
 
 def test_login_failure_wrong_password(client):
     test_client, mock_db = client
-    from app.auth.models import User
-    from app.auth.utils import get_password_hash
 
     hashed_pw = get_password_hash("1q2w3e4r")
     fake_user = User(email="202014746@kyonggi.ac.kr", pw=hashed_pw)
@@ -148,9 +146,8 @@ def test_login_failure_user_not_found(client):
 
 
 # Logout
-def test_logout_success(client):
+def test_logout_success(client, mock_redis_client):
     test_client, mock_db = client
-    from app.auth.models import User
 
     fake_user = User(
         id=1,
@@ -168,6 +165,11 @@ def test_logout_success(client):
         {"sub": "test@email.com", "type": "refresh"}, timedelta(days=7)
     )
 
+    refresh_token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+    mock_redis_client.get.side_effect = lambda key: (
+        refresh_token_hash if key == "RT:test@email.com" else None
+    )
+
     response = test_client.post(
         "/api/v1/auth/logout",
         headers={"Authorization": f"Bearer {access_token}"},
@@ -179,8 +181,6 @@ def test_logout_success(client):
 
 # mask_email
 def test_mask_email():
-    from app.auth.utils import mask_email
-
     assert mask_email("202014746@kyonggi.ac.kr") == "20*******@kyonggi.ac.kr"
     assert mask_email("ab@test.com") == "ab*@test.com"
     assert mask_email("") == "unknown"
@@ -242,7 +242,6 @@ def test_logout_malformed_token(client):
 # Birth Date Update
 def test_update_birth_date_success(client):
     test_client, mock_db = client
-    from app.auth.models import User
 
     fake_user = User(
         id=1,
@@ -295,7 +294,6 @@ def test_update_birth_date_user_not_found(client):
 # Weekly Target Update
 def test_update_weekly_target_success(client):
     test_client, mock_db = client
-    from app.auth.models import User
 
     fake_user = User(
         id=1,

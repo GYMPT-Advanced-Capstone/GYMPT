@@ -53,7 +53,8 @@ def create_token(data: dict, expires_delta: timedelta) -> str:
 def store_refresh_token(email: str, token: str, expires_delta: timedelta):
     redis_client = get_redis_client()
     ttl = int(expires_delta.total_seconds())
-    redis_client.setex(f"RT:{email}", ttl, token)
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    redis_client.setex(f"RT:{email}", ttl, token_hash)
 
 
 def verify_access_token(
@@ -100,7 +101,7 @@ def revoke_refresh_token(token: str, expected_sub: str | None = None) -> None:
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
     except JWTError as e:
-        logger.warning(f"Invalid refresh token during revocation: {str(e)}")
+        logger.warning(f"Invalid refresh token during revocation: {e}")
         return
 
     token_type = payload.get("type")
@@ -115,13 +116,18 @@ def revoke_refresh_token(token: str, expected_sub: str | None = None) -> None:
         logger.warning("Refresh token revocation failed: sub mismatch")
         return
 
+    stored_hash = redis_client.get(f"RT:{email}")
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    if stored_hash != token_hash:
+        logger.warning("Refresh token revocation failed: token hash mismatch")
+        return
+
     redis_client.delete(f"RT:{email}")
 
     if exp is not None:
         now = datetime.now(timezone.utc).timestamp()
         ttl = int(exp - now)
         if ttl > 0:
-            token_hash = hashlib.sha256(token.encode()).hexdigest()
             redis_client.setex(f"RT_BL:{token_hash}", ttl, "revoked")
 
 
