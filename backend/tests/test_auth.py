@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
 from datetime import datetime, timezone, timedelta, date
-from app.auth.models import User
+from app.users.models import User
 from app.auth.utils import create_token, get_password_hash, mask_email
 from app.core.database import get_db
 
@@ -264,7 +264,7 @@ def test_update_birth_date_success(client):
     )
 
     response = test_client.patch(
-        "/api/v1/auth/me/birth-date",
+        "/api/v1/users/me/birth-date",
         headers={"Authorization": f"Bearer {access_token}"},
         json={"birth_date": "2000-01-01"},
     )
@@ -283,7 +283,7 @@ def test_update_birth_date_user_not_found(client):
     )
 
     response = test_client.patch(
-        "/api/v1/auth/me/birth-date",
+        "/api/v1/users/me/birth-date",
         headers={"Authorization": f"Bearer {access_token}"},
         json={"birth_date": "2000-01-01"},
     )
@@ -316,7 +316,7 @@ def test_update_weekly_target_success(client):
     )
 
     response = test_client.patch(
-        "/api/v1/auth/me/weekly-target",
+        "/api/v1/users/me/weekly-target",
         headers={"Authorization": f"Bearer {access_token}"},
         json={"weekly_target": 3},
     )
@@ -333,7 +333,7 @@ def test_update_weekly_target_invalid_range(client):
     )
 
     response = test_client.patch(
-        "/api/v1/auth/me/weekly-target",
+        "/api/v1/users/me/weekly-target",
         headers={"Authorization": f"Bearer {access_token}"},
         json={"weekly_target": 8},
     )
@@ -349,7 +349,7 @@ def test_update_weekly_target_below_min(client):
     )
 
     response = test_client.patch(
-        "/api/v1/auth/me/weekly-target",
+        "/api/v1/users/me/weekly-target",
         headers={"Authorization": f"Bearer {access_token}"},
         json={"weekly_target": 0},
     )
@@ -367,7 +367,7 @@ def test_update_weekly_target_user_not_found(client):
     )
 
     response = test_client.patch(
-        "/api/v1/auth/me/weekly-target",
+        "/api/v1/users/me/weekly-target",
         headers={"Authorization": f"Bearer {access_token}"},
         json={"weekly_target": 3},
     )
