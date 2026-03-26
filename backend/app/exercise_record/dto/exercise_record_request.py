@@ -1,17 +1,17 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class ExerciseRecordCreateRequest(BaseModel):
-    exercise_id: int
-    count: int
-    duration: int
-    calories: Decimal
-    score: int
-    accuracy_avg: Decimal
-    completed_at: datetime
+    exercise_id: int = Field(..., description="운동 종목 ID", example=1)
+    count: int = Field(..., description="운동 횟수", example=20)
+    duration: int = Field(..., description="운동 시간(초)", example=60)
+    calories: Decimal = Field(..., description="소모 칼로리", example="13.5")
+    score: int = Field(..., description="운동 점수", example=95)
+    accuracy_avg: Decimal = Field(..., description="평균 정확도", example="97.25")
+    completed_at: datetime = Field(..., description="운동 완료 시각", example="2026-03-26T10:30:00")
 
     @field_validator("count", "duration", "score")
     @classmethod
@@ -29,8 +29,12 @@ class ExerciseRecordCreateRequest(BaseModel):
 
 
 class ExerciseRecordUpdateRequest(BaseModel):
-    count: int | None = None
-    duration: int | None = None
+    count: int | None = Field(default=None, description="수정할 운동 횟수", example=25)
+    duration: int | None = Field(
+        default=None,
+        description="수정할 운동 시간(초)",
+        example=75,
+    )
 
     @field_validator("count", "duration")
     @classmethod
