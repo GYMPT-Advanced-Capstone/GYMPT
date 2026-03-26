@@ -46,8 +46,14 @@ def create_record(
     description="특정 연도와 월에 운동한 날짜 목록을 조회합니다.",
 )
 def get_calendar(
-    year: Annotated[int, Query(description="조회할 연도", example=2026)],
-    month: Annotated[int, Query(description="조회할 월(1~12)", example=3)],
+    year: Annotated[
+        int,
+        Query(description="조회할 연도", examples=[2026]),
+    ],
+    month: Annotated[
+        int,
+        Query(description="조회할 월(1~12)", examples=[3]),
+    ],
     user_id: int = Depends(get_current_user_id),
     service: ExerciseRecordService = Depends(get_record_service),
 ):
@@ -63,7 +69,7 @@ def get_calendar(
 def get_records_by_date(
     target_date: Annotated[
         date,
-        Path(description="조회할 날짜(YYYY-MM-DD)", example="2026-03-26"),
+        Path(description="조회할 날짜(YYYY-MM-DD)", examples=["2026-03-26"]),
     ],
     user_id: int = Depends(get_current_user_id),
     service: ExerciseRecordService = Depends(get_record_service),
@@ -78,7 +84,10 @@ def get_records_by_date(
     description="운동 기록의 횟수 또는 운동 시간을 수정합니다.",
 )
 def update_record(
-    record_id: Annotated[int, Path(description="수정할 운동 기록 ID", example=1)],
+    record_id: Annotated[
+        int,
+        Path(description="수정할 운동 기록 ID", examples=[1]),
+    ],
     body: ExerciseRecordUpdateRequest,
     user_id: int = Depends(get_current_user_id),
     service: ExerciseRecordService = Depends(get_record_service),
@@ -93,7 +102,10 @@ def update_record(
     description="선택한 운동 기록을 삭제합니다.",
 )
 def delete_record(
-    record_id: Annotated[int, Path(description="삭제할 운동 기록 ID", example=1)],
+    record_id: Annotated[
+        int,
+        Path(description="삭제할 운동 기록 ID", examples=[1]),
+    ],
     user_id: int = Depends(get_current_user_id),
     service: ExerciseRecordService = Depends(get_record_service),
 ):

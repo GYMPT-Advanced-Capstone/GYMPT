@@ -62,9 +62,9 @@ class ExerciseRecordRepository:
         duration: int | None,
     ) -> ExerciseRecord:
         if count is not None:
-            record.count = count
+            setattr(record, "count", count)
         if duration is not None:
-            record.duration = duration
+            setattr(record, "duration", duration)
         self.db.commit()
         self.db.refresh(record)
         return record

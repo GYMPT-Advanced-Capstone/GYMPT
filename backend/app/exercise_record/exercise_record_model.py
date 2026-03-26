@@ -16,9 +16,9 @@ class ExerciseRecord(Base):
     exercise_id = Column(BigInteger, ForeignKey("exercises.id"), nullable=False)
     count = Column(Integer, nullable=False)
     duration = Column(Integer, nullable=False)
-    calories = Column(DECIMAL(6, 2), nullable=False)
+    calories = Column(DECIMAL(6, 2), nullable=False)  # type: ignore[var-annotated]
     score = Column(Integer, nullable=False)
-    accuracy_avg = Column(DECIMAL(5, 2), nullable=False)
+    accuracy_avg = Column(DECIMAL(5, 2), nullable=False)  # type: ignore[var-annotated]
     completed_at = Column(DateTime, nullable=False, default=func.now())
 
     exercise = relationship("Exercise", back_populates="records")

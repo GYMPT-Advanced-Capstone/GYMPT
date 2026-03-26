@@ -1,4 +1,6 @@
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
+from typing import cast
 
 from fastapi import HTTPException, status
 
@@ -74,13 +76,13 @@ class ExerciseRecordService:
 
     def _to_response(self, record: ExerciseRecord) -> ExerciseRecordResponse:
         return ExerciseRecordResponse(
-            id=record.id,
-            exercise_id=record.exercise_id,
+            id=cast(int, record.id),
+            exercise_id=cast(int, record.exercise_id),
             exercise_name=record.exercise.name,
-            count=record.count,
-            duration=record.duration,
-            calories=record.calories,
-            score=record.score,
-            accuracy_avg=record.accuracy_avg,
-            completed_at=record.completed_at,
+            count=cast(int, record.count),
+            duration=cast(int, record.duration),
+            calories=cast(Decimal, record.calories),
+            score=cast(int, record.score),
+            accuracy_avg=cast(Decimal, record.accuracy_avg),
+            completed_at=cast(datetime, record.completed_at),
         )
