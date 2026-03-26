@@ -1,3 +1,6 @@
+import importlib
+import sys
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -20,5 +23,8 @@ def mock_redis_client():
     fake_redis.setex.return_value = True
     fake_redis.delete.return_value = 1
 
-    with patch("app.auth.utils.get_redis_client", return_value=fake_redis):
+    sys.modules.setdefault("redis", MagicMock())
+    auth_utils = importlib.import_module("app.auth.utils")
+
+    with patch.object(auth_utils, "get_redis_client", return_value=fake_redis):
         yield fake_redis
