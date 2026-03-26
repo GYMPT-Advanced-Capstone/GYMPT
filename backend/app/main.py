@@ -1,14 +1,13 @@
 from contextlib import asynccontextmanager
+from importlib import import_module
 
 from fastapi import FastAPI
 
 from app.core.database import get_engine, get_session_local, Base
 from app.auth.router import router as auth_router
 from app.users.router import router as users_router
-from app.users.models import User
 from app.exercise.exercise_model import Exercise
 from app.exercise.exercise_router import router as exercise_router
-from app.exercise_record.exercise_record_model import ExerciseRecord
 from app.exercise_record.exercise_record_router import router as exercise_record_router
 
 
@@ -36,6 +35,9 @@ def seed_exercises() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import_module("app.users.models")
+    import_module("app.exercise.exercise_model")
+    import_module("app.exercise_record.exercise_record_model")
     Base.metadata.create_all(bind=get_engine())
     seed_exercises()
     yield

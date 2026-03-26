@@ -20,6 +20,8 @@ from app.exercise_record.dto.exercise_record_response import (
 from app.exercise_record.exercise_record_service import ExerciseRecordService
 from app.users.models import User
 
+MODEL_REGISTRY = (Exercise, User)
+
 
 def make_record(
     *,
@@ -83,6 +85,7 @@ class FakeExerciseRecordRepo:
 
 
 def test_exercise_record_service_create_returns_response():
+    assert MODEL_REGISTRY
     repo = FakeExerciseRecordRepo()
     service = ExerciseRecordService(repo)
     request = ExerciseRecordCreateRequest(
