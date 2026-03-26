@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.users.models import User
 from app.board import repository
 from app.board.models import Board
+from app.board.schemas import BoardResponse
+from app.board.repository import get_board_list, get_board_detail
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -159,3 +161,71 @@ def update_board_service(
     )
 
     return updated_board
+
+
+def list_boards_service(db: Session) -> list[BoardResponse]:
+    rows = get_board_list(db)
+
+    return [
+        BoardResponse(
+            board_no=board.board_no,
+            title=board.title,
+            content=board.content,
+            imgpath=board.imgpath,
+            writer=nickname,
+            likes=board.likes,
+            upload_date=board.upload_date,
+        )
+        for board, nickname in rows
+    ]
+
+
+def get_board_detail_service(db: Session, board_no: int) -> BoardResponse:
+    result = get_board_detail(db=db, board_no=board_no)
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="게시글을 찾을 수 없습니다.",
+        )
+
+    board, nickname = result
+
+    return BoardResponse(
+        board_no=board.board_no,
+        title=board.title,
+        content=board.content,
+        imgpath=board.imgpath,
+        writer=nickname,
+        likes=board.likes,
+        upload_date=board.upload_date,
+    )
+
+
+def delete_board_service(
+    db: Session,
+    board_no: int,
+    current_user: User,
+) -> None:
+    board = repository.get_board_by_id(db, board_no)
+
+    if board is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="게시글을 찾을 수 없습니다.",
+        )
+
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="로그인이 필요합니다.",
+        )
+
+    if board.writer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="본인이 작성한 게시글만 삭제할 수 있습니다.",
+        )
+
+    _delete_image_file(board.imgpath)
+    repository.delete_board(db=db, board=board)

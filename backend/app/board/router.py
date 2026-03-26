@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.users.models import User
 from app.board.dependencies import get_current_user
 from app.board.schemas import BoardResponse
-from app.board.service import create_board_service, update_board_service
+from app.board.service import (
+    create_board_service,
+    update_board_service,
+    list_boards_service,
+    get_board_detail_service,
+    delete_board_service,
+)
 
 
 router = APIRouter(prefix="/api/v1/board", tags=["Board"])
@@ -75,3 +81,34 @@ def update_board(
         "likes": board.likes,
         "upload_date": board.upload_date,
     }
+
+
+@router.get("/", response_model=list[BoardResponse])
+def list_boards(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return list_boards_service(db)
+
+
+@router.get("/{board_no}", response_model=BoardResponse)
+def get_board_detail(
+    board_no: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_board_detail_service(db=db, board_no=board_no)
+
+
+@router.delete("/{board_no}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_board(
+    board_no: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    delete_board_service(
+        db=db,
+        board_no=board_no,
+        current_user=current_user,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
