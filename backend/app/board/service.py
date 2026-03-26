@@ -61,9 +61,9 @@ def _save_image_file(image: UploadFile) -> str:
     filename = _make_image_filename(image)
     save_path = BOARD_UPLOAD_DIR / filename
 
-    file_bytes = image.file.read()
     with save_path.open("wb") as f:
-        f.write(file_bytes)
+        while chunk := image.file.read(8192):
+            f.write(chunk)
 
     return f"/static/board/{filename}"
 
