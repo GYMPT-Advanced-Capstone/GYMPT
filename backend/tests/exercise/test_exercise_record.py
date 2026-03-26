@@ -60,7 +60,9 @@ class FakeExerciseRecordRepo:
 
     def create(self, record):
         record.id = 99
-        record.exercise = Exercise(id=record.exercise_id, name="Push Up", description=None)
+        record.exercise = Exercise(
+            id=record.exercise_id, name="Push Up", description=None
+        )
         self.created_record = record
         return record
 
@@ -321,7 +323,9 @@ def test_delete_record_route_returns_no_content(client):
         deleted["called"] = True
 
     app.dependency_overrides[get_current_user_id] = lambda: 7
-    app.dependency_overrides[get_record_service] = lambda: SimpleNamespace(delete=delete)
+    app.dependency_overrides[get_record_service] = lambda: SimpleNamespace(
+        delete=delete
+    )
 
     response = client.delete("/api/exercise-records/1")
 

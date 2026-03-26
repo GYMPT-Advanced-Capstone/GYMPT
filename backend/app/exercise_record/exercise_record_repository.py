@@ -43,9 +43,7 @@ class ExerciseRecordRepository:
         )
         return [row[0] for row in rows]
 
-    def get_by_date(
-        self, user_id: int, target_date: date
-    ) -> list[ExerciseRecord]:
+    def get_by_date(self, user_id: int, target_date: date) -> list[ExerciseRecord]:
         return (
             self.db.query(ExerciseRecord)
             .options(joinedload(ExerciseRecord.exercise))

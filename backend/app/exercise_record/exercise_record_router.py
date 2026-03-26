@@ -12,7 +12,10 @@ from app.exercise_record.dto.exercise_record_request import (
     ExerciseRecordCreateRequest,
     ExerciseRecordUpdateRequest,
 )
-from app.exercise_record.dto.exercise_record_response import CalendarResponse, ExerciseRecordResponse
+from app.exercise_record.dto.exercise_record_response import (
+    CalendarResponse,
+    ExerciseRecordResponse,
+)
 
 router = APIRouter(prefix="/api/exercise-records", tags=["exercise-record"])
 

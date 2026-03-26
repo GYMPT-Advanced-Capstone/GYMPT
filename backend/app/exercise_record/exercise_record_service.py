@@ -8,7 +8,10 @@ from app.exercise_record.dto.exercise_record_request import (
     ExerciseRecordCreateRequest,
     ExerciseRecordUpdateRequest,
 )
-from app.exercise_record.dto.exercise_record_response import CalendarResponse, ExerciseRecordResponse
+from app.exercise_record.dto.exercise_record_response import (
+    CalendarResponse,
+    ExerciseRecordResponse,
+)
 
 
 class ExerciseRecordService:
@@ -30,9 +33,7 @@ class ExerciseRecordService:
         )
         return self._to_response(self.repo.create(record))
 
-    def get_calendar(
-        self, user_id: int, year: int, month: int
-    ) -> CalendarResponse:
+    def get_calendar(self, user_id: int, year: int, month: int) -> CalendarResponse:
         if not (1 <= month <= 12):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -44,7 +45,9 @@ class ExerciseRecordService:
     def get_by_date(
         self, user_id: int, target_date: date
     ) -> list[ExerciseRecordResponse]:
-        return [self._to_response(r) for r in self.repo.get_by_date(user_id, target_date)]
+        return [
+            self._to_response(r) for r in self.repo.get_by_date(user_id, target_date)
+        ]
 
     def update(
         self, user_id: int, record_id: int, data: ExerciseRecordUpdateRequest

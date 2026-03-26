@@ -11,7 +11,9 @@ class ExerciseRecordCreateRequest(BaseModel):
     calories: Decimal = Field(..., description="소모 칼로리", example="13.5")
     score: int = Field(..., description="운동 점수", example=95)
     accuracy_avg: Decimal = Field(..., description="평균 정확도", example="97.25")
-    completed_at: datetime = Field(..., description="운동 완료 시각", example="2026-03-26T10:30:00")
+    completed_at: datetime = Field(
+        ..., description="운동 완료 시각", example="2026-03-26T10:30:00"
+    )
 
     @field_validator("count", "duration", "score")
     @classmethod

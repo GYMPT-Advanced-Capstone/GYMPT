@@ -13,10 +13,11 @@ def get_exercise_service(db: Session = Depends(get_db)) -> ExerciseService:
     return ExerciseService(ExerciseRepository(db))
 
 
-@router.get("",
-            response_model=list[ExerciseResponse],
-            summary="운동 목록 조회",
-            description="시스템에 등록된 운동 종목 목록을 조회합니다.",
-            )
+@router.get(
+    "",
+    response_model=list[ExerciseResponse],
+    summary="운동 목록 조회",
+    description="시스템에 등록된 운동 종목 목록을 조회합니다.",
+)
 def get_exercises(service: ExerciseService = Depends(get_exercise_service)):
     return service.get_all()
