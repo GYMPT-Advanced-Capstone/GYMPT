@@ -34,6 +34,16 @@ feature/*   ← 기능 개발
 docker compose -f docker/docker-compose.yml up -d
 ```
 
+### 테스트용 백엔드/DB/Redis 실행
+```bash
+docker compose -f docker/docker-compose.test.yml up -d --build
+```
+
+테스트용 Swagger:
+```text
+http://localhost:8001/docs
+```
+
 ### 모니터링 스택 실행 (선택)
 ```bash
 docker compose -f docker/docker-compose.monitoring.yml up -d
