@@ -10,8 +10,8 @@ class ExerciseRecord(Base):
 
     id = Column(BigInteger, primary_key=True, index=True)
 
-    # user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
-    # user = relationship("User", back_populates="exercise_records")
+    user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
+    user = relationship("User", back_populates="exercise_records")
 
     exercise_id = Column(BigInteger, ForeignKey("exercises.id"), nullable=False)
     count = Column(Integer, nullable=False)
