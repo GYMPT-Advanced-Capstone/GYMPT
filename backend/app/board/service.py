@@ -93,19 +93,25 @@ def create_board_service(
         )
 
     imgpath = None
+    created_imgpath = None
+
     if image is not None and image.filename:
-        imgpath = _save_image_file(image)
+        created_imgpath = _save_image_file(image)
+        imgpath = created_imgpath
 
     user_id = int(current_user.id)
 
-    board = repository.create_board(
-        db=db,
-        title=title,
-        content=content,
-        imgpath=imgpath,
-        writer_id=user_id,
-    )
-    return board
+    try:
+        return repository.create_board(
+            db=db,
+            title=title,
+            content=content,
+            imgpath=imgpath,
+            writer_id=user_id,
+        )
+    except Exception:
+        _delete_image_file(created_imgpath)
+        raise
 
 
 def update_board_service(
@@ -142,23 +148,30 @@ def update_board_service(
             detail="이미지 업로드와 삭제를 동시에 요청할 수 없습니다.",
         )
 
-    imgpath = board.imgpath
+    old_imgpath = board.imgpath
+    imgpath = old_imgpath
+    new_imgpath = None
 
     if delete_image:
-        _delete_image_file(board.imgpath)
         imgpath = None
     elif image is not None and image.filename:
         new_imgpath = _save_image_file(image)
-        _delete_image_file(board.imgpath)
         imgpath = new_imgpath
 
-    updated_board = repository.update_board(
-        db=db,
-        board=board,
-        title=title,
-        content=content,
-        imgpath=imgpath,
-    )
+    try:
+        updated_board = repository.update_board(
+            db=db,
+            board=board,
+            title=title,
+            content=content,
+            imgpath=imgpath,
+        )
+    except Exception:
+        _delete_image_file(new_imgpath)
+        raise
+
+    if delete_image or new_imgpath is not None:
+        _delete_image_file(old_imgpath)
 
     return updated_board
 
@@ -227,5 +240,6 @@ def delete_board_service(
             detail="본인이 작성한 게시글만 삭제할 수 있습니다.",
         )
 
-    _delete_image_file(board.imgpath)
+    old_imgpath = board.imgpath
     repository.delete_board(db=db, board=board)
+    _delete_image_file(old_imgpath)

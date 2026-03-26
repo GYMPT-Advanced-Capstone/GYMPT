@@ -1,5 +1,5 @@
-from sqlalchemy.orm import Session
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.board.models import Board
 from app.users.models import User
@@ -64,7 +64,6 @@ def get_board_list(db: Session) -> list[tuple[Board, str]]:
     )
 
     result = db.execute(stmt).all()
-
     rows = [(board, nickname) for board, nickname in result]
 
     return rows
@@ -87,5 +86,9 @@ def get_board_detail(db: Session, board_no: int) -> tuple[Board, str] | None:
 
 
 def delete_board(db: Session, board: Board) -> None:
-    db.delete(board)
-    db.commit()
+    try:
+        db.delete(board)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
