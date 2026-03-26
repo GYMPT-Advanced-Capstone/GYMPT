@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     MYSQL_USER: str
     MYSQL_PASSWORD: str
     MYSQL_DATABASE: str
+    MYSQL_SSL_VERIFY_CERT: bool = True
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     REDIS_HOST: str = "redis"
@@ -20,10 +21,14 @@ class Settings(BaseSettings):
         return (
             f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
             f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
-            "?ssl_verify_cert=true"
+            f"?ssl_verify_cert={'true' if self.MYSQL_SSL_VERIFY_CERT else 'false'}"
         )
 
-    model_config = SettingsConfigDict(extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 
 @lru_cache
