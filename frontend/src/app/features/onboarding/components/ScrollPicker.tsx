@@ -14,24 +14,22 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
   const scrollTimeout = useRef<ReturnType<typeof setTimeout>>();
   const isUserScrolling = useRef(false);
 
-  const scrollToIndex = useCallback(
-    (index: number, smooth = true) => {
-      const container = containerRef.current;
-      if (!container) return;
-      container.scrollTo({
-        top: index * ITEM_HEIGHT,
-        behavior: smooth ? 'smooth' : 'instant',
-      });
-    },
-    []
-  );
+  const scrollToIndex = useCallback((index: number, smooth = true) => {
+    const container = containerRef.current;
+    if (!container) return;
+    container.scrollTo({
+      top: index * ITEM_HEIGHT,
+      behavior: smooth ? 'smooth' : 'instant',
+    });
+  }, []);
 
   useEffect(() => {
     const index = items.indexOf(value);
     if (index >= 0) {
-      setTimeout(() => scrollToIndex(index, false), 50);
+      const timer = setTimeout(() => scrollToIndex(index, false), 50);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [items, value, scrollToIndex]);
 
   useEffect(() => {
     if (!isUserScrolling.current) {
@@ -43,22 +41,27 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
         onChange(items[items.length - 1]);
       }
     }
-  }, [value, items]);
+  }, [value, items, onChange, scrollToIndex]);
 
   const handleScroll = useCallback(() => {
     isUserScrolling.current = true;
     if (scrollTimeout.current) {
       clearTimeout(scrollTimeout.current);
     }
+
     scrollTimeout.current = setTimeout(() => {
       const container = containerRef.current;
       if (!container) return;
+
       const index = Math.round(container.scrollTop / ITEM_HEIGHT);
       const clampedIndex = Math.max(0, Math.min(index, items.length - 1));
+      
       scrollToIndex(clampedIndex, true);
+
       if (items[clampedIndex] !== value) {
         onChange(items[clampedIndex]);
       }
+
       setTimeout(() => {
         isUserScrolling.current = false;
       }, 200);
@@ -101,16 +104,17 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
           height: totalHeight,
           overflowY: 'scroll',
           scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
           WebkitOverflowScrolling: 'touch',
         }}
         onScroll={handleScroll}
+        className="no-scrollbar"
       >
         <div style={{ height: padding }} />
 
-        {items.map((item) => {
+        {items.map((item, itemIdx) => {
           const isSelected = item === value;
           const selectedIdx = items.indexOf(value);
-          const itemIdx = items.indexOf(item);
           const distance = Math.abs(itemIdx - selectedIdx);
           const opacity = distance === 0 ? 1 : distance === 1 ? 0.45 : 0.2;
 
@@ -118,8 +122,7 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
             <div
               key={item}
               onClick={() => {
-                const index = items.indexOf(item);
-                scrollToIndex(index, true);
+                scrollToIndex(itemIdx, true);
                 onChange(item);
               }}
               style={{
@@ -132,7 +135,7 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
                 fontSize: isSelected ? '20px' : distance === 1 ? '17px' : '15px',
                 fontWeight: isSelected ? '700' : '400',
                 opacity,
-                transition: 'color 0.15s, font-size 0.15s, opacity 0.15s',
+                transition: 'all 0.15s',
               }}
             >
               {item}
