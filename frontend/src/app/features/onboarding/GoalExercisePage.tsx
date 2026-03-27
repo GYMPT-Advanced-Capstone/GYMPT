@@ -93,14 +93,14 @@ export function GoalExercisePage() {
   const id = (exerciseId as ExerciseId) || 'squat';
   const exercise = exerciseData[id];
 
-  const [count, setCount] = useState(
-    goal.exerciseCounts[id] || exercise.defaultCount
-  );
-
   if (!exercise) {
     navigate('/goal/exercise/squat');
     return null;
   }
+
+  const [count, setCount] = useState(
+    goal.exerciseCounts[id] ?? exercise.defaultCount
+  );
 
   const handleDecrease = () => {
     setCount((prev) => Math.max(exercise.min, prev - exercise.stepSize));

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { GoalLayout } from './components/GoalLayout';
 import { ScrollPicker } from './components/ScrollPicker';
@@ -20,6 +20,13 @@ export function GoalBirthdayPage() {
   const [monthNum, setMonthNum] = useState(goal.birthday.month);
   const [dayNum, setDayNum] = useState(goal.birthday.day);
 
+  const adjustDayIfNeeded = (newYear: number, newMonth: number, currentDay: number) => {
+    const maxDay = getDaysInMonth(newYear, newMonth);
+    if (currentDay > maxDay) {
+      setDayNum(maxDay);
+    }
+  };
+
   const yearItems = useMemo(
     () => Array.from({ length: 80 }, (_, i) => `${1940 + i}년`),
     []
@@ -32,17 +39,6 @@ export function GoalBirthdayPage() {
     const count = getDaysInMonth(yearNum, monthNum);
     return Array.from({ length: count }, (_, i) => `${i + 1}일`);
   }, [yearNum, monthNum]);
-
-  useEffect(() => {
-    const maxDay = getDaysInMonth(yearNum, monthNum);
-    if (dayNum > maxDay) {
-      setDayNum(maxDay);
-    }
-  }, [yearNum, monthNum]);
-
-  const yearValue = `${yearNum}년`;
-  const monthValue = `${monthNum}월`;
-  const dayValue = `${dayNum}일`;
 
   const handleNext = () => {
     updateGoal({ birthday: { year: yearNum, month: monthNum, day: dayNum } });
@@ -93,23 +89,31 @@ export function GoalBirthdayPage() {
             <div style={{ flex: 5 }}>
               <ScrollPicker
                 items={yearItems}
-                value={yearValue}
-                onChange={(v) => setYearNum(parseInt(v))}
+                value={`${yearNum}년`}
+                onChange={(v) => {
+                  const newYear = parseInt(v);
+                  setYearNum(newYear);
+                  adjustDayIfNeeded(newYear, monthNum, dayNum);
+                }}
               />
             </div>
             <div style={{ width: 1, backgroundColor: '#3A3A3E', alignSelf: 'stretch' }} />
             <div style={{ flex: 3 }}>
               <ScrollPicker
                 items={monthItems}
-                value={monthValue}
-                onChange={(v) => setMonthNum(parseInt(v))}
+                value={`${monthNum}월`}
+                onChange={(v) => {
+                  const newMonth = parseInt(v);
+                  setMonthNum(newMonth);
+                  adjustDayIfNeeded(yearNum, newMonth, dayNum);
+                }}
               />
             </div>
             <div style={{ width: 1, backgroundColor: '#3A3A3E', alignSelf: 'stretch' }} />
             <div style={{ flex: 3 }}>
               <ScrollPicker
                 items={dayItems}
-                value={dayValue}
+                value={`${dayNum}일`}
                 onChange={(v) => setDayNum(parseInt(v))}
               />
             </div>
