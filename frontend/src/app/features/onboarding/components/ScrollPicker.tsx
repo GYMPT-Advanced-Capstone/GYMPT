@@ -7,7 +7,7 @@ interface ScrollPickerProps {
 }
 
 const ITEM_HEIGHT = 52;
-const VISIBLE = 5; // 위 2개 + 선택 1개 + 아래 2개
+const VISIBLE = 5;
 
 export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -26,7 +26,6 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
     []
   );
 
-  // Initialize scroll position on mount
   useEffect(() => {
     const index = items.indexOf(value);
     if (index >= 0) {
@@ -34,7 +33,6 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
     }
   }, []);
 
-  // Sync scroll when value or items change externally
   useEffect(() => {
     if (!isUserScrolling.current) {
       const index = items.indexOf(value);
@@ -68,11 +66,10 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
   }, [items, value, onChange, scrollToIndex]);
 
   const totalHeight = ITEM_HEIGHT * VISIBLE;
-  const padding = ITEM_HEIGHT * 2; // 위아래 2칸 패딩
+  const padding = ITEM_HEIGHT * 2;
 
   return (
     <div className="relative" style={{ height: totalHeight }}>
-      {/* Selection highlight */}
       <div
         className="absolute left-0 right-0 pointer-events-none z-10"
         style={{
@@ -83,7 +80,6 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
           backgroundColor: 'rgba(63,253,212,0.05)',
         }}
       />
-      {/* Top fade */}
       <div
         className="absolute top-0 left-0 right-0 pointer-events-none z-20"
         style={{
@@ -91,7 +87,6 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
           background: 'linear-gradient(to bottom, #2C2C30 20%, transparent 100%)',
         }}
       />
-      {/* Bottom fade */}
       <div
         className="absolute bottom-0 left-0 right-0 pointer-events-none z-20"
         style={{
@@ -110,7 +105,6 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
         }}
         onScroll={handleScroll}
       >
-        {/* Top padding */}
         <div style={{ height: padding }} />
 
         {items.map((item) => {
@@ -146,7 +140,6 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
           );
         })}
 
-        {/* Bottom padding */}
         <div style={{ height: padding }} />
       </div>
     </div>

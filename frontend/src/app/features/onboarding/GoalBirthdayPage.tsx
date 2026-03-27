@@ -1,0 +1,143 @@
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router';
+import { GoalLayout } from './components/GoalLayout';
+import { ScrollPicker } from './components/ScrollPicker';
+import { useGoal } from '../../context/GoalContext';
+
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month, 0).getDate();
+}
+
+function padTwo(n: number) {
+  return String(n).padStart(2, '0');
+}
+
+export function GoalBirthdayPage() {
+  const navigate = useNavigate();
+  const { goal, updateGoal } = useGoal();
+
+  const [yearNum, setYearNum] = useState(goal.birthday.year);
+  const [monthNum, setMonthNum] = useState(goal.birthday.month);
+  const [dayNum, setDayNum] = useState(goal.birthday.day);
+
+  const yearItems = useMemo(
+    () => Array.from({ length: 80 }, (_, i) => `${1940 + i}년`),
+    []
+  );
+  const monthItems = useMemo(
+    () => Array.from({ length: 12 }, (_, i) => `${i + 1}월`),
+    []
+  );
+  const dayItems = useMemo(() => {
+    const count = getDaysInMonth(yearNum, monthNum);
+    return Array.from({ length: count }, (_, i) => `${i + 1}일`);
+  }, [yearNum, monthNum]);
+
+  useEffect(() => {
+    const maxDay = getDaysInMonth(yearNum, monthNum);
+    if (dayNum > maxDay) {
+      setDayNum(maxDay);
+    }
+  }, [yearNum, monthNum]);
+
+  const yearValue = `${yearNum}년`;
+  const monthValue = `${monthNum}월`;
+  const dayValue = `${dayNum}일`;
+
+  const handleNext = () => {
+    updateGoal({ birthday: { year: yearNum, month: monthNum, day: dayNum } });
+    navigate('/goal/weekly');
+  };
+
+  return (
+    <GoalLayout step={1} totalSteps={3} onBack={() => navigate('/')}>
+      <div className="px-6 pt-4 flex flex-col flex-1">
+        <h1
+          style={{
+            color: '#FFFFFF',
+            fontSize: 22,
+            fontWeight: 700,
+            lineHeight: 1.35,
+            marginTop: 15,
+            marginBottom: 9,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          생년월일이 어떻게 되시나요?
+        </h1>
+        <p style={{ color: '#888888', fontSize: 14, lineHeight: 1.6, marginBottom: 40 }}>
+          나이는 신체 수준을 파악하여 운동 플랜을 제공하는데
+          <br />
+          필요해요. 절대 외부에 공개되지 않아요.
+        </p>
+
+        <div
+          className="flex items-center justify-center mb-6"
+          style={{
+            backgroundColor: '#2C2C30',
+            borderRadius: 16,
+            height: 72,
+            border: '1px solid rgba(63,253,212,0.2)',
+          }}
+        >
+          <span style={{ color: '#3FFDD4', fontSize: 26, fontWeight: 700, letterSpacing: 1 }}>
+            {yearNum}년&nbsp;{padTwo(monthNum)}월&nbsp;{padTwo(dayNum)}일
+          </span>
+        </div>
+
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ backgroundColor: '#2C2C30', border: '1px solid #3A3A3E' }}
+        >
+          <div className="flex">
+            <div style={{ flex: 5 }}>
+              <ScrollPicker
+                items={yearItems}
+                value={yearValue}
+                onChange={(v) => setYearNum(parseInt(v))}
+              />
+            </div>
+            <div style={{ width: 1, backgroundColor: '#3A3A3E', alignSelf: 'stretch' }} />
+            <div style={{ flex: 3 }}>
+              <ScrollPicker
+                items={monthItems}
+                value={monthValue}
+                onChange={(v) => setMonthNum(parseInt(v))}
+              />
+            </div>
+            <div style={{ width: 1, backgroundColor: '#3A3A3E', alignSelf: 'stretch' }} />
+            <div style={{ flex: 3 }}>
+              <ScrollPicker
+                items={dayItems}
+                value={dayValue}
+                onChange={(v) => setDayNum(parseInt(v))}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ flex: 1 }} />
+      </div>
+
+      <div className="px-6 pb-10 pt-6">
+        <button
+          onClick={handleNext}
+          style={{
+            width: '100%',
+            height: 56,
+            backgroundColor: '#3FFDD4',
+            borderRadius: 14,
+            border: 'none',
+            color: '#0A1A16',
+            fontSize: 17,
+            fontWeight: 700,
+            cursor: 'pointer',
+            marginBottom: 50,
+          }}
+        >
+          다음
+        </button>
+      </div>
+    </GoalLayout>
+  );
+}
