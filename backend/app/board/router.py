@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status, Response
+from fastapi import APIRouter, Depends, File, Form, UploadFile, status, Response, Path
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -23,9 +23,20 @@ router = APIRouter(prefix="/api/v1/board", tags=["Board"])
     status_code=status.HTTP_201_CREATED,
 )
 def create_board(
-    title: str = Form(...),
-    content: str = Form(...),
-    image: UploadFile | None = File(None),
+    title: str = Form(
+        ...,
+        description="게시글 제목",
+        examples=["오늘 운동 인증합니다"],
+    ),
+    content: str = Form(
+        ...,
+        description="게시글 내용",
+        examples=["스쿼트 100개 완료했습니다."],
+    ),
+    image: UploadFile | None = File(
+        None,
+        description="업로드할 게시글 이미지 파일",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -54,11 +65,30 @@ def create_board(
     status_code=status.HTTP_200_OK,
 )
 def update_board(
-    board_no: int,
-    title: str | None = Form(None),
-    content: str | None = Form(None),
-    delete_image: bool = Form(False),
-    image: UploadFile | None = File(None),
+    board_no: int = Path(
+        ...,
+        description="게시글 번호",
+        examples=[1],
+    ),
+    title: str | None = Form(
+        None,
+        description="수정할 게시글 제목",
+        examples=["수정된 제목"],
+    ),
+    content: str | None = Form(
+        None,
+        description="수정할 게시글 내용",
+        examples=["수정된 내용입니다."],
+    ),
+    delete_image: bool = Form(
+        False,
+        description="기존 이미지 삭제 여부",
+        examples=[True],
+    ),
+    image: UploadFile | None = File(
+        None,
+        description="새로 업로드할 게시글 이미지 파일",
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -93,7 +123,11 @@ def list_boards(
 
 @router.get("/{board_no}", response_model=BoardResponse)
 def get_board_detail(
-    board_no: int,
+    board_no: int = Path(
+        ...,
+        description="게시글 번호",
+        examples=[1],
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -102,7 +136,11 @@ def get_board_detail(
 
 @router.delete("/{board_no}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_board(
-    board_no: int,
+    board_no: int = Path(
+        ...,
+        description="삭제할 게시글 번호",
+        examples=[1],
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
