@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from importlib import import_module
 
 from fastapi import FastAPI
+from sqlalchemy import select
 
 from app.core.database import get_engine, get_session_local, Base
 from app.auth.router import router as auth_router
@@ -39,11 +40,19 @@ def seed_exercises() -> None:
     SessionLocal = get_session_local()
     session = SessionLocal()
     try:
-        exists = session.query(Exercise.id).first()
-        if exists:
+        existing_ids = {
+            row[0] for row in session.execute(select(Exercise.id)).all()
+        }
+        missing_exercises = [
+            Exercise(**exercise)
+            for exercise in DEFAULT_EXERCISES
+            if exercise["id"] not in existing_ids
+        ]
+
+        if not missing_exercises:
             return
 
-        session.add_all([Exercise(**exercise) for exercise in DEFAULT_EXERCISES])
+        session.add_all(missing_exercises)
         session.commit()
     finally:
         session.close()
