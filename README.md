@@ -34,9 +34,19 @@ feature/*   ← 기능 개발
 docker compose -f docker/docker-compose.yml up -d
 ```
 
+기본 운동 데이터 초기화:
+```bash
+docker compose -f docker/docker-compose.yml exec backend python -m app.scripts.seed_exercises
+```
+
 ### 테스트용 백엔드/DB/Redis 실행
 ```bash
 docker compose -f docker/docker-compose.test.yml up -d --build
+```
+
+테스트용 기본 운동 데이터 초기화:
+```bash
+docker compose -f docker/docker-compose.test.yml exec backend-test python -m app.scripts.seed_exercises
 ```
 
 테스트용 Swagger:
