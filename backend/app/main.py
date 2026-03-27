@@ -47,7 +47,6 @@ async def health_check():
 
 app.include_router(exercise_router)
 app.include_router(exercise_record_router)
-
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(board_router)
