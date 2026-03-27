@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Minus, Plus } from 'lucide-react';
 import { GoalLayout } from './components/GoalLayout';
@@ -93,14 +93,19 @@ export function GoalExercisePage() {
   const id = (exerciseId as ExerciseId) || 'squat';
   const exercise = exerciseData[id];
 
+  const [count, setCount] = useState(
+    goal.exerciseCounts[id] ?? (exercise?.defaultCount || 15)
+  );
+
+  useEffect(() => {
+    if (!exercise) {
+      navigate('/goal/exercise/squat', { replace: true });
+    }
+  }, [exercise, navigate]);
+
   if (!exercise) {
-    navigate('/goal/exercise/squat');
     return null;
   }
-
-  const [count, setCount] = useState(
-    goal.exerciseCounts[id] ?? exercise.defaultCount
-  );
 
   const handleDecrease = () => {
     setCount((prev) => Math.max(exercise.min, prev - exercise.stepSize));
