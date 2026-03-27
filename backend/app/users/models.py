@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Date
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.core.database import Base
@@ -15,3 +16,5 @@ class User(Base):
     birth_date = Column(Date, nullable=True)
     weekly_target = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    exercise_records = relationship("ExerciseRecord", back_populates="user")
