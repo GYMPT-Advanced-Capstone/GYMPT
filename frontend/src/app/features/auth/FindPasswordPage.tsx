@@ -154,7 +154,7 @@ export function FindPasswordPage() {
                   border: '1px solid rgba(63,253,212,0.2)',
                 }}
               >
-                <p style={{ color: '#AAAAAA', fontSize: 13, lineHeight: 1.7 }}>
+                <p style={{ color: '#AAAAAA', fontSize: 11.8, lineHeight: 1.7 }}>
                   가입 시 등록한{' '}
                   <span style={{ color: '#3FFDD4', fontWeight: 600 }}>이메일 주소</span>로
                   인증 코드를 전송해드려요.<br />

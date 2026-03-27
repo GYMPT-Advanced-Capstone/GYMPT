@@ -11,9 +11,29 @@ export function LoginPage() {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [pwHover, setPwHover] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  const canLogin = id.trim().length > 0 && password.length > 0;
 
   const handleLogin = () => {
-    setUserName(id.trim() || '박준서');
+    setLoginError('');
+
+    // 이 부분 추후 백엔드 API 연결 시 아래 localStorage 로직을 API 호출로 교체
+    const registeredEmail = localStorage.getItem('registered_email') ?? '';
+    const registeredPassword = localStorage.getItem('registered_password') ?? '';
+    const registeredName = localStorage.getItem('registered_name') ?? '';
+
+    if (!registeredEmail) {
+      setLoginError('가입된 계정이 없어요. 먼저 회원가입을 해주세요.');
+      return;
+    }
+
+    if (id.trim() !== registeredEmail || password !== registeredPassword) {
+      setLoginError('아이디 또는 비밀번호가 올바르지 않아요.');
+      return;
+    }
+
+    setUserName(registeredName || id.trim());
     navigate('/goal/birthday');
   };
 
@@ -31,14 +51,12 @@ export function LoginPage() {
           backgroundColor: '#1A1A1A',
         }}
       >
-        {/* Hero Image */}
         <div className="relative" style={{ height: 300, overflow: 'hidden' }}>
           <img
             src={HERO_IMAGE}
             alt="AI 피트니스 코칭"
             className="w-full h-full object-cover object-top"
           />
-          {/* Gradient overlay */}
           <div
             className="absolute inset-0"
             style={{
@@ -46,7 +64,6 @@ export function LoginPage() {
                 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, rgba(26,26,26,0.95) 90%, #1A1A1A 100%)',
             }}
           />
-          {/* Title text on image */}
           <div className="absolute bottom-2 left-6">
             <h1 style={{ color: '#FFFFFF', fontSize: 28, fontWeight: 700, lineHeight: 1.2 }}>
               AI 피트니스 코칭
@@ -57,9 +74,7 @@ export function LoginPage() {
           </div>
         </div>
 
-        {/* Form Area */}
         <div className="flex-1 px-6 pt-16 pb-10 flex flex-col">
-          {/* ID Input */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ color: '#CCCCCC', fontSize: 14, display: 'block', marginBottom: 8 }}>
               아이디
@@ -70,7 +85,8 @@ export function LoginPage() {
                 backgroundColor: '#2C2C30',
                 borderRadius: 12,
                 height: 54,
-                border: '1px solid #3A3A3E',
+                border: `1px solid ${loginError ? 'rgba(255,80,80,0.4)' : '#3A3A3E'}`,
+                transition: 'border-color 0.2s',
               }}
             >
               <User size={18} color="#666666" />
@@ -78,7 +94,7 @@ export function LoginPage() {
                 type="text"
                 placeholder="아이디를 입력하세요"
                 value={id}
-                onChange={(e) => setId(e.target.value)}
+                onChange={(e) => { setId(e.target.value); setLoginError(''); }}
                 style={{
                   flex: 1,
                   background: 'transparent',
@@ -92,8 +108,7 @@ export function LoginPage() {
             </div>
           </div>
 
-          {/* Password Input */}
-          <div style={{ marginBottom: 36 }}>
+          <div style={{ marginBottom: loginError ? 12 : 36 }}>
             <label style={{ color: '#CCCCCC', fontSize: 14, display: 'block', marginBottom: 8 }}>
               비밀번호
             </label>
@@ -103,7 +118,8 @@ export function LoginPage() {
                 backgroundColor: '#2C2C30',
                 borderRadius: 12,
                 height: 54,
-                border: '1px solid #3A3A3E',
+                border: `1px solid ${loginError ? 'rgba(255,80,80,0.4)' : '#3A3A3E'}`,
+                transition: 'border-color 0.2s',
               }}
             >
               <Lock size={18} color="#666666" />
@@ -111,7 +127,7 @@ export function LoginPage() {
                 type="password"
                 placeholder="비밀번호를 입력하세요"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
                 style={{
                   flex: 1,
                   background: 'transparent',
@@ -125,26 +141,46 @@ export function LoginPage() {
             </div>
           </div>
 
-          {/* Login Button */}
+          {loginError && (
+            <div
+              className="flex items-center gap-2"
+              style={{
+                marginBottom: 20,
+                padding: '10px 14px',
+                backgroundColor: 'rgba(255,80,80,0.08)',
+                borderRadius: 10,
+                border: '1px solid rgba(255,80,80,0.25)',
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="7.5" cy="7.5" r="6.5" stroke="#FF6B6B" strokeWidth="1.4" />
+                <path d="M7.5 4.5V8" stroke="#FF6B6B" strokeWidth="1.4" strokeLinecap="round" />
+                <circle cx="7.5" cy="10.5" r="0.75" fill="#FF6B6B" />
+              </svg>
+              <p style={{ color: '#FF6B6B', fontSize: 13, lineHeight: 1.4 }}>{loginError}</p>
+            </div>
+          )}
+
           <button
             onClick={handleLogin}
+            disabled={!canLogin}
             style={{
               width: '100%',
               height: 56,
-              backgroundColor: '#3FFDD4',
+              backgroundColor: canLogin ? '#3FFDD4' : '#2C2C30',
               borderRadius: 14,
               border: 'none',
-              color: '#0A1A16',
+              color: canLogin ? '#0A1A16' : '#555555',
               fontSize: 17,
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: canLogin ? 'pointer' : 'not-allowed',
               letterSpacing: 1,
+              transition: 'background-color 0.2s, color 0.2s',
             }}
           >
             로그인
           </button>
 
-          {/* 비밀번호를 잊으셨나요? */}
           <div className="flex items-center justify-center mt-5">
             <button
               onClick={() => navigate('/find-password')}
