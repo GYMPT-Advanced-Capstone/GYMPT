@@ -11,7 +11,8 @@ const VISIBLE = 5;
 
 export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollTimeout = useRef<ReturnType<typeof setTimeout>>();
+
+  const scrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null); 
   const isUserScrolling = useRef(false);
 
   const scrollToIndex = useCallback((index: number, smooth = true) => {
@@ -45,6 +46,7 @@ export function ScrollPicker({ items, value, onChange }: ScrollPickerProps) {
 
   const handleScroll = useCallback(() => {
     isUserScrolling.current = true;
+
     if (scrollTimeout.current) {
       clearTimeout(scrollTimeout.current);
     }
