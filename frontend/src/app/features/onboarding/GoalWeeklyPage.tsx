@@ -46,8 +46,6 @@ export function GoalWeeklyPage() {
     navigate('/goal/exercises');
   };
 
-  const selectedOption = weeklyOptions.find((o) => o.count === selected);
-
   return (
     <GoalLayout step={2} totalSteps={3} onBack={() => navigate('/goal/birthday')}>
       <div className="px-6 pt-4 flex flex-col flex-1">
