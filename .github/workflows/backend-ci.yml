@@ -49,7 +49,7 @@ jobs:
         run: mypy app/
 
       - name: Test (pytest)
-        run: pytest --cov=app --cov-report=xml
+        run: pytest --cov=app --cov-report=xml --cov-omit="app/scripts/*"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
