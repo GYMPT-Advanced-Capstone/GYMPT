@@ -39,9 +39,7 @@ def seed_exercises() -> None:
     SessionLocal = get_session_local()
     session = SessionLocal()
     try:
-        existing_ids = {
-            row[0] for row in session.execute(select(Exercise.id)).all()
-        }
+        existing_ids = {row[0] for row in session.execute(select(Exercise.id)).all()}
         missing_exercises = [
             Exercise(**exercise)
             for exercise in DEFAULT_EXERCISES
