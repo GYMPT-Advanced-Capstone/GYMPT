@@ -21,10 +21,12 @@ export function FindPasswordPage() {
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const handleSendCode = () => {
+    // 이 부분 추후 백엔드 API 연결 시 이메일로 인증 코드 발송
     setCodeSent(true);
   };
 
   const handleVerify = () => {
+    // 이 부분 추후 백엔드 API 연결 시 코드 검증
     setStep('reset');
   };
 
@@ -32,6 +34,7 @@ export function FindPasswordPage() {
   const pwMatch = newPw === confirmPw && confirmPw.length > 0;
 
   const handleReset = () => {
+    // 이 부분 실제 서비스에서는 여기서 API를 호출해 비밀번호를 변경 예정
     setStep('done');
   };
 
@@ -52,7 +55,6 @@ export function FindPasswordPage() {
           backgroundColor: '#1A1A1A',
         }}
       >
-        {/* Header */}
         <div
           className="flex items-center px-4"
           style={{ paddingTop: 56, paddingBottom: 20 }}
@@ -66,7 +68,6 @@ export function FindPasswordPage() {
           <p style={{ color: '#FFFFFF', fontSize: 18, fontWeight: 700 }}>비밀번호 찾기</p>
         </div>
 
-        {/* Step indicator */}
         <div className="flex items-center px-6 mb-8 gap-2">
           {(['verify', 'reset', 'done'] as Step[]).map((s, i) => (
             <div key={s} className="flex items-center gap-2" style={{ flex: i < 2 ? 'none' : undefined }}>
@@ -144,7 +145,6 @@ export function FindPasswordPage() {
         </div>
 
         <div className="flex-1 px-6 flex flex-col">
-          {/* ── STEP 1: 이메일 인증 ── */}
           {step === 'verify' && (
             <>
               <div
@@ -154,7 +154,7 @@ export function FindPasswordPage() {
                   border: '1px solid rgba(63,253,212,0.2)',
                 }}
               >
-                <p style={{ color: '#AAAAAA', fontSize: 11.8, lineHeight: 1.7 }}>
+                <p style={{ color: '#AAAAAA', fontSize: 13, lineHeight: 1.7 }}>
                   가입 시 등록한{' '}
                   <span style={{ color: '#3FFDD4', fontWeight: 600 }}>이메일 주소</span>로
                   인증 코드를 전송해드려요.<br />
@@ -163,7 +163,6 @@ export function FindPasswordPage() {
                 </p>
               </div>
 
-              {/* 이메일 */}
               <div style={{ marginBottom: 16 }}>
                 <label style={{ color: '#CCCCCC', fontSize: 14, display: 'block', marginBottom: 8 }}>
                   이메일
@@ -225,63 +224,67 @@ export function FindPasswordPage() {
                 )}
               </div>
 
-              {/* 인증 코드 */}
-              <div style={{ marginBottom: 32 }}>
-                <div
-                  className="flex items-center gap-3 px-4"
-                  style={{
-                    backgroundColor: '#2C2C30',
-                    borderRadius: 12,
-                    height: 54,
-                    border: `1px solid ${code.trim() ? 'rgba(63,253,212,0.4)' : '#3A3A3E'}`,
-                    transition: 'border-color 0.2s',
-                  }}
-                >
-                  <input
-                    type="text"
-                    placeholder="인증번호 6자리를 입력해주세요"
-                    value={code}
-                    maxLength={6}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              {codeSent && (
+                <div className="flex items-center gap-2" style={{ marginBottom: 32, width: '100%' }}>
+                  <div
+                    className="flex items-center gap-3 px-4"
                     style={{
                       flex: 1,
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      color: '#FFFFFF',
-                      fontSize: 15,
-                      letterSpacing: code ? 4 : 0,
+                      minWidth: 0,
+                      backgroundColor: '#2C2C30',
+                      borderRadius: 12,
+                      height: 54,
+                      border: `1px solid ${code.trim() ? 'rgba(63,253,212,0.4)' : '#3A3A3E'}`,
+                      transition: 'border-color 0.2s',
                     }}
-                    className="placeholder-[#555555]"
-                  />
-                  {code.length === 6 && (
-                    <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 600 }}>✓</span>
-                  )}
+                  >
+                    <input
+                      type="text"
+                      placeholder="인증번호 6자리를 입력해주세요"
+                      value={code}
+                      maxLength={6}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        color: '#FFFFFF',
+                        fontSize: 15,
+                        letterSpacing: code ? 4 : 0,
+                      }}
+                      className="placeholder-[#555555]"
+                    />
+                    {code.length === 6 && (
+                      <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>✓</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleVerify}
+                    disabled={!verifyReady}
+                    style={{
+                      flexShrink: 0,
+                      width: 80,
+                      height: 54,
+                      borderRadius: 12,
+                      border: `1.5px solid ${verifyReady ? '#3FFDD4' : '#3A3A3E'}`,
+                      backgroundColor: 'transparent',
+                      color: verifyReady ? '#3FFDD4' : '#555555',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: verifyReady ? 'pointer' : 'not-allowed',
+                      whiteSpace: 'nowrap',
+                      transition: 'color 0.2s, border-color 0.2s',
+                    }}
+                  >
+                    인증 확인
+                  </button>
                 </div>
-              </div>
-
-              <button
-                onClick={handleVerify}
-                disabled={!verifyReady}
-                style={{
-                  width: '100%',
-                  height: 56,
-                  backgroundColor: verifyReady ? '#3FFDD4' : '#2C2C30',
-                  borderRadius: 14,
-                  border: 'none',
-                  color: verifyReady ? '#0A1A16' : '#555555',
-                  fontSize: 17,
-                  fontWeight: 700,
-                  cursor: verifyReady ? 'pointer' : 'not-allowed',
-                  transition: 'background-color 0.2s, color 0.2s',
-                }}
-              >
-                인증 확인
-              </button>
+              )}
             </>
           )}
 
-          {/* ── STEP 2: 비밀번호 재설정 ── */}
           {step === 'reset' && (
             <>
               <div
@@ -298,7 +301,6 @@ export function FindPasswordPage() {
                 </p>
               </div>
 
-              {/* 새 비밀번호 */}
               <div style={{ marginBottom: 20 }}>
                 <label style={{ color: '#CCCCCC', fontSize: 14, display: 'block', marginBottom: 8 }}>
                   새 비밀번호
@@ -341,7 +343,6 @@ export function FindPasswordPage() {
                 )}
               </div>
 
-              {/* 비밀번호 확인 */}
               <div style={{ marginBottom: 32 }}>
                 <label style={{ color: '#CCCCCC', fontSize: 14, display: 'block', marginBottom: 8 }}>
                   비밀번호 확인
@@ -408,7 +409,6 @@ export function FindPasswordPage() {
             </>
           )}
 
-          {/* ── STEP 3: 완료 ── */}
           {step === 'done' && (
             <div className="flex flex-col items-center justify-center flex-1 gap-4 pb-16">
               <div
