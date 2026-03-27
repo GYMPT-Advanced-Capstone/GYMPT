@@ -1,0 +1,45 @@
+services:
+  mysql-test:
+    image: mysql:8.4
+    container_name: gympt_mysql_test
+    environment:
+      MYSQL_DATABASE: gympt_test
+      MYSQL_USER: gympt_test_user
+      MYSQL_PASSWORD: gympt_test_password
+      MYSQL_ROOT_PASSWORD: gympt_root_password
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pgympt_root_password"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - mysql_test_data:/var/lib/mysql
+
+  redis-test:
+    image: redis:alpine
+    container_name: gympt_redis_test
+    ports:
+      - "6380:6379"
+
+  backend-test:
+    image: gympt-backend-test
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    env_file:
+      - ../backend/.env.test
+    environment:
+      MYSQL_HOST: mysql-test
+      REDIS_HOST: redis-test
+    ports:
+      - "8001:8000"
+    depends_on:
+      mysql-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_started
+
+volumes:
+  mysql_test_data:
