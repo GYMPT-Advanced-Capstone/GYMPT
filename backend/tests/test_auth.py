@@ -95,6 +95,34 @@ def test_signup_already_registered(client, mock_redis_client):
     )
 
     assert response.status_code == 409
+    assert response.json()["detail"] == "이미 가입된 이메일입니다."
+
+
+def test_signup_nickname_duplicate(client, mock_redis_client):
+    test_client, mock_db = client
+    from sqlalchemy.exc import IntegrityError
+
+    mock_redis_client.get.side_effect = lambda key: (
+        "1" if key == "VERIFIED:202014746@kyonggi.ac.kr" else None
+    )
+    mock_db.commit.side_effect = IntegrityError(
+        "mock error",
+        params={},
+        orig=Exception("UNIQUE constraint failed: user.nickname"),
+    )
+
+    response = test_client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "202014746@kyonggi.ac.kr",
+            "pw": "1q2w3e4r",
+            "name": "최인규",
+            "nickname": "짐피티",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "이미 사용 중인 닉네임입니다."
 
 
 # Login
@@ -596,7 +624,12 @@ def test_refresh_token_success(client, mock_redis_client):
     assert "access_token" in data
     assert "refresh_token" in data
     assert data["token_type"] == "Bearer"
-    mock_redis_client.delete.assert_called_with("RT:test@test.com")
+    new_refresh_token_hash = hashlib.sha256(data["refresh_token"].encode()).hexdigest()
+    mock_redis_client.setex.assert_called_with(
+        "RT:test@test.com",
+        mock_redis_client.setex.call_args[0][1],
+        new_refresh_token_hash,
+    )
 
 
 def test_refresh_token_invalid_hash(client, mock_redis_client):

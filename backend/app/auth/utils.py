@@ -57,7 +57,13 @@ def store_refresh_token(email: str, token: str, expires_delta: timedelta) -> Non
     redis_client = get_redis_client()
     ttl = int(expires_delta.total_seconds())
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    redis_client.setex(f"RT:{email}", ttl, token_hash)
+    try:
+        redis_client.setex(f"RT:{email}", ttl, token_hash)
+    except redis.RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="인증 서버에 일시적인 오류가 발생했습니다.",
+        )
 
 
 def verify_access_token(

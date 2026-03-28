@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
@@ -34,11 +35,14 @@ from app.auth.utils import (
     verify_access_token,
     revoke_tokens,
     invalidate_user_session,
+    mask_email,
     store_email_verified,
     is_email_verified,
     delete_email_verified,
 )
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
@@ -63,7 +67,12 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
         db.add(new_user)
         db.commit()
         db.refresh(new_user)
-        delete_email_verified(user_data.email)
+        try:
+            delete_email_verified(user_data.email)
+        except Exception:
+            logger.warning(
+                f"Redis cleanup failed for {mask_email(user_data.email)} after signup"
+            )
         return new_user
     except IntegrityError as e:
         db.rollback()
