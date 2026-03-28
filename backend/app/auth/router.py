@@ -133,7 +133,9 @@ def request_email_verify(data: EmailVerifyRequest, db: Session = Depends(get_db)
         )
     code = generate_verification_code()
     store_verification_code(data.email, code)
-    send_verification_email(data.email, code, subject="[GYMPT] 회원가입 인증 코드", purpose="회원가입")
+    send_verification_email(
+        data.email, code, subject="[GYMPT] 회원가입 인증 코드", purpose="회원가입"
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -182,7 +184,12 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
         )
     code = generate_verification_code()
     store_verification_code(data.email, code)
-    send_verification_email(data.email, code, subject="[GYMPT] 비밀번호 재설정 인증 코드", purpose="비밀번호 재설정")
+    send_verification_email(
+        data.email,
+        code,
+        subject="[GYMPT] 비밀번호 재설정 인증 코드",
+        purpose="비밀번호 재설정",
+    )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

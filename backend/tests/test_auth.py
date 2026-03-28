@@ -456,7 +456,9 @@ def test_request_email_verify_success(client, mock_redis_client):
 
 def test_request_email_verify_already_registered(client):
     test_client, mock_db = client
-    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    fake_user = User(
+        id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
+    )
     mock_db.query.return_value.filter.return_value.first.return_value = fake_user
 
     response = test_client.post(
@@ -502,7 +504,12 @@ def test_signup_without_email_verify(client, mock_redis_client):
 
     response = test_client.post(
         "/api/v1/auth/signup",
-        json={"email": "test@test.com", "pw": "1q2w3e4r", "name": "최인규", "nickname": "테스터"},
+        json={
+            "email": "test@test.com",
+            "pw": "1q2w3e4r",
+            "name": "최인규",
+            "nickname": "테스터",
+        },
     )
 
     assert response.status_code == 403
@@ -522,7 +529,9 @@ def test_check_email_available(client):
 
 def test_check_email_taken(client):
     test_client, mock_db = client
-    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    fake_user = User(
+        id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
+    )
     mock_db.query.return_value.filter.return_value.first.return_value = fake_user
 
     response = test_client.get("/api/v1/auth/check-email?email=test@test.com")
@@ -544,7 +553,9 @@ def test_check_nickname_available(client):
 
 def test_check_nickname_taken(client):
     test_client, mock_db = client
-    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    fake_user = User(
+        id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
+    )
     mock_db.query.return_value.filter.return_value.first.return_value = fake_user
 
     response = test_client.get("/api/v1/auth/check-nickname?nickname=테스터")
@@ -605,7 +616,9 @@ def test_refresh_token_wrong_type(client):
 # Password Reset Request
 def test_request_password_reset_success(client, mock_redis_client):
     test_client, mock_db = client
-    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    fake_user = User(
+        id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
+    )
     mock_db.query.return_value.filter.return_value.first.return_value = fake_user
 
     with patch("app.auth.router.send_verification_email"):
@@ -633,13 +646,19 @@ def test_request_password_reset_user_not_found(client):
 # Password Reset
 def test_reset_password_success(client, mock_redis_client):
     test_client, mock_db = client
-    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    fake_user = User(
+        id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
+    )
     mock_db.query.return_value.filter.return_value.first.return_value = fake_user
     mock_redis_client.get.return_value = "123456"
 
     response = test_client.post(
         "/api/v1/auth/password-reset",
-        json={"email": "test@test.com", "code": "123456", "new_password": "newpassword"},
+        json={
+            "email": "test@test.com",
+            "code": "123456",
+            "new_password": "newpassword",
+        },
     )
 
     assert response.status_code == 204
@@ -653,7 +672,11 @@ def test_reset_password_invalid_code(client, mock_redis_client):
 
     response = test_client.post(
         "/api/v1/auth/password-reset",
-        json={"email": "test@test.com", "code": "000000", "new_password": "newpassword"},
+        json={
+            "email": "test@test.com",
+            "code": "000000",
+            "new_password": "newpassword",
+        },
     )
 
     assert response.status_code == 400
@@ -667,7 +690,11 @@ def test_reset_password_user_not_found(client, mock_redis_client):
 
     response = test_client.post(
         "/api/v1/auth/password-reset",
-        json={"email": "test@test.com", "code": "123456", "new_password": "newpassword"},
+        json={
+            "email": "test@test.com",
+            "code": "123456",
+            "new_password": "newpassword",
+        },
     )
 
     assert response.status_code == 404

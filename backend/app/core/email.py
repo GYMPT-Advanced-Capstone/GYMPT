@@ -5,7 +5,9 @@ from email.mime.text import MIMEText
 from app.core.config import get_settings
 
 
-def send_verification_email(to_email: str, code: str, subject: str, purpose: str) -> None:
+def send_verification_email(
+    to_email: str, code: str, subject: str, purpose: str
+) -> None:
     settings = get_settings()
 
     msg = MIMEMultipart()

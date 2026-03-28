@@ -187,7 +187,9 @@ def verify_refresh_token(token: str) -> str:
     redis_client = get_redis_client()
 
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
         email = payload.get("sub")
         token_type = payload.get("type")
 
