@@ -68,19 +68,29 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
     except IntegrityError as e:
         db.rollback()
         orig = e.orig
-        is_duplicate = (
-            (orig is not None and orig.args and orig.args[0] == 1062)
-            or "unique constraint failed" in str(orig).lower()
-            or bool(
-                re.search(
-                    r"unique constraint failed.*email|duplicate entry.*email",
-                    str(orig).lower(),
-                )
-            )
+        orig_str = str(orig).lower()
+        is_1062 = orig is not None and orig.args and orig.args[0] == 1062
+        is_unique_failed = (
+            "unique constraint failed" in orig_str or "duplicate entry" in orig_str
         )
-        if is_duplicate:
+        if is_1062 or is_unique_failed:
+            if re.search(
+                r"unique constraint failed.*nickname|duplicate entry.*nickname",
+                orig_str,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="이미 사용 중인 닉네임입니다.",
+                )
+            if re.search(
+                r"unique constraint failed.*email|duplicate entry.*email", orig_str
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="이미 가입된 이메일입니다.",
+                )
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="이미 가입된 이메일입니다."
+                status_code=status.HTTP_409_CONFLICT, detail="이미 사용 중인 값입니다."
             )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -173,8 +183,6 @@ def refresh_token(data: TokenRefreshRequest):
     email = verify_refresh_token(data.refresh_token)
     settings = get_settings()
     refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
-    invalidate_user_session(email)
 
     new_access_token = create_token(
         data={"sub": email, "type": "access"},

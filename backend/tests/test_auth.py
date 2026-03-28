@@ -683,7 +683,10 @@ def test_reset_password_success(client, mock_redis_client):
 
 
 def test_reset_password_invalid_code(client, mock_redis_client):
-    test_client, _ = client
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = MagicMock(
+        id=1, email="test@test.com", pw="hashed_password"
+    )
     mock_redis_client.get.return_value = "123456"
 
     response = test_client.post(
