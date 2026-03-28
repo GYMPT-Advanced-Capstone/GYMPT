@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.users.models import User
@@ -9,6 +10,13 @@ from app.board import repository
 from app.board.models import Board
 from app.board.schemas import BoardResponse
 from app.board.repository import get_board_list, get_board_detail
+
+from app.board.models import Comment
+from app.board.repository import (
+    get_comment_by_id,
+    update_comment,
+    delete_comment,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -243,3 +251,149 @@ def delete_board_service(
     old_imgpath = board.imgpath
     repository.delete_board(db=db, board=board)
     _delete_image_file(old_imgpath)
+
+
+def toggle_board_like_service(
+    db: Session,
+    board_no: int,
+    current_user: User,
+) -> tuple[Board, bool]:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="로그인이 필요합니다.",
+        )
+
+    board = repository.get_board_by_id(db, board_no)
+    if board is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="게시글을 찾을 수 없습니다.",
+        )
+
+    existing_like = repository.get_like_by_writer_and_board(
+        db=db,
+        writer_id=int(current_user.id),
+        board_no=board_no,
+    )
+
+    try:
+        if existing_like is None:
+            repository.create_like(
+                db=db,
+                writer_id=int(current_user.id),
+                board_no=board_no,
+            )
+            board.likes += 1
+            liked = True
+        else:
+            repository.delete_like(
+                db=db,
+                like=existing_like,
+            )
+            board.likes = max(board.likes - 1, 0)
+            liked = False
+
+        db.commit()
+        db.refresh(board)
+
+        return board, liked
+
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="좋아요 처리 중 충돌이 발생했습니다.",
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+
+def create_comment_service(
+    db: Session,
+    board_no: int,
+    current_user: User,
+    content: str,
+) -> Comment:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="로그인이 필요합니다.",
+        )
+
+    board = repository.get_board_by_id(db, board_no)
+    if board is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="게시글을 찾을 수 없습니다.",
+        )
+
+    return repository.create_comment(
+        db=db,
+        content=content,
+        writer_id=int(current_user.id),
+        board_no=board_no,
+    )
+
+
+def update_comment_service(
+    db: Session,
+    comment_no: int,
+    current_user: User,
+    content: str,
+) -> Comment:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="로그인이 필요합니다.",
+        )
+
+    comment = get_comment_by_id(db, comment_no)
+    if comment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="댓글을 찾을 수 없습니다.",
+        )
+
+    if comment.writer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="본인이 작성한 댓글만 수정할 수 있습니다.",
+        )
+
+    return update_comment(
+        db=db,
+        comment=comment,
+        content=content,
+    )
+
+
+def delete_comment_service(
+    db: Session,
+    comment_no: int,
+    current_user: User,
+) -> None:
+    if current_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="로그인이 필요합니다.",
+        )
+
+    comment = get_comment_by_id(db, comment_no)
+    if comment is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="댓글을 찾을 수 없습니다.",
+        )
+
+    if comment.writer_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="본인이 작성한 댓글만 삭제할 수 있습니다.",
+        )
+
+    delete_comment(
+        db=db,
+        comment=comment,
+    )

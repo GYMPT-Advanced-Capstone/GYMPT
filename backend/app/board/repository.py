@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.board.models import Board
+from app.board.models import Board, Comment, Like
 from app.users.models import User
 
 
@@ -88,6 +88,94 @@ def get_board_detail(db: Session, board_no: int) -> tuple[Board, str] | None:
 def delete_board(db: Session, board: Board) -> None:
     try:
         db.delete(board)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
+def get_like_by_writer_and_board(
+    db: Session,
+    writer_id: int,
+    board_no: int,
+) -> Like | None:
+    stmt = select(Like).where(
+        Like.writer_id == writer_id,
+        Like.board_no == board_no,
+    )
+
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def create_like(
+    db: Session,
+    writer_id: int,
+    board_no: int,
+) -> Like:
+    new_like = Like(
+        writer_id=writer_id,
+        board_no=board_no,
+    )
+    db.add(new_like)
+    return new_like
+
+
+def delete_like(
+    db: Session,
+    like: Like,
+) -> None:
+    db.delete(like)
+
+
+def get_comment_by_id(db: Session, comment_no: int) -> Comment | None:
+    stmt = select(Comment).where(Comment.comment_no == comment_no)
+    return db.execute(stmt).scalar_one_or_none()
+
+
+def create_comment(
+    db: Session,
+    content: str,
+    writer_id: int,
+    board_no: int,
+) -> Comment:
+    new_comment = Comment(
+        content=content,
+        writer_id=writer_id,
+        board_no=board_no,
+    )
+
+    try:
+        db.add(new_comment)
+        db.commit()
+        db.refresh(new_comment)
+        return new_comment
+    except Exception:
+        db.rollback()
+        raise
+
+
+def update_comment(
+    db: Session,
+    comment: Comment,
+    content: str,
+) -> Comment:
+    comment.content = content
+
+    try:
+        db.commit()
+        db.refresh(comment)
+        return comment
+    except Exception:
+        db.rollback()
+        raise
+
+
+def delete_comment(
+    db: Session,
+    comment: Comment,
+) -> None:
+    try:
+        db.delete(comment)
         db.commit()
     except Exception:
         db.rollback()
