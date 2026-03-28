@@ -21,7 +21,7 @@ def send_verification_email(
         f"이 코드는 {settings.VERIFICATION_CODE_EXPIRE_MINUTES}분 후 만료됩니다.\n"
         f"본인이 요청하지 않은 경우 이 이메일을 무시해주세요."
     )
-    msg.attach(MIMEText(body, "plain"))
+    msg.attach(MIMEText(body, "plain", "utf-8"))
 
     with smtplib.SMTP(settings.MAIL_SERVER, settings.MAIL_PORT) as server:
         server.starttls()

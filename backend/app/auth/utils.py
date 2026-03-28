@@ -200,7 +200,13 @@ def verify_refresh_token(token: str) -> str:
             )
 
         token_hash = hashlib.sha256(token.encode()).hexdigest()
-        stored_hash = redis_client.get(f"RT:{email}")
+        try:
+            stored_hash = redis_client.get(f"RT:{email}")
+        except redis.RedisError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="인증 서버에 일시적인 오류가 발생했습니다.",
+            )
 
         if stored_hash != token_hash:
             raise HTTPException(

@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from pydantic import EmailStr
@@ -9,7 +10,6 @@ from app.core.config import get_settings
 from app.core.email import send_verification_email
 from app.users.models import User
 from app.auth.schemas import (
-    AccessTokenResponse,
     CheckResponse,
     EmailVerify,
     EmailVerifyRequest,
@@ -71,7 +71,12 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
         is_duplicate = (
             (orig is not None and orig.args and orig.args[0] == 1062)
             or "unique constraint failed" in str(orig).lower()
-            or "email" in str(orig).lower()
+            or bool(
+                re.search(
+                    r"unique constraint failed.*email|duplicate entry.*email",
+                    str(orig).lower(),
+                )
+            )
         )
         if is_duplicate:
             raise HTTPException(
@@ -163,15 +168,31 @@ def check_nickname(nickname: str = Query(...), db: Session = Depends(get_db)):
     return CheckResponse(available=user is None)
 
 
-@router.post("/refresh", response_model=AccessTokenResponse)
+@router.post("/refresh", response_model=TokenResponse)
 def refresh_token(data: TokenRefreshRequest):
     email = verify_refresh_token(data.refresh_token)
     settings = get_settings()
-    access_token = create_token(
+    refresh_token_expires = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    invalidate_user_session(email)
+
+    new_access_token = create_token(
         data={"sub": email, "type": "access"},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    return AccessTokenResponse(access_token=access_token)
+    new_refresh_token = create_token(
+        data={"sub": email, "type": "refresh"},
+        expires_delta=refresh_token_expires,
+    )
+    store_refresh_token(email, new_refresh_token, refresh_token_expires)
+
+    return TokenResponse(
+        success=True,
+        message="토큰 재발급 성공",
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        token_type="Bearer",
+    )
 
 
 @router.post("/password-reset/request", status_code=status.HTTP_204_NO_CONTENT)
@@ -195,17 +216,17 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
 
 @router.post("/password-reset", status_code=status.HTTP_204_NO_CONTENT)
 def reset_password(data: PasswordReset, db: Session = Depends(get_db)):
-    is_valid = verify_verification_code(data.email, data.code)
-    if not is_valid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="인증 코드가 올바르지 않거나 만료되었습니다.",
-        )
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="존재하지 않는 사용자입니다.",
+        )
+    is_valid = verify_verification_code(data.email, data.code)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="인증 코드가 올바르지 않거나 만료되었습니다.",
         )
     user.pw = get_password_hash(data.new_password)  # type: ignore[assignment]
     db.commit()

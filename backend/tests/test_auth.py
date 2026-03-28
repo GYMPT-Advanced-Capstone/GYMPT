@@ -497,6 +497,19 @@ def test_verify_email_invalid_code(client, mock_redis_client):
     assert response.json()["detail"] == "인증 코드가 올바르지 않거나 만료되었습니다."
 
 
+def test_verify_email_expired_code(client, mock_redis_client):
+    test_client, _ = client
+    mock_redis_client.get.return_value = None
+
+    response = test_client.post(
+        "/api/v1/auth/email-verify",
+        json={"email": "test@test.com", "code": "123456"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "인증 코드가 올바르지 않거나 만료되었습니다."
+
+
 def test_signup_without_email_verify(client, mock_redis_client):
     test_client, mock_db = client
     mock_db.query.return_value.filter.return_value.first.return_value = None
@@ -579,8 +592,11 @@ def test_refresh_token_success(client, mock_redis_client):
     )
 
     assert response.status_code == 200
-    assert "access_token" in response.json()
-    assert response.json()["token_type"] == "Bearer"
+    data = response.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["token_type"] == "Bearer"
+    mock_redis_client.delete.assert_called_with("RT:test@test.com")
 
 
 def test_refresh_token_invalid_hash(client, mock_redis_client):
