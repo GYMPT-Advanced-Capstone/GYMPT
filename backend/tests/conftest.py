@@ -14,6 +14,12 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("MYSQL_DATABASE", "test_db")
     monkeypatch.setenv("SECRET_KEY", "test_secret_key_for_testing_only")
     monkeypatch.setenv("ALGORITHM", "HS256")
+    monkeypatch.setenv("MAIL_USERNAME", "test@gmail.com")
+    monkeypatch.setenv("MAIL_PASSWORD", "testpassword")
+    monkeypatch.setenv("MAIL_FROM", "test@gmail.com")
+    monkeypatch.setenv("MAIL_SERVER", "smtp.gmail.com")
+    monkeypatch.setenv("MAIL_PORT", "587")
+    monkeypatch.setenv("VERIFICATION_CODE_EXPIRE_MINUTES", "10")
 
 
 @pytest.fixture(autouse=True)

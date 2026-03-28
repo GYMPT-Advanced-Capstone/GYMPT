@@ -1,7 +1,8 @@
 import hashlib
 import pytest
+import redis
 from fastapi.testclient import TestClient
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone, timedelta, date
 from app.users.models import User
 from app.auth.utils import create_token, get_password_hash, mask_email
@@ -22,10 +23,13 @@ def client(mock_env_vars):
 
 
 # Signup
-def test_signup_success(client):
+def test_signup_success(client, mock_redis_client):
     test_client, mock_db = client
 
     mock_db.query.return_value.filter.return_value.first.return_value = None
+    mock_redis_client.get.side_effect = lambda key: (
+        "1" if key == "VERIFIED:202014746@kyonggi.ac.kr" else None
+    )
 
     def mock_refresh(instance):
         instance.id = 1
@@ -69,10 +73,13 @@ def test_signup_password_too_short(client):
     assert response.status_code == 422
 
 
-def test_signup_already_registered(client):
+def test_signup_already_registered(client, mock_redis_client):
     test_client, mock_db = client
     from sqlalchemy.exc import IntegrityError
 
+    mock_redis_client.get.side_effect = lambda key: (
+        "1" if key == "VERIFIED:202014746@kyonggi.ac.kr" else None
+    )
     mock_db.commit.side_effect = IntegrityError(
         "mock error", params={}, orig=Exception("UNIQUE constraint failed: user.email")
     )
@@ -185,6 +192,26 @@ def test_mask_email():
     assert mask_email("ab@test.com") == "ab*@test.com"
     assert mask_email("") == "unknown"
     assert mask_email("invalid") == "unknown"
+
+
+# Redis 연결 오류 → 401
+def test_verify_access_token_redis_error(client, mock_redis_client):
+    test_client, _ = client
+
+    access_token = create_token(
+        {"sub": "test@email.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    mock_redis_client.get.side_effect = redis.RedisError("connection refused")
+
+    response = test_client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"refresh_token": "dummy"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "인증 서버에 일시적인 오류가 발생했습니다."
 
 
 # 블랙리스트 토큰 → 401
@@ -411,3 +438,237 @@ def test_revoke_tokens_no_exp(mock_redis_client, mock_env_vars):
 
     revoke_tokens(no_exp_token, refresh_token_dummy, "user@email.com")
     mock_redis_client.setex.assert_not_called()
+
+
+# Email Verify
+def test_request_email_verify_success(client, mock_redis_client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    with patch("app.auth.router.send_verification_email"):
+        response = test_client.post(
+            "/api/v1/auth/email-verify/request",
+            json={"email": "test@test.com"},
+        )
+
+    assert response.status_code == 204
+
+
+def test_request_email_verify_already_registered(client):
+    test_client, mock_db = client
+    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+
+    response = test_client.post(
+        "/api/v1/auth/email-verify/request",
+        json={"email": "test@test.com"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "이미 가입된 이메일입니다."
+
+
+def test_verify_email_success(client, mock_redis_client):
+    test_client, _ = client
+    mock_redis_client.get.return_value = "123456"
+
+    response = test_client.post(
+        "/api/v1/auth/email-verify",
+        json={"email": "test@test.com", "code": "123456"},
+    )
+
+    assert response.status_code == 204
+    mock_redis_client.delete.assert_called_with("EMAIL_CODE:test@test.com")
+    mock_redis_client.setex.assert_called()
+
+
+def test_verify_email_invalid_code(client, mock_redis_client):
+    test_client, _ = client
+    mock_redis_client.get.return_value = "123456"
+
+    response = test_client.post(
+        "/api/v1/auth/email-verify",
+        json={"email": "test@test.com", "code": "000000"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "인증 코드가 올바르지 않거나 만료되었습니다."
+
+
+def test_signup_without_email_verify(client, mock_redis_client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+    mock_redis_client.get.return_value = None
+
+    response = test_client.post(
+        "/api/v1/auth/signup",
+        json={"email": "test@test.com", "pw": "1q2w3e4r", "name": "최인규", "nickname": "테스터"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "이메일 인증이 완료되지 않았습니다."
+
+
+# Check Email
+def test_check_email_available(client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    response = test_client.get("/api/v1/auth/check-email?email=test@test.com")
+
+    assert response.status_code == 200
+    assert response.json()["available"] is True
+
+
+def test_check_email_taken(client):
+    test_client, mock_db = client
+    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+
+    response = test_client.get("/api/v1/auth/check-email?email=test@test.com")
+
+    assert response.status_code == 200
+    assert response.json()["available"] is False
+
+
+# Check Nickname
+def test_check_nickname_available(client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    response = test_client.get("/api/v1/auth/check-nickname?nickname=테스터")
+
+    assert response.status_code == 200
+    assert response.json()["available"] is True
+
+
+def test_check_nickname_taken(client):
+    test_client, mock_db = client
+    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+
+    response = test_client.get("/api/v1/auth/check-nickname?nickname=테스터")
+
+    assert response.status_code == 200
+    assert response.json()["available"] is False
+
+
+# Refresh Token
+def test_refresh_token_success(client, mock_redis_client):
+    test_client, _ = client
+    refresh_token = create_token(
+        {"sub": "test@test.com", "type": "refresh"}, timedelta(days=7)
+    )
+    refresh_token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+    mock_redis_client.get.return_value = refresh_token_hash
+
+    response = test_client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+
+    assert response.status_code == 200
+    assert "access_token" in response.json()
+    assert response.json()["token_type"] == "Bearer"
+
+
+def test_refresh_token_invalid_hash(client, mock_redis_client):
+    test_client, _ = client
+    refresh_token = create_token(
+        {"sub": "test@test.com", "type": "refresh"}, timedelta(days=7)
+    )
+    mock_redis_client.get.return_value = "wrong_hash"
+
+    response = test_client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": refresh_token},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "유효하지 않거나 만료된 리프레시 토큰입니다."
+
+
+def test_refresh_token_wrong_type(client):
+    test_client, _ = client
+    access_token = create_token(
+        {"sub": "test@test.com", "type": "access"}, timedelta(minutes=15)
+    )
+
+    response = test_client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": access_token},
+    )
+
+    assert response.status_code == 401
+
+
+# Password Reset Request
+def test_request_password_reset_success(client, mock_redis_client):
+    test_client, mock_db = client
+    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+
+    with patch("app.auth.router.send_verification_email"):
+        response = test_client.post(
+            "/api/v1/auth/password-reset/request",
+            json={"email": "test@test.com"},
+        )
+
+    assert response.status_code == 204
+
+
+def test_request_password_reset_user_not_found(client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset/request",
+        json={"email": "test@test.com"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "등록되지 않은 이메일입니다."
+
+
+# Password Reset
+def test_reset_password_success(client, mock_redis_client):
+    test_client, mock_db = client
+    fake_user = User(id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터")
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+    mock_redis_client.get.return_value = "123456"
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset",
+        json={"email": "test@test.com", "code": "123456", "new_password": "newpassword"},
+    )
+
+    assert response.status_code == 204
+    mock_redis_client.delete.assert_any_call("EMAIL_CODE:test@test.com")
+    mock_redis_client.delete.assert_any_call("RT:test@test.com")
+
+
+def test_reset_password_invalid_code(client, mock_redis_client):
+    test_client, _ = client
+    mock_redis_client.get.return_value = "123456"
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset",
+        json={"email": "test@test.com", "code": "000000", "new_password": "newpassword"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "인증 코드가 올바르지 않거나 만료되었습니다."
+
+
+def test_reset_password_user_not_found(client, mock_redis_client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+    mock_redis_client.get.return_value = "123456"
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset",
+        json={"email": "test@test.com", "code": "123456", "new_password": "newpassword"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "존재하지 않는 사용자입니다."

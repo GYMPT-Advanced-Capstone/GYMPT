@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta, timezone
 import hashlib
 import logging
+import secrets
+from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi import HTTPException, status, Depends
@@ -52,7 +53,7 @@ def create_token(data: dict, expires_delta: timedelta) -> str:
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def store_refresh_token(email: str, token: str, expires_delta: timedelta):
+def store_refresh_token(email: str, token: str, expires_delta: timedelta) -> None:
     redis_client = get_redis_client()
     ttl = int(expires_delta.total_seconds())
     token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -67,7 +68,13 @@ def verify_access_token(
     token = credentials.credentials
 
     token_hash = hashlib.sha256(token.encode()).hexdigest()
-    is_blacklisted = redis_client.get(f"AT:{token_hash}")
+    try:
+        is_blacklisted = redis_client.get(f"AT:{token_hash}")
+    except redis.RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="인증 서버에 일시적인 오류가 발생했습니다.",
+        )
     if is_blacklisted:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="로그아웃된 토큰입니다."
@@ -131,6 +138,80 @@ def revoke_refresh_token(token: str, expected_sub: str | None = None) -> None:
         ttl = int(exp - now)
         if ttl > 0:
             redis_client.setex(f"RT_BL:{token_hash}", ttl, "revoked")
+
+
+def generate_verification_code() -> str:
+    return str(secrets.randbelow(1000000)).zfill(6)
+
+
+def store_verification_code(email: str, code: str) -> None:
+    redis_client = get_redis_client()
+    settings = get_settings()
+    ttl = settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60
+    redis_client.setex(f"EMAIL_CODE:{email}", ttl, code)
+
+
+def store_email_verified(email: str) -> None:
+    redis_client = get_redis_client()
+    settings = get_settings()
+    ttl = settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60
+    redis_client.setex(f"VERIFIED:{email}", ttl, "1")
+
+
+def is_email_verified(email: str) -> bool:
+    redis_client = get_redis_client()
+    return redis_client.get(f"VERIFIED:{email}") == "1"
+
+
+def delete_email_verified(email: str) -> None:
+    redis_client = get_redis_client()
+    redis_client.delete(f"VERIFIED:{email}")
+
+
+def verify_verification_code(email: str, code: str) -> bool:
+    redis_client = get_redis_client()
+    stored = redis_client.get(f"EMAIL_CODE:{email}")
+    if stored == code:
+        redis_client.delete(f"EMAIL_CODE:{email}")
+        return True
+    return False
+
+
+def invalidate_user_session(email: str) -> None:
+    redis_client = get_redis_client()
+    redis_client.delete(f"RT:{email}")
+
+
+def verify_refresh_token(token: str) -> str:
+    settings = get_settings()
+    redis_client = get_redis_client()
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email = payload.get("sub")
+        token_type = payload.get("type")
+
+        if not isinstance(email, str) or token_type != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="유효하지 않은 토큰입니다.",
+            )
+
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        stored_hash = redis_client.get(f"RT:{email}")
+
+        if stored_hash != token_hash:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="유효하지 않거나 만료된 리프레시 토큰입니다.",
+            )
+        return email
+
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않거나 만료된 토큰입니다.",
+        )
 
 
 def revoke_tokens(access_token: str, refresh_token: str, email: str) -> None:

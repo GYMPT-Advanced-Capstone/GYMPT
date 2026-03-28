@@ -21,3 +21,35 @@ class TokenResponse(BaseModel):
     token_type: str
     access_token: str
     refresh_token: str
+
+
+class CheckResponse(BaseModel):
+    available: bool
+
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class AccessTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordReset(BaseModel):
+    email: EmailStr
+    code: str
+    new_password: str = Field(..., min_length=8)
+
+
+class EmailVerifyRequest(BaseModel):
+    email: EmailStr
+
+
+class EmailVerify(BaseModel):
+    email: EmailStr
+    code: str

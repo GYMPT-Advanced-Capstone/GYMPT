@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    MAIL_USERNAME: str
+    MAIL_PASSWORD: str
+    MAIL_FROM: str
+    MAIL_SERVER: str
+    MAIL_PORT: int
+    VERIFICATION_CODE_EXPIRE_MINUTES: int = 10
 
     @property
     def database_url(self) -> str:
