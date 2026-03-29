@@ -2,7 +2,6 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import case, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -62,9 +61,14 @@ def _save_image_file(image: UploadFile) -> str:
     filename = _make_image_filename(image)
     save_path = BOARD_UPLOAD_DIR / filename
 
-    with save_path.open("wb") as f:
-        while chunk := image.file.read(8192):
-            f.write(chunk)
+    try:
+        with save_path.open("wb") as f:
+            while chunk := image.file.read(8192):
+                f.write(chunk)
+    except Exception:
+        if save_path.exists():
+            save_path.unlink()
+        raise
 
     return f"/static/board/{filename}"
 
@@ -104,6 +108,11 @@ def create_board_service(
             imgpath=imgpath,
             writer_id=user_id,
         )
+    except repository.BoardCommitError:
+        _delete_image_file(created_imgpath)
+        raise
+    except repository.BoardRefreshError:
+        raise
     except Exception:
         _delete_image_file(created_imgpath)
         raise
@@ -155,6 +164,11 @@ def update_board_service(
             content=content,
             imgpath=imgpath,
         )
+    except repository.BoardCommitError:
+        _delete_image_file(new_imgpath)
+        raise
+    except repository.BoardRefreshError:
+        raise
     except Exception:
         _delete_image_file(new_imgpath)
         raise
@@ -253,29 +267,23 @@ def toggle_board_like_service(
                 writer_id=int(current_user.id),
                 board_no=board_no,
             )
-            db.execute(
-                update(Board)
-                .where(Board.board_no == board_no)
-                .values({Board.likes: Board.likes + 1})
+            repository.increment_board_likes(
+                db=db,
+                board_no=board_no,
             )
             liked = True
         else:
-            repository.delete_like(
+            deleted_rows = repository.delete_like(
                 db=db,
                 like=existing_like,
             )
-            db.execute(
-                update(Board)
-                .where(Board.board_no == board_no)
-                .values(
-                    {
-                        Board.likes: case(
-                            (Board.likes > 0, Board.likes - 1),
-                            else_=0,
-                        )
-                    }
+
+            if deleted_rows > 0:
+                repository.decrement_board_likes(
+                    db=db,
+                    board_no=board_no,
                 )
-            )
+
             liked = False
 
         db.commit()

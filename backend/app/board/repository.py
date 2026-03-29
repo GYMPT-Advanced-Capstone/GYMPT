@@ -1,8 +1,16 @@
-from sqlalchemy import select
+from sqlalchemy import case, select, update
 from sqlalchemy.orm import Session
 
 from app.board.models import Board, Comment, Like
 from app.users.models import User
+
+
+class BoardCommitError(Exception):
+    pass
+
+
+class BoardRefreshError(Exception):
+    pass
 
 
 def get_board_by_id(db: Session, board_no: int) -> Board | None:
@@ -26,11 +34,16 @@ def create_board(
     try:
         db.add(new_board)
         db.commit()
-        db.refresh(new_board)
-        return new_board
-    except Exception:
+    except Exception as exc:
         db.rollback()
-        raise
+        raise BoardCommitError from exc
+
+    try:
+        db.refresh(new_board)
+    except Exception as exc:
+        raise BoardRefreshError from exc
+
+    return new_board
 
 
 def update_board(
@@ -49,11 +62,16 @@ def update_board(
 
     try:
         db.commit()
-        db.refresh(board)
-        return board
-    except Exception:
+    except Exception as exc:
         db.rollback()
-        raise
+        raise BoardCommitError from exc
+
+    try:
+        db.refresh(board)
+    except Exception as exc:
+        raise BoardRefreshError from exc
+
+    return board
 
 
 def get_board_list(db: Session) -> list[tuple[Board, str]]:
@@ -123,8 +141,42 @@ def create_like(
 def delete_like(
     db: Session,
     like: Like,
+) -> int:
+    result = (
+        db.query(Like)
+        .filter(Like.likes_no == like.likes_no)
+        .delete(synchronize_session=False)
+    )
+    return result
+
+
+def increment_board_likes(
+    db: Session,
+    board_no: int,
 ) -> None:
-    db.delete(like)
+    db.execute(
+        update(Board)
+        .where(Board.board_no == board_no)
+        .values({Board.likes: Board.likes + 1})
+    )
+
+
+def decrement_board_likes(
+    db: Session,
+    board_no: int,
+) -> None:
+    db.execute(
+        update(Board)
+        .where(Board.board_no == board_no)
+        .values(
+            {
+                Board.likes: case(
+                    (Board.likes > 0, Board.likes - 1),
+                    else_=0,
+                )
+            }
+        )
+    )
 
 
 def get_comment_by_id(db: Session, comment_no: int) -> Comment | None:
