@@ -10,6 +10,8 @@ import { GoalExercisePage } from "./features/onboarding/GoalExercisePage";
 import { GoalExerciseAllPage } from "./features/onboarding/GoalExerciseAllPage";
 import { GoalReadyPage } from "./features/onboarding/GoalReadyPage";
 
+import { MainPage } from "./features/workout/MainPage";
+
 export const router = createBrowserRouter([
   { path: "/", Component: LoginPage },
   { path: "/signup", Component: SignUpPage },
@@ -20,4 +22,6 @@ export const router = createBrowserRouter([
   { path: "/goal/exercise/:exerciseId", Component: GoalExercisePage },
   { path: "/goal/exercises", Component: GoalExerciseAllPage },
   { path: "/goal/ready", Component: GoalReadyPage },
+
+  { path: "/main", Component: MainPage },
 ]);
