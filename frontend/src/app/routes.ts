@@ -14,6 +14,11 @@ import { MainPage } from "./features/workout/MainPage";
 
 import { MyPage } from "./features/profile/MyPage";
 
+import { PostWorkout } from "./features/workout/PostWorkout";
+import { Community } from "./features/community/Community";
+import { CreatePost } from "./features/community/CreatePost";
+
+
 export const router = createBrowserRouter([
   { path: "/", Component: LoginPage },
   { path: "/signup", Component: SignUpPage },
@@ -26,6 +31,10 @@ export const router = createBrowserRouter([
   { path: "/goal/ready", Component: GoalReadyPage },
 
   { path: "/main", Component: MainPage },
+
+  { path: "/post-workout", Component: PostWorkout },
+  { path: "/community", Component: Community },
+  { path: "/create-post", Component: CreatePost },
 
   { path: "/mypage", Component: MyPage },
 ]);
