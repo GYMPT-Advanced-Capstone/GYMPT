@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import case
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -259,7 +260,6 @@ def toggle_board_like_service(
                 db=db,
                 like=existing_like,
             )
-            from sqlalchemy import case
 
             board.likes = case((Board.likes > 0, Board.likes - 1), else_=0)
             liked = False
