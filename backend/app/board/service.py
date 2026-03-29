@@ -5,18 +5,10 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.users.models import User
 from app.board import repository
-from app.board.models import Board
+from app.board.models import Board, Comment
 from app.board.schemas import BoardResponse
-from app.board.repository import get_board_list, get_board_detail
-
-from app.board.models import Comment
-from app.board.repository import (
-    get_comment_by_id,
-    update_comment,
-    delete_comment,
-)
+from app.users.models import User
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -94,12 +86,6 @@ def create_board_service(
     content: str,
     image: UploadFile | None = None,
 ) -> Board:
-    if current_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다.",
-        )
-
     imgpath = None
     created_imgpath = None
 
@@ -136,12 +122,6 @@ def update_board_service(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="게시글을 찾을 수 없습니다.",
-        )
-
-    if current_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다.",
         )
 
     if board.writer_id != current_user.id:
@@ -185,7 +165,7 @@ def update_board_service(
 
 
 def list_boards_service(db: Session) -> list[BoardResponse]:
-    rows = get_board_list(db)
+    rows = repository.get_board_list(db)
 
     return [
         BoardResponse(
@@ -202,7 +182,7 @@ def list_boards_service(db: Session) -> list[BoardResponse]:
 
 
 def get_board_detail_service(db: Session, board_no: int) -> BoardResponse:
-    result = get_board_detail(db=db, board_no=board_no)
+    result = repository.get_board_detail(db=db, board_no=board_no)
 
     if result is None:
         raise HTTPException(
@@ -236,12 +216,6 @@ def delete_board_service(
             detail="게시글을 찾을 수 없습니다.",
         )
 
-    if current_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다.",
-        )
-
     if board.writer_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -258,12 +232,6 @@ def toggle_board_like_service(
     board_no: int,
     current_user: User,
 ) -> tuple[Board, bool]:
-    if current_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다.",
-        )
-
     board = repository.get_board_by_id(db, board_no)
     if board is None:
         raise HTTPException(
@@ -316,12 +284,6 @@ def create_comment_service(
     current_user: User,
     content: str,
 ) -> Comment:
-    if current_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다.",
-        )
-
     board = repository.get_board_by_id(db, board_no)
     if board is None:
         raise HTTPException(
@@ -343,13 +305,7 @@ def update_comment_service(
     current_user: User,
     content: str,
 ) -> Comment:
-    if current_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다.",
-        )
-
-    comment = get_comment_by_id(db, comment_no)
+    comment = repository.get_comment_by_id(db, comment_no)
     if comment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -362,7 +318,7 @@ def update_comment_service(
             detail="본인이 작성한 댓글만 수정할 수 있습니다.",
         )
 
-    return update_comment(
+    return repository.update_comment(
         db=db,
         comment=comment,
         content=content,
@@ -374,13 +330,7 @@ def delete_comment_service(
     comment_no: int,
     current_user: User,
 ) -> None:
-    if current_user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="로그인이 필요합니다.",
-        )
-
-    comment = get_comment_by_id(db, comment_no)
+    comment = repository.get_comment_by_id(db, comment_no)
     if comment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -393,7 +343,7 @@ def delete_comment_service(
             detail="본인이 작성한 댓글만 삭제할 수 있습니다.",
         )
 
-    delete_comment(
+    repository.delete_comment(
         db=db,
         comment=comment,
     )
