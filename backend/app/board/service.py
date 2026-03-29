@@ -252,14 +252,16 @@ def toggle_board_like_service(
                 writer_id=int(current_user.id),
                 board_no=board_no,
             )
-            board.likes += 1
+            board.likes = Board.likes + 1
             liked = True
         else:
             repository.delete_like(
                 db=db,
                 like=existing_like,
             )
-            board.likes = max(board.likes - 1, 0)
+            from sqlalchemy import case
+
+            board.likes = case((Board.likes > 0, Board.likes - 1), else_=0)
             liked = False
 
         db.commit()
