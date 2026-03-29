@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import case
+from sqlalchemy import case, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -253,15 +253,29 @@ def toggle_board_like_service(
                 writer_id=int(current_user.id),
                 board_no=board_no,
             )
-            board.likes = Board.likes + 1
+            db.execute(
+                update(Board)
+                .where(Board.board_no == board_no)
+                .values({Board.likes: Board.likes + 1})
+            )
             liked = True
         else:
             repository.delete_like(
                 db=db,
                 like=existing_like,
             )
-
-            board.likes = case((Board.likes > 0, Board.likes - 1), else_=0)
+            db.execute(
+                update(Board)
+                .where(Board.board_no == board_no)
+                .values(
+                    {
+                        Board.likes: case(
+                            (Board.likes > 0, Board.likes - 1),
+                            else_=0,
+                        )
+                    }
+                )
+            )
             liked = False
 
         db.commit()
