@@ -5,7 +5,6 @@ import {
   LogOut,
   Edit3,
   User,
-  Calendar,
   Dumbbell,
   Target,
   Minus,
