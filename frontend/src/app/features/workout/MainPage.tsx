@@ -86,7 +86,7 @@ export function MainPage() {
               🦾
             </div>
             <div>
-              <p style={{ color: '#888888', fontSize: 12, marginBottom: 2 }}>AI 트레이너</p>
+              <p style={{ color: '#3FFDD4', fontSize: 12, marginBottom: 2 }}>AI 트레이너</p>
               <p style={{ color: '#FFFFFF', fontSize: 17, fontWeight: 700 }}>
                 {userName ? `환영합니다, ${userName}님!` : '환영합니다!'}
               </p>
