@@ -12,6 +12,8 @@ import { GoalReadyPage } from "./features/onboarding/GoalReadyPage";
 
 import { MainPage } from "./features/workout/MainPage";
 
+import { MyPage } from "./features/profile/MyPage";
+
 export const router = createBrowserRouter([
   { path: "/", Component: LoginPage },
   { path: "/signup", Component: SignUpPage },
@@ -24,4 +26,6 @@ export const router = createBrowserRouter([
   { path: "/goal/ready", Component: GoalReadyPage },
 
   { path: "/main", Component: MainPage },
+
+  { path: "/mypage", Component: MyPage },
 ]);

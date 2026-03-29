@@ -67,7 +67,6 @@ export function MainPage() {
           paddingBottom: 88,
         }}
       >
-        {/* ── Header ── */}
         <div
           className="flex items-center px-5"
           style={{ paddingTop: 56, paddingBottom: 24 }}
@@ -94,7 +93,6 @@ export function MainPage() {
           </div>
         </div>
 
-        {/* ── Today Summary Banner ── */}
         <div className="px-5 mb-5">
           <div
             className="rounded-2xl px-5 py-4 flex items-center justify-between"
@@ -136,7 +134,6 @@ export function MainPage() {
           </div>
         </div>
 
-        {/* ── Exercise Cards 2x2 ── */}
         <div className="px-5 mb-6">
           <div className="flex items-center justify-between mb-3">
             <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700 }}>운동 시작하기</p>
@@ -214,7 +211,6 @@ export function MainPage() {
           </div>
         </div>
 
-        {/* ── Weekly Calendar ── */}
         <div className="px-5 mb-6">
           <div className="flex items-center justify-between mb-3">
             <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700 }}>이번 주 운동</p>
@@ -255,7 +251,6 @@ export function MainPage() {
           </div>
         </div>
 
-        {/* ── Badges ── */}
         <div className="px-5 mb-6">
           <div className="flex items-center justify-between mb-3">
             <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700 }}>획득한 배지</p>
@@ -286,7 +281,6 @@ export function MainPage() {
           </div>
         </div>
 
-        {/* ── AI PT쌤 한마디 ── */}
         <div className="px-5 mb-4">
           <div
             className="rounded-2xl px-5 py-4"
