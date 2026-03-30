@@ -73,9 +73,9 @@ export function AnalysisPage() {
         ],
         data: dates.map((date, index) => ({
           date,
-          userAngle: Math.floor(Math.random() * 51) + 80,
-          idealAngle: 130,
-          id: `plank-item-${index}`
+            userAngle: 80 + ((index * 13) % 51), 
+            idealAngle: 130,
+            id: `plank-item-${index}`
         }))
       }
     ];
