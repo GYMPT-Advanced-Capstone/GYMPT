@@ -751,3 +751,64 @@ def test_reset_password_user_not_found(client, mock_redis_client):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "존재하지 않는 사용자입니다."
+
+
+# Redis 에러 핸들링
+def test_signup_redis_error(client, mock_redis_client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+    mock_redis_client.get.side_effect = redis.RedisError("connection error")
+
+    response = test_client.post(
+        "/api/v1/auth/signup",
+        json={
+            "email": "test@test.com",
+            "pw": "1q2w3e4r",
+            "name": "최인규",
+            "nickname": "짐피티",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "인증 서버에 일시적인 오류가 발생했습니다."
+
+
+def test_request_email_verify_redis_error(client, mock_redis_client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+    mock_redis_client.setex.side_effect = redis.RedisError("connection error")
+
+    response = test_client.post(
+        "/api/v1/auth/email-verify/request",
+        json={"email": "test@test.com"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "인증 서버에 일시적인 오류가 발생했습니다."
+
+
+def test_verify_email_redis_error(client, mock_redis_client):
+    test_client, _ = client
+    mock_redis_client.get.side_effect = redis.RedisError("connection error")
+
+    response = test_client.post(
+        "/api/v1/auth/email-verify",
+        json={"email": "test@test.com", "code": "123456"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "인증 서버에 일시적인 오류가 발생했습니다."
+
+
+def test_store_email_verified_redis_error(client, mock_redis_client):
+    test_client, _ = client
+    mock_redis_client.get.return_value = "123456"
+    mock_redis_client.setex.side_effect = redis.RedisError("connection error")
+
+    response = test_client.post(
+        "/api/v1/auth/email-verify",
+        json={"email": "test@test.com", "code": "123456"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "인증 서버에 일시적인 오류가 발생했습니다."

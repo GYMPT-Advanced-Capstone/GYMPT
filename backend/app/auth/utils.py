@@ -154,19 +154,37 @@ def store_verification_code(email: str, code: str) -> None:
     redis_client = get_redis_client()
     settings = get_settings()
     ttl = settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60
-    redis_client.setex(f"EMAIL_CODE:{email}", ttl, code)
+    try:
+        redis_client.setex(f"EMAIL_CODE:{email}", ttl, code)
+    except redis.RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="인증 서버에 일시적인 오류가 발생했습니다.",
+        )
 
 
 def store_email_verified(email: str) -> None:
     redis_client = get_redis_client()
     settings = get_settings()
     ttl = settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60
-    redis_client.setex(f"VERIFIED:{email}", ttl, "1")
+    try:
+        redis_client.setex(f"VERIFIED:{email}", ttl, "1")
+    except redis.RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="인증 서버에 일시적인 오류가 발생했습니다.",
+        )
 
 
 def is_email_verified(email: str) -> bool:
     redis_client = get_redis_client()
-    return redis_client.get(f"VERIFIED:{email}") == "1"
+    try:
+        return redis_client.get(f"VERIFIED:{email}") == "1"
+    except redis.RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="인증 서버에 일시적인 오류가 발생했습니다.",
+        )
 
 
 def delete_email_verified(email: str) -> None:
@@ -176,7 +194,13 @@ def delete_email_verified(email: str) -> None:
 
 def verify_verification_code(email: str, code: str) -> bool:
     redis_client = get_redis_client()
-    stored = redis_client.get(f"EMAIL_CODE:{email}")
+    try:
+        stored = redis_client.get(f"EMAIL_CODE:{email}")
+    except redis.RedisError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="인증 서버에 일시적인 오류가 발생했습니다.",
+        )
     if stored == code:
         redis_client.delete(f"EMAIL_CODE:{email}")
         return True

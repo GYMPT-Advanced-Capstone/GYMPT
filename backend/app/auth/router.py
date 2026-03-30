@@ -10,16 +10,18 @@ from app.core.database import get_db
 from app.core.config import get_settings
 from app.core.email import send_verification_email
 from app.users.models import User
-from app.auth.schemas import (
-    CheckResponse,
-    EmailVerify,
+from app.auth.dto.auth_request import (
+    EmailVerifyConfirmRequest,
     EmailVerifyRequest,
-    PasswordReset,
+    LoginRequest,
+    LogoutRequest,
+    PasswordResetConfirmRequest,
     PasswordResetRequest,
+    SignupRequest,
     TokenRefreshRequest,
-    UserCreate,
-    UserLogin,
-    UserLogout,
+)
+from app.auth.dto.auth_response import (
+    CheckResponse,
     TokenResponse,
 )
 from app.users.schemas import UserResponse
@@ -50,7 +52,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 @router.post(
     "/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED
 )
-def signup(user_data: UserCreate, db: Session = Depends(get_db)):
+def signup(user_data: SignupRequest, db: Session = Depends(get_db)):
     if not is_email_verified(user_data.email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -108,7 +110,7 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
+def login(user_data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data.email).first()
     if not user or not verify_password(user_data.pw, str(user.pw)):
         raise HTTPException(
@@ -140,7 +142,8 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
-    logout_data: UserLogout, token_data: tuple[str, str] = Depends(verify_access_token)
+    logout_data: LogoutRequest,
+    token_data: tuple[str, str] = Depends(verify_access_token),
 ):
     email, access_token = token_data
     revoke_tokens(access_token, logout_data.refresh_token, email)
@@ -164,7 +167,7 @@ def request_email_verify(data: EmailVerifyRequest, db: Session = Depends(get_db)
 
 
 @router.post("/email-verify", status_code=status.HTTP_204_NO_CONTENT)
-def verify_email(data: EmailVerify):
+def verify_email(data: EmailVerifyConfirmRequest):
     is_valid = verify_verification_code(data.email, data.code)
     if not is_valid:
         raise HTTPException(
@@ -182,7 +185,10 @@ def check_email(email: EmailStr = Query(...), db: Session = Depends(get_db)):
 
 
 @router.get("/check-nickname", response_model=CheckResponse)
-def check_nickname(nickname: str = Query(...), db: Session = Depends(get_db)):
+def check_nickname(
+    nickname: str = Query(..., min_length=1, max_length=100),
+    db: Session = Depends(get_db),
+):
     user = db.query(User).filter(User.nickname == nickname).first()
     return CheckResponse(available=user is None)
 
@@ -232,7 +238,7 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
 
 
 @router.post("/password-reset", status_code=status.HTTP_204_NO_CONTENT)
-def reset_password(data: PasswordReset, db: Session = Depends(get_db)):
+def reset_password(data: PasswordResetConfirmRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(
