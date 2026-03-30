@@ -12,3 +12,4 @@ class Exercise(Base):
     description = Column(String(250), nullable=True)
 
     records = relationship("ExerciseRecord", back_populates="exercise")
+    goals = relationship("UserExerciseGoal", back_populates="exercise")
