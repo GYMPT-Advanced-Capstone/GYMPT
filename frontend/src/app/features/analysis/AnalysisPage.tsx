@@ -27,7 +27,7 @@ export function AnalysisPage() {
         ],
         data: dates.map((date, index) => ({
           date,
-          userAngle: Math.floor(Math.random() * 51) + 80, 
+          userAngle: 80 + ((index * 17) % 51), 
           idealAngle: 130,
           id: `squat-item-${index}`
         }))
@@ -41,7 +41,7 @@ export function AnalysisPage() {
         ],
         data: dates.map((date, index) => ({
           date,
-          userAngle: Math.floor(Math.random() * 51) + 80,
+          userAngle: 80 + ((index * 23) % 51),
           idealAngle: 130,
           id: `lunge-item-${index}`
         }))
@@ -57,9 +57,9 @@ export function AnalysisPage() {
         ],
         data: dates.map((date, index) => ({
           date,
-          userAngle: Math.floor(Math.random() * 51) + 80,
+          userAngle: 80 + ((index * 11) % 51),
           idealAngle: 130,
-          userAngle2: Math.floor(Math.random() * 21) + 150,
+          userAngle2: 150 + ((index * 7) % 21),
           idealAngle2: 180,
           id: `pushup-item-${index}`
         }))
