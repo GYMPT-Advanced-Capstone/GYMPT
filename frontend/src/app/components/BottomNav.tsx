@@ -29,7 +29,9 @@ export function BottomNav() {
     >
       <div className="flex items-center justify-around" style={{ height: 64 }}>
         {navItems.map(({ label, icon: Icon, path }) => {
-          const isActive = location.pathname === path;
+          const isActive = 
+            location.pathname === path || 
+            (path === '/community' && location.pathname === '/create-post');
           return (
             <button
               key={path}
