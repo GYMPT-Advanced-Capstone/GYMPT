@@ -2,17 +2,28 @@ from contextlib import asynccontextmanager
 from importlib import import_module
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 from app.core.database import get_engine, Base
 from app.auth.router import router as auth_router
 from app.users.router import router as users_router
+from app.board.router import router as board_router
 from app.exercise.exercise_router import router as exercise_router
 from app.exercise_record.exercise_record_router import router as exercise_record_router
+
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+STATIC_DIR = BASE_DIR / "static"
+BOARD_IMAGE_DIR = STATIC_DIR / "board"
+
+BOARD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import_module("app.users.models")
+    import_module("app.board.models")
     import_module("app.exercise.exercise_model")
     import_module("app.exercise_record.exercise_record_model")
     Base.metadata.create_all(bind=get_engine())
@@ -26,6 +37,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 @app.get("/health")
 async def health_check():
@@ -34,6 +47,6 @@ async def health_check():
 
 app.include_router(exercise_router)
 app.include_router(exercise_record_router)
-
 app.include_router(auth_router)
 app.include_router(users_router)
+app.include_router(board_router)
