@@ -12,7 +12,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     pw = Column(String(255), nullable=False)
     name = Column(String(100), nullable=False)
-    nickname = Column(String(100), nullable=False)
+    nickname = Column(String(100), unique=True, nullable=False)
     birth_date = Column(Date, nullable=True)
     weekly_target = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
