@@ -33,7 +33,13 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture(autouse=True)
 def mock_redis_client():
     fake_redis = MagicMock()
-    fake_redis.get.return_value = None
+
+    def fake_get(key):
+        if key.startswith("VERIFIED:"):
+            return "1"
+        return None
+
+    fake_redis.get.side_effect = fake_get
     fake_redis.setex.return_value = True
     fake_redis.delete.return_value = 1
 
