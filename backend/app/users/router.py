@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -98,7 +99,8 @@ def create_exercise_goal(
     exercise = db.query(Exercise).filter(Exercise.id == data.exercise_id).first()
     if not exercise:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="존재하지 않는 운동 종목입니다."
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 운동 종목입니다.",
         )
     goal = UserExerciseGoal(
         user_id=user.id,
@@ -108,7 +110,14 @@ def create_exercise_goal(
         threshold=data.threshold,
     )
     db.add(goal)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="해당 운동 종목의 목표가 이미 존재합니다.",
+        )
     db.refresh(goal)
     return goal
 

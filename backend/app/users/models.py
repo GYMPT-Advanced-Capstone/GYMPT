@@ -7,6 +7,7 @@ from sqlalchemy import (
     String,
     DateTime,
     Date,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -39,6 +40,8 @@ class UserExerciseGoal(Base):
     daily_target_count = Column(Integer, nullable=True)
     daily_target_duration = Column(Integer, nullable=True)
     threshold = Column(Float, nullable=True)
+
+    __table_args__ = (UniqueConstraint("user_id", "exercise_id"),)
 
     user = relationship("User", back_populates="exercise_goals")
     exercise = relationship("Exercise", back_populates="goals")

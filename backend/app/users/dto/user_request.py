@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 class ExerciseGoalCreateRequest(BaseModel):
     exercise_id: int = Field(
         ...,
+        ge=1,
         description="운동 종목 ID",
         json_schema_extra={"example": 1},
     )
