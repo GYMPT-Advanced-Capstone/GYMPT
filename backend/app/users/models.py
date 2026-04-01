@@ -37,6 +37,7 @@ class UserExerciseGoal(Base):
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     exercise_id = Column(BigInteger, ForeignKey("exercises.id"), nullable=False)
     daily_target_count = Column(Integer, nullable=True)
+    daily_target_duration = Column(Integer, nullable=True)
     threshold = Column(Float, nullable=True)
 
     user = relationship("User", back_populates="exercise_goals")

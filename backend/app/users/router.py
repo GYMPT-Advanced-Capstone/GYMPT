@@ -104,6 +104,7 @@ def create_exercise_goal(
         user_id=user.id,
         exercise_id=data.exercise_id,
         daily_target_count=data.daily_target_count,
+        daily_target_duration=data.daily_target_duration,
         threshold=data.threshold,
     )
     db.add(goal)
@@ -138,13 +139,19 @@ def update_exercise_goal(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="운동 목표를 찾을 수 없습니다.",
         )
-    if data.daily_target_count is None and data.threshold is None:
+    if (
+        data.daily_target_count is None
+        and data.daily_target_duration is None
+        and data.threshold is None
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="수정할 항목을 하나 이상 입력해주세요.",
         )
     if data.daily_target_count is not None:
         goal.daily_target_count = data.daily_target_count  # type: ignore[assignment]
+    if data.daily_target_duration is not None:
+        goal.daily_target_duration = data.daily_target_duration  # type: ignore[assignment]
     if data.threshold is not None:
         goal.threshold = data.threshold  # type: ignore[assignment]
     db.commit()

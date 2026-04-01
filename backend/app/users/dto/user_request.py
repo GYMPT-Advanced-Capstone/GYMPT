@@ -13,6 +13,12 @@ class ExerciseGoalCreateRequest(BaseModel):
         description="일일 목표 횟수",
         json_schema_extra={"example": 10},
     )
+    daily_target_duration: int | None = Field(
+        default=None,
+        ge=1,
+        description="일일 목표 시간 (초)",
+        json_schema_extra={"example": 60},
+    )
     threshold: float | None = Field(
         default=None,
         ge=0.0,
@@ -28,6 +34,12 @@ class ExerciseGoalUpdateRequest(BaseModel):
         ge=1,
         description="수정할 일일 목표 횟수",
         json_schema_extra={"example": 15},
+    )
+    daily_target_duration: int | None = Field(
+        default=None,
+        ge=1,
+        description="수정할 일일 목표 시간 (초)",
+        json_schema_extra={"example": 90},
     )
     threshold: float | None = Field(
         default=None,
