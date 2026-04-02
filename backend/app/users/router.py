@@ -58,8 +58,8 @@ def get_main_summary(
     today_durations: dict[int, int] = {}
     for record in today_records:
         eid = int(record.exercise_id)
-        today_counts[eid] = today_counts.get(eid, 0) + record.count
-        today_durations[eid] = today_durations.get(eid, 0) + record.duration
+        today_counts[eid] = today_counts.get(eid, 0) + int(record.count)
+        today_durations[eid] = today_durations.get(eid, 0) + int(record.duration)
 
     goals_with_target = [
         g
@@ -78,7 +78,9 @@ def get_main_summary(
             and today_durations.get(int(g.exercise_id), 0) >= g.daily_target_duration
         )
     )
-    achievement_rate = (achieved / len(goals_with_target) * 100) if goals_with_target else 0.0
+    achievement_rate = (
+        (achieved / len(goals_with_target) * 100) if goals_with_target else 0.0
+    )
 
     today_completed_count = len(today_counts)
 
@@ -93,8 +95,10 @@ def get_main_summary(
     exercise_goal_summaries = [
         ExerciseGoalSummaryItem(
             exercise_id=int(goal.exercise_id),
-            exercise_name=exercise_map.get(int(goal.exercise_id), ""),
-            daily_target_count=goal.daily_target_count,
+            exercise_name=str(exercise_map.get(int(goal.exercise_id), "")),
+            daily_target_count=int(goal.daily_target_count)
+            if goal.daily_target_count is not None
+            else None,
             today_count=today_counts.get(int(goal.exercise_id), 0),
         )
         for goal in goals
@@ -106,7 +110,7 @@ def get_main_summary(
     ]
 
     return MainSummaryResponse(
-        nickname=user.nickname,
+        nickname=str(user.nickname),
         today_achievement_rate=round(achievement_rate, 1),
         today_completed_count=today_completed_count,
         exercise_goals=exercise_goal_summaries,
