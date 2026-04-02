@@ -82,9 +82,53 @@ def test_get_main_summary_success(client, mock_redis_client, access_token, fake_
     assert len(data["exercise_goals"]) == 1
     assert data["exercise_goals"][0]["exercise_name"] == "스쿼트"
     assert data["exercise_goals"][0]["today_count"] == 10
+    assert data["exercise_goals"][0]["today_duration"] == 60
     assert len(data["weekly_workout_days"]) == 7
+    assert data["weekly_workout_days"][today.weekday()] is True
     assert data["badges"] == []
     assert data["ai_comment"] is None
+
+
+def test_get_main_summary_duration_goal(
+    client, mock_redis_client, access_token, fake_user
+):
+    test_client, mock_db = client
+    mock_redis_client.get.return_value = None
+
+    today = date.today()
+    fake_goal = UserExerciseGoal(
+        id=1, user_id=1, exercise_id=2, daily_target_duration=60
+    )
+    fake_exercise = Exercise(id=2, name="플랭크")
+    fake_record = ExerciseRecord(
+        id=1,
+        user_id=1,
+        exercise_id=2,
+        count=0,
+        duration=60,
+        calories=10,
+        score=90,
+        accuracy_avg=85,
+        completed_at=datetime.combine(today, datetime.min.time()),
+    )
+
+    mock_db.query.return_value.filter.return_value.first.side_effect = [fake_user]
+    mock_db.query.return_value.filter.return_value.all.side_effect = [
+        [fake_goal],
+        [fake_record],
+        [fake_exercise],
+    ]
+
+    response = test_client.get(
+        "/api/v1/users/me/summary",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["today_achievement_rate"] == 100.0
+    assert data["exercise_goals"][0]["daily_target_duration"] == 60
+    assert data["exercise_goals"][0]["today_duration"] == 60
 
 
 def test_get_main_summary_no_goals(client, mock_redis_client, access_token, fake_user):

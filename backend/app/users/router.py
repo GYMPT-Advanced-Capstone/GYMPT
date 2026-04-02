@@ -99,7 +99,11 @@ def get_main_summary(
             daily_target_count=int(goal.daily_target_count)
             if goal.daily_target_count is not None
             else None,
+            daily_target_duration=int(goal.daily_target_duration)
+            if goal.daily_target_duration is not None
+            else None,
             today_count=today_counts.get(int(goal.exercise_id), 0),
+            today_duration=today_durations.get(int(goal.exercise_id), 0),
         )
         for goal in goals
     ]

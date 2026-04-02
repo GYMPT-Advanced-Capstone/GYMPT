@@ -17,10 +17,20 @@ class ExerciseGoalSummaryItem(BaseModel):
         description="일일 목표 횟수",
         json_schema_extra={"example": 10},
     )
+    daily_target_duration: int | None = Field(
+        default=None,
+        description="일일 목표 시간 (초)",
+        json_schema_extra={"example": 60},
+    )
     today_count: int = Field(
         ...,
         description="오늘 완료한 횟수",
         json_schema_extra={"example": 5},
+    )
+    today_duration: int = Field(
+        default=0,
+        description="오늘 완료한 시간 (초)",
+        json_schema_extra={"example": 60},
     )
 
 
