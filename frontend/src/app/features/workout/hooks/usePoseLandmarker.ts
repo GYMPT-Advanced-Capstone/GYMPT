@@ -53,11 +53,11 @@ interface UsePoseLandmarkerResult {
   hasPoseLandmarks: boolean;
 }
 
-const MP_ESM_URL =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
-const MP_SCRIPT_URL =
-  "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js";
-const MP_WASM_ROOT = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm";
+const MP_VERSION = "0.10.14";
+const MP_PACKAGE = `@mediapipe/tasks-vision@${MP_VERSION}`;
+const MP_ESM_URL = `https://cdn.jsdelivr.net/npm/${MP_PACKAGE}/+esm`;
+const MP_SCRIPT_URL = `https://cdn.jsdelivr.net/npm/${MP_PACKAGE}/vision_bundle.js`;
+const MP_WASM_ROOT = `https://cdn.jsdelivr.net/npm/${MP_PACKAGE}/wasm`;
 const MP_MODEL_URL =
   "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
 
@@ -103,9 +103,17 @@ async function ensureScriptLoaded(): Promise<void> {
 
   if (!scriptPromise) {
     scriptPromise = new Promise<void>((resolve, reject) => {
-      const existing = document.querySelector(
+      let existing = document.querySelector(
         `script[data-mediapipe-vision="true"]`,
       ) as HTMLScriptElement | null;
+
+      if (existing) {
+        const loadState = existing.dataset.mediapipeLoadState;
+        if (loadState === "error") {
+          existing.remove();
+          existing = null;
+        }
+      }
 
       if (existing) {
         existing.addEventListener("load", () => resolve(), { once: true });
@@ -122,13 +130,31 @@ async function ensureScriptLoaded(): Promise<void> {
       script.async = true;
       script.crossOrigin = "anonymous";
       script.dataset.mediapipeVision = "true";
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error("Failed to load MediaPipe script."));
+      script.dataset.mediapipeLoadState = "loading";
+      script.onload = () => {
+        script.dataset.mediapipeLoadState = "loaded";
+        resolve();
+      };
+      script.onerror = () => {
+        script.dataset.mediapipeLoadState = "error";
+        reject(new Error("Failed to load MediaPipe script."));
+      };
       document.head.appendChild(script);
     });
   }
 
-  await scriptPromise;
+  try {
+    await scriptPromise;
+  } catch (error) {
+    scriptPromise = null;
+    document.querySelectorAll(`script[data-mediapipe-vision="true"]`).forEach((scriptNode) => {
+      const script = scriptNode as HTMLScriptElement;
+      if (script.dataset.mediapipeLoadState === "error") {
+        script.remove();
+      }
+    });
+    throw error;
+  }
 }
 
 async function loadRuntime(): Promise<VisionRuntime> {

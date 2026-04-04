@@ -100,10 +100,12 @@ export function useCameraPreview(
       const nextStream = await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
       streamRef.current = nextStream;
 
-      if (videoRef.current) {
-        videoRef.current.srcObject = nextStream;
-        await videoRef.current.play().catch(() => undefined);
+      const video = videoRef.current;
+      if (!video) {
+        throw new Error("Camera video element is not ready.");
       }
+      video.srcObject = nextStream;
+      await video.play();
 
       setIsStreaming(true);
       setCameraStatus("ready");

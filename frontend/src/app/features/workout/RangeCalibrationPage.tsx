@@ -15,6 +15,7 @@ const TEXT = {
   noticeGuide: "본인의 관절 최대 가동 범위를 설정하는 단계입니다.",
   activeGuide: "고통을 느끼지 전까지 무릎을 최대한 굽혀주세요.",
   modelError: "AI 자세 분석을 시작할 수 없습니다.",
+  retry: "다시 시도",
   completeTitle: "가동 범위 설정 완료!",
   start: "자세 설정 시작",
   detect: "자세 인식 중...",
@@ -50,10 +51,14 @@ function resolveActionLabel(params: {
   isCalibrationComplete: boolean;
   isStreaming: boolean;
   canCompleteCalibration: boolean;
+  isPoseError: boolean;
 }): string {
-  const { isCalibrationComplete, isStreaming, canCompleteCalibration } = params;
+  const { isCalibrationComplete, isStreaming, canCompleteCalibration, isPoseError } = params;
   if (isCalibrationComplete) {
     return TEXT.next;
+  }
+  if (isPoseError) {
+    return TEXT.retry;
   }
   if (!isStreaming) {
     return TEXT.start;
@@ -91,12 +96,13 @@ export function RangeCalibrationPage() {
   });
 
   const resolvedExerciseId = exerciseId ?? "squat";
+  const isPoseError = poseStatus === "error";
 
   let noticeMessage: string = TEXT.noticeGuide;
   if (isStreaming) {
     noticeMessage = TEXT.activeGuide;
   }
-  if (poseStatus === "error") {
+  if (isPoseError) {
     noticeMessage = poseErrorMessage ?? TEXT.modelError;
   }
 
@@ -104,6 +110,12 @@ export function RangeCalibrationPage() {
     if (isCalibrationComplete) {
       markCalibrated(resolvedExerciseId);
       navigate("/workout/camera");
+      return;
+    }
+
+    if (isPoseError) {
+      stopCamera();
+      void requestCamera();
       return;
     }
 
@@ -121,8 +133,9 @@ export function RangeCalibrationPage() {
     isCalibrationComplete,
     isStreaming,
     canCompleteCalibration,
+    isPoseError,
   });
-  const actionDisabled = !isCalibrationComplete && isStreaming && !canCompleteCalibration;
+  const actionDisabled = !isCalibrationComplete && !isPoseError && isStreaming && !canCompleteCalibration;
 
   return (
     <div className="flex min-h-[100dvh] items-start justify-center bg-[#080A0D]">
