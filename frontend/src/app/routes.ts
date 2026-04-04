@@ -3,6 +3,8 @@ import { createBrowserRouter } from "react-router";
 import { LoginPage } from "./features/auth/LoginPage";
 import { SignUpPage } from "./features/auth/SignUpPage";
 import { FindPasswordPage } from "./features/auth/FindPasswordPage";
+import { CameraAnalysisPage } from "./features/workout/CameraAnalysisPage";
+import { RangeCalibrationPage } from "./features/workout/RangeCalibrationPage";
 
 import { GoalBirthdayPage } from "./features/onboarding/GoalBirthdayPage";
 import { GoalWeeklyPage } from "./features/onboarding/GoalWeeklyPage";
@@ -18,7 +20,7 @@ import { PostWorkout } from "./features/workout/PostWorkout";
 import { Community } from "./features/community/Community";
 import { CreatePost } from "./features/community/CreatePost";
 
-import { AnalysisPage } from './features/analysis/AnalysisPage';
+import { AnalysisPage } from "./features/analysis/AnalysisPage";
 
 
 export const router = createBrowserRouter([
@@ -33,7 +35,8 @@ export const router = createBrowserRouter([
   { path: "/goal/ready", Component: GoalReadyPage },
 
   { path: "/main", Component: MainPage },
-
+  { path: "/workout/calibration/:exerciseId", Component: RangeCalibrationPage },
+  { path: "/workout/camera", Component: CameraAnalysisPage },
   { path: "/post-workout", Component: PostWorkout },
   { path: "/community", Component: Community },
   { path: "/create-post", Component: CreatePost },

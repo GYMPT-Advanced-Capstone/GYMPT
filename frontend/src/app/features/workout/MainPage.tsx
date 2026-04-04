@@ -38,10 +38,15 @@ export function MainPage() {
   const { exerciseCounts } = goal;
 
   const handleExerciseClick = (exerciseId: string) => {
+    if (exerciseId !== "squat") {
+      navigate("/workout/camera");
+      return;
+    }
+
     if (calibratedExercises[exerciseId]) {
-      navigate(`/camera/${exerciseId}`);
+      navigate("/workout/camera");
     } else {
-      navigate(`/calibration/${exerciseId}`);
+      navigate(`/workout/calibration/${exerciseId}`);
     }
   };
 
