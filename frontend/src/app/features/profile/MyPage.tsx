@@ -11,14 +11,16 @@ import {
   Plus,
   X,
   Check,
+  RotateCcw,
+  Gauge,
 } from "lucide-react";
 import { useGoal } from "../../context/GoalContext";
 import { BottomNav } from "../../components/BottomNav";
 
-//이 부분 mock값이고 추후 api 연동 예정
+// 여기 나중에 연동 예정
 const MOCK_USER = {
   name: "박준서",
-  username: "junseo@naver.com",
+  username: "junseo_fit",
   joinDate: "2026.01.15",
   level: "Lv.3 피트니스 루키",
 };
@@ -33,69 +35,37 @@ type EditTarget =
   | null;
 
 const exerciseMeta = {
-  squat: {
-    name: "스쿼트",
-    unit: "개",
-    min: 5,
-    max: 100,
-    step: 1,
-  },
+  squat: { name: "스쿼트", unit: "개", min: 5, max: 100, step: 1 },
   lunge: { name: "런지", unit: "개", min: 5, max: 60, step: 1 },
-  pushup: {
-    name: "푸시업",
-    unit: "개",
-    min: 3,
-    max: 80,
-    step: 1,
-  },
-  plank: {
-    name: "플랭크",
-    unit: "초",
-    min: 10,
-    max: 300,
-    step: 5,
-  },
+  pushup: { name: "푸시업", unit: "개", min: 3, max: 80, step: 1 },
+  plank: { name: "플랭크", unit: "초", min: 10, max: 300, step: 5 },
 };
 
 export function MyPage() {
   const navigate = useNavigate();
   const { goal, updateGoal } = useGoal();
 
-  const [editTarget, setEditTarget] =
-    useState<EditTarget>(null);
-
+  const [editTarget, setEditTarget] = useState<EditTarget>(null);
   const [tmpBirthday, setTmpBirthday] = useState(goal.birthday);
-  const [tmpWeekly, setTmpWeekly] = useState(
-    goal.weeklyFrequency,
-  );
+  const [tmpWeekly, setTmpWeekly] = useState(goal.weeklyFrequency);
   const [tmpCount, setTmpCount] = useState(0);
-
-  const [showLogoutConfirm, setShowLogoutConfirm] =
-    useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [resetTarget, setResetTarget] = useState<keyof typeof exerciseMeta | null>(null);
 
   const openEdit = (target: EditTarget) => {
     setEditTarget(target);
     if (target === "birthday") setTmpBirthday(goal.birthday);
     if (target === "weekly") setTmpWeekly(goal.weeklyFrequency);
     if (target && target in exerciseMeta)
-      setTmpCount(
-        goal.exerciseCounts[
-          target as keyof typeof exerciseMeta
-        ],
-      );
+      setTmpCount(goal.exerciseCounts[target as keyof typeof exerciseMeta]);
   };
 
   const saveEdit = () => {
-    if (editTarget === "birthday")
-      updateGoal({ birthday: tmpBirthday });
-    if (editTarget === "weekly")
-      updateGoal({ weeklyFrequency: tmpWeekly });
+    if (editTarget === "birthday") updateGoal({ birthday: tmpBirthday });
+    if (editTarget === "weekly") updateGoal({ weeklyFrequency: tmpWeekly });
     if (editTarget && editTarget in exerciseMeta) {
       updateGoal({
-        exerciseCounts: {
-          ...goal.exerciseCounts,
-          [editTarget]: tmpCount,
-        },
+        exerciseCounts: { ...goal.exerciseCounts, [editTarget]: tmpCount },
       });
     }
     setEditTarget(null);
@@ -106,19 +76,18 @@ export function MyPage() {
     navigate("/");
   };
 
+  const handleResetThreshold = () => {
+    setResetTarget(null);
+  };
+
   const { birthday, weeklyFrequency, exerciseCounts } = goal;
-
   const formattedBirthday = `${birthday.year}.${String(birthday.month).padStart(2, "0")}.${String(birthday.day).padStart(2, "0")}`;
-
   const age = 2026 - birthday.year;
 
   return (
     <div
       className="flex justify-center items-start"
-      style={{
-        minHeight: "100dvh",
-        backgroundColor: "#111111",
-      }}
+      style={{ minHeight: "100dvh", backgroundColor: "#111111" }}
     >
       <div
         className="flex flex-col"
@@ -175,22 +144,10 @@ export function MyPage() {
             </div>
 
             <div className="flex flex-col">
-              <span
-                style={{
-                  color: "#FFFFFF",
-                  fontSize: 20,
-                  fontWeight: 700,
-                }}
-              >
+              <span style={{ color: "#FFFFFF", fontSize: 20, fontWeight: 700 }}>
                 {MOCK_USER.name}
               </span>
-              <span
-                style={{
-                  color: "#888888",
-                  fontSize: 13,
-                  marginTop: 2,
-                }}
-              >
+              <span style={{ color: "#888888", fontSize: 13, marginTop: 2 }}>
                 @{MOCK_USER.username}
               </span>
               <div
@@ -201,13 +158,7 @@ export function MyPage() {
                   width: "fit-content",
                 }}
               >
-                <span
-                  style={{
-                    color: "#3FFDD4",
-                    fontSize: 11,
-                    fontWeight: 600,
-                  }}
-                >
+                <span style={{ color: "#3FFDD4", fontSize: 11, fontWeight: 600 }}>
                   {MOCK_USER.level}
                 </span>
               </div>
@@ -217,36 +168,18 @@ export function MyPage() {
           <div className="flex gap-3 mt-5">
             {[
               { label: "나이", value: `${age}세` },
-              {
-                label: "주간 목표",
-                value: `${weeklyFrequency}회`,
-              },
+              { label: "주간 목표", value: `${weeklyFrequency}회` },
               { label: "운동 종목", value: "4가지" },
             ].map((s) => (
               <div
                 key={s.label}
                 className="flex flex-col items-center flex-1 rounded-xl py-3"
-                style={{
-                  backgroundColor: "#2C2C30",
-                  border: "1px solid #3A3A3E",
-                }}
+                style={{ backgroundColor: "#2C2C30", border: "1px solid #3A3A3E" }}
               >
-                <span
-                  style={{
-                    color: "#3FFDD4",
-                    fontSize: 16,
-                    fontWeight: 700,
-                  }}
-                >
+                <span style={{ color: "#3FFDD4", fontSize: 16, fontWeight: 700 }}>
                   {s.value}
                 </span>
-                <span
-                  style={{
-                    color: "#888888",
-                    fontSize: 11,
-                    marginTop: 2,
-                  }}
-                >
+                <span style={{ color: "#888888", fontSize: 11, marginTop: 2 }}>
                   {s.label}
                 </span>
               </div>
@@ -254,10 +187,7 @@ export function MyPage() {
           </div>
         </div>
 
-        <Section
-          title="사용자 정보"
-          icon={<User size={15} color="#3FFDD4" />}
-        >
+        <Section title="사용자 정보" icon={<User size={15} color="#3FFDD4" />}>
           <InfoRow label="이름" value={MOCK_USER.name} />
           <InfoRow label="아이디" value={MOCK_USER.username} />
           <InfoRow label="가입일" value={MOCK_USER.joinDate} />
@@ -294,6 +224,66 @@ export function MyPage() {
         </Section>
 
         <Section
+          title="운동 임계값 초기화"
+          icon={<Gauge size={15} color="#3FFDD4" />}
+          topGap
+        >
+          <div className="px-5 py-3">
+            <p style={{ color: "#888888", fontSize: 12, marginBottom: 14 }}>
+              촬영 전 측정한 임계값을 운동별로 초기화할 수 있어요
+            </p>
+            <div className="flex flex-col gap-3">
+              {(Object.entries(exerciseMeta) as [
+                keyof typeof exerciseMeta,
+                (typeof exerciseMeta)[keyof typeof exerciseMeta],
+              ][]).map(([key, meta]) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between px-4 rounded-xl"
+                  style={{
+                    backgroundColor: "#242428",
+                    border: "1px solid #2C2C30",
+                    height: 52,
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex items-center justify-center rounded-lg"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        backgroundColor: "rgba(63,253,212,0.08)",
+                        border: "1px solid rgba(63,253,212,0.2)",
+                      }}
+                    >
+                      <Dumbbell size={14} color="#3FFDD4" />
+                    </div>
+                    <span style={{ color: "#CCCCCC", fontSize: 14 }}>
+                      {meta.name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setResetTarget(key)}
+                    className="flex items-center gap-1.5 px-3 rounded-lg"
+                    style={{
+                      height: 32,
+                      backgroundColor: "rgba(255,90,90,0.1)",
+                      border: "1px solid rgba(255,90,90,0.25)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <RotateCcw size={12} color="#FF5A5A" />
+                    <span style={{ color: "#FF5A5A", fontSize: 12, fontWeight: 600 }}>
+                      초기화
+                    </span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Section>
+
+        <Section
           title="계정"
           icon={<Dumbbell size={15} color="#3FFDD4" />}
           topGap
@@ -310,9 +300,7 @@ export function MyPage() {
           >
             <div className="flex items-center gap-3">
               <LogOut size={17} color="#FF5A5A" />
-              <span style={{ color: "#FF5A5A", fontSize: 15 }}>
-                로그아웃
-              </span>
+              <span style={{ color: "#FF5A5A", fontSize: 15 }}>로그아웃</span>
             </div>
             <ChevronRight size={16} color="#555555" />
           </button>
@@ -355,6 +343,20 @@ export function MyPage() {
           onCancel={() => setShowLogoutConfirm(false)}
         />
       )}
+
+      {resetTarget && (
+        <ConfirmSheet
+          message={`${exerciseMeta[resetTarget].name} 임계값을 초기화할까요?`}
+          subMessage="다음 촬영 시 임계값을 다시 측정해야 해요"
+          confirmLabel="초기화"
+          confirmColor="#FF5A5A"
+          onConfirm={handleResetThreshold}
+          onCancel={() => setResetTarget(null)}
+          icon={<RotateCcw size={24} color="#FF5A5A" />}
+          iconBg="rgba(255,90,90,0.12)"
+          iconBorder="rgba(255,90,90,0.3)"
+        />
+      )}
     </div>
   );
 }
@@ -388,9 +390,7 @@ function Section({
           {title}
         </span>
       </div>
-      <div style={{ backgroundColor: "#1E1E22" }}>
-        {children}
-      </div>
+      <div style={{ backgroundColor: "#1E1E22" }}>{children}</div>
     </div>
   );
 }
@@ -409,28 +409,15 @@ function InfoRow({
       className="flex items-center justify-between px-5 py-4"
       style={{ borderBottom: "1px solid #2C2C30" }}
     >
-      <span style={{ color: "#888888", fontSize: 14 }}>
-        {label}
-      </span>
+      <span style={{ color: "#888888", fontSize: 14 }}>{label}</span>
       <div className="flex items-center gap-2">
-        <span
-          style={{
-            color: "#FFFFFF",
-            fontSize: 14,
-            fontWeight: 500,
-          }}
-        >
+        <span style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 500 }}>
           {value}
         </span>
         {onEdit && (
           <button
             onClick={onEdit}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: 2,
-            }}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}
           >
             <Edit3 size={14} color="#3FFDD4" />
           </button>
@@ -460,17 +447,9 @@ function GoalRow({
         cursor: "pointer",
       }}
     >
-      <span style={{ color: "#CCCCCC", fontSize: 14 }}>
-        {label}
-      </span>
+      <span style={{ color: "#CCCCCC", fontSize: 14 }}>{label}</span>
       <div className="flex items-center gap-2">
-        <span
-          style={{
-            color: "#3FFDD4",
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
+        <span style={{ color: "#3FFDD4", fontSize: 14, fontWeight: 600 }}>
           {value}
         </span>
         <ChevronRight size={15} color="#555555" />
@@ -492,11 +471,7 @@ function EditModal({
 }: {
   editTarget: EditTarget;
   tmpBirthday: { year: number; month: number; day: number };
-  setTmpBirthday: (v: {
-    year: number;
-    month: number;
-    day: number;
-  }) => void;
+  setTmpBirthday: (v: { year: number; month: number; day: number }) => void;
   tmpWeekly: number;
   setTmpWeekly: (v: number) => void;
   tmpCount: number;
@@ -512,13 +487,8 @@ function EditModal({
   return (
     <div
       className="fixed inset-0 flex justify-center items-end"
-      style={{
-        zIndex: 200,
-        backgroundColor: "rgba(0,0,0,0.65)",
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      style={{ zIndex: 200, backgroundColor: "rgba(0,0,0,0.65)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="w-full rounded-t-3xl px-6 pt-5 pb-10"
@@ -530,32 +500,18 @@ function EditModal({
       >
         <div
           className="mx-auto mb-5 rounded-full"
-          style={{
-            width: 40,
-            height: 4,
-            backgroundColor: "#3A3A3E",
-          }}
+          style={{ width: 40, height: 4, backgroundColor: "#3A3A3E" }}
         />
 
         <div className="flex items-center justify-between mb-5">
-          <span
-            style={{
-              color: "#FFFFFF",
-              fontSize: 17,
-              fontWeight: 700,
-            }}
-          >
+          <span style={{ color: "#FFFFFF", fontSize: 17, fontWeight: 700 }}>
             {editTarget === "birthday" && "생년월일 수정"}
             {editTarget === "weekly" && "주간 운동 횟수 수정"}
             {isExercise && `${meta!.name} 목표 수정`}
           </span>
           <button
             onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-            }}
+            style={{ background: "none", border: "none", cursor: "pointer" }}
           >
             <X size={20} color="#888888" />
           </button>
@@ -586,29 +542,17 @@ function EditModal({
                 <CounterBtn
                   disabled={tmpBirthday.year <= 1940}
                   onClick={() =>
-                    setTmpBirthday({
-                      ...tmpBirthday,
-                      year: tmpBirthday.year - 1,
-                    })
+                    setTmpBirthday({ ...tmpBirthday, year: tmpBirthday.year - 1 })
                   }
                   icon={<Minus size={16} />}
                 />
-                <span
-                  style={{
-                    color: "#3FFDD4",
-                    fontSize: 22,
-                    fontWeight: 700,
-                  }}
-                >
+                <span style={{ color: "#3FFDD4", fontSize: 22, fontWeight: 700 }}>
                   {tmpBirthday.year}
                 </span>
                 <CounterBtn
                   disabled={tmpBirthday.year >= 2015}
                   onClick={() =>
-                    setTmpBirthday({
-                      ...tmpBirthday,
-                      year: tmpBirthday.year + 1,
-                    })
+                    setTmpBirthday({ ...tmpBirthday, year: tmpBirthday.year + 1 })
                   }
                   icon={<Plus size={16} />}
                 />
@@ -638,29 +582,17 @@ function EditModal({
                   <CounterBtn
                     disabled={tmpBirthday.month <= 1}
                     onClick={() =>
-                      setTmpBirthday({
-                        ...tmpBirthday,
-                        month: tmpBirthday.month - 1,
-                      })
+                      setTmpBirthday({ ...tmpBirthday, month: tmpBirthday.month - 1 })
                     }
                     icon={<Minus size={14} />}
                   />
-                  <span
-                    style={{
-                      color: "#3FFDD4",
-                      fontSize: 20,
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span style={{ color: "#3FFDD4", fontSize: 20, fontWeight: 700 }}>
                     {tmpBirthday.month}
                   </span>
                   <CounterBtn
                     disabled={tmpBirthday.month >= 12}
                     onClick={() =>
-                      setTmpBirthday({
-                        ...tmpBirthday,
-                        month: tmpBirthday.month + 1,
-                      })
+                      setTmpBirthday({ ...tmpBirthday, month: tmpBirthday.month + 1 })
                     }
                     icon={<Plus size={14} />}
                   />
@@ -689,29 +621,17 @@ function EditModal({
                   <CounterBtn
                     disabled={tmpBirthday.day <= 1}
                     onClick={() =>
-                      setTmpBirthday({
-                        ...tmpBirthday,
-                        day: tmpBirthday.day - 1,
-                      })
+                      setTmpBirthday({ ...tmpBirthday, day: tmpBirthday.day - 1 })
                     }
                     icon={<Minus size={14} />}
                   />
-                  <span
-                    style={{
-                      color: "#3FFDD4",
-                      fontSize: 20,
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span style={{ color: "#3FFDD4", fontSize: 20, fontWeight: 700 }}>
                     {tmpBirthday.day}
                   </span>
                   <CounterBtn
                     disabled={tmpBirthday.day >= 31}
                     onClick={() =>
-                      setTmpBirthday({
-                        ...tmpBirthday,
-                        day: tmpBirthday.day + 1,
-                      })
+                      setTmpBirthday({ ...tmpBirthday, day: tmpBirthday.day + 1 })
                     }
                     icon={<Plus size={14} />}
                   />
@@ -723,13 +643,7 @@ function EditModal({
 
         {editTarget === "weekly" && (
           <div>
-            <p
-              style={{
-                color: "#888888",
-                fontSize: 13,
-                marginBottom: 16,
-              }}
-            >
+            <p style={{ color: "#888888", fontSize: 13, marginBottom: 16 }}>
               일주일에 몇 번 운동할 건가요?
             </p>
             <div className="flex gap-3">
@@ -740,11 +654,9 @@ function EditModal({
                   className="flex-1 flex items-center justify-center rounded-xl"
                   style={{
                     height: 52,
-                    backgroundColor:
-                      tmpWeekly === n ? "#3FFDD4" : "#2C2C30",
+                    backgroundColor: tmpWeekly === n ? "#3FFDD4" : "#2C2C30",
                     border: `1px solid ${tmpWeekly === n ? "#3FFDD4" : "#3A3A3E"}`,
-                    color:
-                      tmpWeekly === n ? "#0A1A16" : "#CCCCCC",
+                    color: tmpWeekly === n ? "#0A1A16" : "#CCCCCC",
                     fontSize: 16,
                     fontWeight: tmpWeekly === n ? 700 : 400,
                     cursor: "pointer",
@@ -769,13 +681,7 @@ function EditModal({
 
         {isExercise && meta && (
           <div>
-            <p
-              style={{
-                color: "#888888",
-                fontSize: 13,
-                marginBottom: 20,
-              }}
-            >
+            <p style={{ color: "#888888", fontSize: 13, marginBottom: 20 }}>
               {meta.name} 목표를 조정해보세요
             </p>
             <div
@@ -788,11 +694,7 @@ function EditModal({
             >
               <CounterBtn
                 disabled={tmpCount <= meta.min}
-                onClick={() =>
-                  setTmpCount(
-                    Math.max(meta.min, tmpCount - meta.step),
-                  )
-                }
+                onClick={() => setTmpCount(Math.max(meta.min, tmpCount - meta.step))}
                 icon={<Minus size={20} />}
                 size={44}
               />
@@ -807,23 +709,13 @@ function EditModal({
                 >
                   {tmpCount}
                 </span>
-                <span
-                  style={{
-                    color: "#888888",
-                    fontSize: 13,
-                    marginTop: 4,
-                  }}
-                >
+                <span style={{ color: "#888888", fontSize: 13, marginTop: 4 }}>
                   {meta.unit}
                 </span>
               </div>
               <CounterBtn
                 disabled={tmpCount >= meta.max}
-                onClick={() =>
-                  setTmpCount(
-                    Math.min(meta.max, tmpCount + meta.step),
-                  )
-                }
+                onClick={() => setTmpCount(Math.min(meta.max, tmpCount + meta.step))}
                 icon={<Plus size={20} />}
                 size={44}
               />
@@ -889,24 +781,29 @@ function CounterBtn({
 
 function ConfirmSheet({
   message,
+  subMessage,
   confirmLabel,
   confirmColor,
   onConfirm,
   onCancel,
+  icon,
+  iconBg,
+  iconBorder,
 }: {
   message: string;
+  subMessage?: string;
   confirmLabel: string;
   confirmColor: string;
   onConfirm: () => void;
   onCancel: () => void;
+  icon?: React.ReactNode;
+  iconBg?: string;
+  iconBorder?: string;
 }) {
   return (
     <div
       className="fixed inset-0 flex justify-center items-end"
-      style={{
-        zIndex: 300,
-        backgroundColor: "rgba(0,0,0,0.7)",
-      }}
+      style={{ zIndex: 300, backgroundColor: "rgba(0,0,0,0.7)" }}
     >
       <div
         className="w-full rounded-t-3xl px-6 pt-5 pb-10"
@@ -918,11 +815,7 @@ function ConfirmSheet({
       >
         <div
           className="mx-auto mb-6 rounded-full"
-          style={{
-            width: 40,
-            height: 4,
-            backgroundColor: "#3A3A3E",
-          }}
+          style={{ width: 40, height: 4, backgroundColor: "#3A3A3E" }}
         />
 
         <div className="flex justify-center mb-4">
@@ -931,11 +824,11 @@ function ConfirmSheet({
             style={{
               width: 56,
               height: 56,
-              backgroundColor: "rgba(255,90,90,0.12)",
-              border: "1px solid rgba(255,90,90,0.3)",
+              backgroundColor: iconBg ?? "rgba(255,90,90,0.12)",
+              border: `1px solid ${iconBorder ?? "rgba(255,90,90,0.3)"}`,
             }}
           >
-            <LogOut size={24} color="#FF5A5A" />
+            {icon ?? <LogOut size={24} color="#FF5A5A" />}
           </div>
         </div>
 
@@ -958,21 +851,20 @@ function ConfirmSheet({
             marginBottom: 28,
           }}
         >
-          로그아웃 후 다시 로그인이 필요해요
+          {subMessage ?? "로그아웃 후 다시 로그인이 필요해요"}
         </p>
 
         <div className="flex gap-3">
           <button
             onClick={onCancel}
+            className="flex-1 flex items-center justify-center rounded-2xl"
             style={{
-              flex: 1,
               height: 52,
               backgroundColor: "#2C2C30",
               border: "1px solid #3A3A3E",
-              borderRadius: 14,
               color: "#CCCCCC",
               fontSize: 15,
-              fontWeight: 500,
+              fontWeight: 600,
               cursor: "pointer",
             }}
           >
@@ -980,12 +872,11 @@ function ConfirmSheet({
           </button>
           <button
             onClick={onConfirm}
+            className="flex-1 flex items-center justify-center rounded-2xl"
             style={{
-              flex: 1,
               height: 52,
               backgroundColor: confirmColor,
               border: "none",
-              borderRadius: 14,
               color: "#FFFFFF",
               fontSize: 15,
               fontWeight: 700,
