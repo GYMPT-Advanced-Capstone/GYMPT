@@ -75,7 +75,7 @@ export function PostWorkout() {
 
         <div className="flex gap-3 mt-auto pt-4 shrink-0">
           <button 
-            onClick={() => navigate('/camera')}
+            onClick={() => navigate("/workout/camera")}
             className="flex-1 bg-[#3FFDD4] text-[#111111] text-[16px] font-bold py-4 rounded-2xl shadow-[0_4px_20px_rgba(63,253,212,0.2)] hover:brightness-110 transition-all active:scale-[0.98]"
           >
             운동 재개
