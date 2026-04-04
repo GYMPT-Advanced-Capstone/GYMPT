@@ -32,13 +32,15 @@ const STATUS_MAP: Record<SquatAnalysisStatus, true> = {
   insufficient_visibility: true,
 };
 
+const INITIAL_ANALYSIS: SquatAnalysisSnapshot = {
+  timestampMs: 0,
+  status: "idle",
+  feedbackMessage: "",
+  fullRepCount: 0,
+};
+
 function createInitialAnalysis(): SquatAnalysisSnapshot {
-  return {
-    timestampMs: 0,
-    status: "idle",
-    feedbackMessage: "",
-    fullRepCount: 0,
-  };
+  return { ...INITIAL_ANALYSIS };
 }
 
 function resolveWebSocketUrl(): string {
@@ -149,17 +151,6 @@ export function useSquatAnalysis({
   useEffect(() => {
     if (!enabled) {
       lastSentAtMsRef.current = 0;
-      setAnalysis((prev) => {
-        if (
-          prev.status === "idle"
-          && prev.feedbackMessage.length === 0
-          && prev.fullRepCount === 0
-          && prev.timestampMs === 0
-        ) {
-          return prev;
-        }
-        return createInitialAnalysis();
-      });
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -248,7 +239,7 @@ export function useSquatAnalysis({
   }, [enabled]);
 
   return {
-    analysis,
+    analysis: enabled ? analysis : INITIAL_ANALYSIS,
     onPoseLandmarks,
   };
 }

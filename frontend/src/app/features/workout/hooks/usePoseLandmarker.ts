@@ -278,9 +278,6 @@ export function usePoseLandmarker({
 
   useEffect(() => {
     if (!enabled) {
-      setPoseStatus("idle");
-      setPoseErrorMessage(null);
-      setHasPoseLandmarks(false);
       hasPoseLandmarksRef.current = false;
       onPoseLandmarksRef.current?.(null, performance.now());
       if (frameRef.current !== null) {
@@ -374,8 +371,8 @@ export function usePoseLandmarker({
   }, [canvasRef, enabled, videoRef]);
 
   return {
-    poseStatus,
-    poseErrorMessage,
-    hasPoseLandmarks,
+    poseStatus: enabled ? poseStatus : "idle",
+    poseErrorMessage: enabled ? poseErrorMessage : null,
+    hasPoseLandmarks: enabled ? hasPoseLandmarks : false,
   };
 }
