@@ -36,3 +36,4 @@ Thumbs.db
 
 # ─── Python venv ───────────────────────────────────────────────
 backend/venv/
+node_modules
