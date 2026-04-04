@@ -55,7 +55,7 @@ export function CameraAnalysisPage() {
     onPoseLandmarks,
   });
 
-  let noticeMessage = TEXT.searching;
+  let noticeMessage: string = TEXT.searching;
 
   if (!isStreaming) {
     noticeMessage = TEXT.idleFeedback;

@@ -92,7 +92,7 @@ export function RangeCalibrationPage() {
 
   const resolvedExerciseId = exerciseId ?? "squat";
 
-  let noticeMessage = TEXT.noticeGuide;
+  let noticeMessage: string = TEXT.noticeGuide;
   if (isStreaming) {
     noticeMessage = TEXT.activeGuide;
   }
