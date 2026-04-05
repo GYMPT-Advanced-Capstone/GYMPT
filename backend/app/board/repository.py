@@ -103,6 +103,18 @@ def get_board_detail(db: Session, board_no: int) -> tuple[Board, str] | None:
     return board, nickname
 
 
+def get_comments_by_board_no(db: Session, board_no: int) -> list[tuple[Comment, str]]:
+    stmt = (
+        select(Comment, User.nickname)
+        .join(User, Comment.writer_id == User.id)
+        .where(Comment.board_no == board_no)
+        .order_by(Comment.create_at.asc(), Comment.comment_no.asc())
+    )
+
+    result = db.execute(stmt).all()
+    return [(comment, nickname) for comment, nickname in result]
+
+
 def delete_board(db: Session, board: Board) -> None:
     try:
         db.delete(board)

@@ -15,6 +15,7 @@ from app.core.database import get_db
 from app.users.models import User
 from app.board.dependencies import get_current_user
 from app.board.schemas import (
+    BoardDetailResponse,
     BoardResponse,
     LikeToggleResponse,
     CommentCreateRequest,
@@ -141,7 +142,7 @@ def list_boards(
     return list_boards_service(db)
 
 
-@router.get("/{board_no}", response_model=BoardResponse)
+@router.get("/{board_no}", response_model=BoardDetailResponse)
 def get_board_detail(
     board_no: int = Path(
         ...,

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.board import repository
 from app.board.models import Board, Comment
-from app.board.schemas import BoardResponse
+from app.board.schemas import BoardDetailResponse, BoardResponse, CommentResponse
 from app.users.models import User
 
 
@@ -196,7 +196,7 @@ def list_boards_service(db: Session) -> list[BoardResponse]:
     ]
 
 
-def get_board_detail_service(db: Session, board_no: int) -> BoardResponse:
+def get_board_detail_service(db: Session, board_no: int) -> BoardDetailResponse:
     result = repository.get_board_detail(db=db, board_no=board_no)
 
     if result is None:
@@ -206,8 +206,20 @@ def get_board_detail_service(db: Session, board_no: int) -> BoardResponse:
         )
 
     board, nickname = result
+    comment_rows = repository.get_comments_by_board_no(db=db, board_no=board_no)
 
-    return BoardResponse(
+    comments = [
+        CommentResponse(
+            comment_no=comment.comment_no,
+            content=comment.content,
+            create_at=comment.create_at,
+            writer=comment_nickname,
+            board_no=comment.board_no,
+        )
+        for comment, comment_nickname in comment_rows
+    ]
+
+    return BoardDetailResponse(
         board_no=board.board_no,
         title=board.title,
         content=board.content,
@@ -215,6 +227,7 @@ def get_board_detail_service(db: Session, board_no: int) -> BoardResponse:
         writer=nickname,
         likes=board.likes,
         upload_date=board.upload_date,
+        comments=comments,
     )
 
 

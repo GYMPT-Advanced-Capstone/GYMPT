@@ -116,6 +116,13 @@ class CommentResponse(BaseModel):
     )
 
 
+class BoardDetailResponse(BoardResponse):
+    comments: list[CommentResponse] = Field(
+        default_factory=list,
+        description="해당 게시글의 댓글 목록",
+    )
+
+
 class CommentDeleteResponse(BaseModel):
     message: str = Field(
         ...,
