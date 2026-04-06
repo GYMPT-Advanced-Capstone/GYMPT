@@ -11,6 +11,7 @@ from app.users.router import router as users_router
 from app.board.router import router as board_router
 from app.exercise.exercise_router import router as exercise_router
 from app.exercise_record.exercise_record_router import router as exercise_record_router
+from app.pose.pose_controller import router as pose_router
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -50,3 +51,4 @@ app.include_router(exercise_record_router)
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(board_router)
+app.include_router(pose_router)
