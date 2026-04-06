@@ -6,10 +6,14 @@ from typing import Any
 
 DEFAULT_GOAL_COUNT = 10
 DEFAULT_POSE_ISSUE = "무릎이 발끝과 같은 방향을 유지하도록 해주세요."
-SESSION_STARTED_MESSAGE = "자세 세션이 시작되었습니다. pose_landmarks 프레임을 전송해주세요."
+SESSION_STARTED_MESSAGE = (
+    "자세 세션이 시작되었습니다. pose_landmarks 프레임을 전송해주세요."
+)
 UNSUPPORTED_MESSAGE_TYPE = "지원하지 않는 메시지 타입입니다."
 NO_LANDMARKS_MESSAGE = "주요 관절이 보이도록 화면 안으로 들어와 주세요."
-INSUFFICIENT_LANDMARKS_MESSAGE = "안정적인 피드백을 위해 더 많은 관절 좌표가 필요합니다."
+INSUFFICIENT_LANDMARKS_MESSAGE = (
+    "안정적인 피드백을 위해 더 많은 관절 좌표가 필요합니다."
+)
 DEFAULT_FEEDBACK_MESSAGE = "가슴을 세우고 스쿼트 깊이를 일정하게 유지해 주세요."
 
 
@@ -85,8 +89,7 @@ class PoseFeedbackService:
             previous_issue = state.last_pose_issue
             state.full_rep_count += 1
             feedback_message = (
-                f"{state.full_rep_count}회 완료. "
-                f"이전 자세 피드백: {previous_issue}"
+                f"{state.full_rep_count}회 완료. 이전 자세 피드백: {previous_issue}"
             )
 
         state.last_pose_issue = current_issue

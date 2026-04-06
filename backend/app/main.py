@@ -1,17 +1,17 @@
 from contextlib import asynccontextmanager
 from importlib import import_module
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pathlib import Path
 
-from app.core.database import get_engine, Base
 from app.auth.router import router as auth_router
-from app.users.router import router as users_router
 from app.board.router import router as board_router
+from app.core.database import Base, get_engine
 from app.exercise.exercise_router import router as exercise_router
 from app.exercise_record.exercise_record_router import router as exercise_record_router
 from app.pose.pose_controller import router as pose_router
+from app.users.router import router as users_router
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
