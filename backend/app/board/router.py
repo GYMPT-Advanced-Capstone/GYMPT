@@ -42,6 +42,8 @@ router = APIRouter(prefix="/api/v1/board", tags=["Board"])
     "/",
     response_model=BoardResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="게시글 생성",
+    description="로그인한 사용자가 새로운 게시글을 작성합니다. 제목, 내용은 필수이며 이미지 파일은 선택적으로 업로드할 수 있습니다.",
 )
 def create_board(
     title: str = Form(
@@ -84,6 +86,11 @@ def create_board(
     "/{board_no}",
     response_model=BoardResponse,
     status_code=status.HTTP_200_OK,
+    summary="게시글 수정",
+    description=(
+        "로그인한 사용자가 본인이 작성한 게시글을 수정합니다. "
+        "제목, 내용은 부분 수정이 가능하며 이미지 삭제 또는 새 이미지 업로드를 선택할 수 있습니다."
+    ),
 )
 def update_board(
     board_no: int = Path(
@@ -134,7 +141,12 @@ def update_board(
     }
 
 
-@router.get("/", response_model=list[BoardResponse])
+@router.get(
+    "/",
+    response_model=list[BoardResponse],
+    summary="게시글 목록 조회",
+    description="로그인한 사용자가 전체 게시글 목록을 최신순으로 조회합니다.",
+)
 def list_boards(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -142,7 +154,12 @@ def list_boards(
     return list_boards_service(db)
 
 
-@router.get("/{board_no}", response_model=BoardDetailResponse)
+@router.get(
+    "/{board_no}",
+    response_model=BoardDetailResponse,
+    summary="게시글 상세 조회",
+    description="로그인한 사용자가 특정 게시글의 상세 정보와 댓글 목록을 조회합니다.",
+)
 def get_board_detail(
     board_no: int = Path(
         ...,
@@ -276,7 +293,12 @@ def delete_comment(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.delete("/{board_no}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{board_no}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="게시글 삭제",
+    description="로그인한 사용자가 본인이 작성한 게시글을 삭제합니다.",
+)
 def delete_board(
     board_no: int = Path(
         ...,
