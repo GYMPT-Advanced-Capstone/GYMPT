@@ -23,8 +23,11 @@ interface BackendFeedbackPayload {
 }
 
 const LANDMARK_SEND_INTERVAL_MS = 100;
-const WS_URL_FALLBACK = "ws://localhost:8000/ws/workout-feedback";
+const WORKOUT_FEEDBACK_PATH = "/ws/workout-feedback";
+const LEGACY_POSE_PATH = "/ws/pose";
+const WS_URL_FALLBACK = `ws://localhost:8000${WORKOUT_FEEDBACK_PATH}`;
 const DISCONNECTED_STATUS: SquatAnalysisStatus = "insufficient_visibility";
+const DISCONNECTED_MESSAGE = "백엔드 연결이 끊겼습니다. 다시 연결을 시도해주세요.";
 
 const STATUS_MAP: Record<SquatAnalysisStatus, true> = {
   idle: true,
@@ -43,11 +46,50 @@ function createInitialAnalysis(): SquatAnalysisSnapshot {
   return { ...INITIAL_ANALYSIS };
 }
 
-function resolveWebSocketUrl(): string {
-  const configured = (import.meta.env as Record<string, string | undefined>).VITE_WORKOUT_WS_URL;
-  if (typeof configured === "string" && configured.trim().length > 0) {
-    return configured.trim();
+function toWebSocketUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl);
+    const protocol =
+      parsed.protocol === "https:"
+        ? "wss:"
+        : parsed.protocol === "http:"
+          ? "ws:"
+          : parsed.protocol;
+
+    if (protocol !== "ws:" && protocol !== "wss:") {
+      return null;
+    }
+
+    const pathname = parsed.pathname === "/" ? WORKOUT_FEEDBACK_PATH : parsed.pathname;
+    const normalizedPath = pathname.endsWith(LEGACY_POSE_PATH)
+      ? `${pathname.slice(0, -LEGACY_POSE_PATH.length)}${WORKOUT_FEEDBACK_PATH}`
+      : pathname;
+
+    return `${protocol}//${parsed.host}${normalizedPath}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
   }
+}
+
+function resolveWebSocketUrl(): string {
+  const env = import.meta.env as Record<string, string | undefined>;
+  const configured = env.VITE_WORKOUT_WS_URL ?? env.VITE_WS_URL;
+
+  if (typeof configured === "string" && configured.trim().length > 0) {
+    const wsUrl = toWebSocketUrl(configured.trim());
+    if (wsUrl) {
+      return wsUrl;
+    }
+  }
+
+  const apiUrl = env.VITE_API_URL;
+  if (typeof apiUrl === "string" && apiUrl.trim().length > 0) {
+    const wsUrl = toWebSocketUrl(apiUrl.trim());
+    if (wsUrl) {
+      return wsUrl;
+    }
+  }
+
   return WS_URL_FALLBACK;
 }
 
@@ -58,6 +100,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function toNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
   }
   return null;
 }
@@ -77,15 +125,16 @@ function toMessageFromPayload(payload: BackendFeedbackPayload): string | null {
 }
 
 function parseBackendFeedback(raw: unknown): BackendFeedbackPayload | null {
-  if (typeof raw !== "string" || raw.length === 0) {
-    return null;
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return { feedbackMessage: raw };
+  let parsed: unknown = raw;
+  if (typeof raw === "string") {
+    if (raw.length === 0) {
+      return null;
+    }
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { feedbackMessage: raw };
+    }
   }
 
   if (!isRecord(parsed)) {
@@ -122,6 +171,7 @@ export function useSquatAnalysis({
   const [analysis, setAnalysis] = useState<SquatAnalysisSnapshot>(createInitialAnalysis);
   const socketRef = useRef<WebSocket | null>(null);
   const lastSentAtMsRef = useRef(0);
+  const disconnectNotifiedRef = useRef(false);
 
   const onPoseLandmarks = useCallback(
     (landmarks: NormalizedLandmark[] | null, timestampMs: number) => {
@@ -151,6 +201,7 @@ export function useSquatAnalysis({
   useEffect(() => {
     if (!enabled) {
       lastSentAtMsRef.current = 0;
+      disconnectNotifiedRef.current = false;
       if (socketRef.current) {
         socketRef.current.close();
         socketRef.current = null;
@@ -166,6 +217,7 @@ export function useSquatAnalysis({
       if (isDisposed) {
         return;
       }
+      disconnectNotifiedRef.current = false;
       setAnalysis((prev) => (
         prev.status === "tracking"
           ? prev
@@ -206,13 +258,19 @@ export function useSquatAnalysis({
     };
 
     const handleDisconnected = () => {
-      if (isDisposed) {
+      if (isDisposed || disconnectNotifiedRef.current) {
         return;
       }
+      disconnectNotifiedRef.current = true;
       setAnalysis((prev) => (
         prev.status === DISCONNECTED_STATUS
+          && prev.feedbackMessage === DISCONNECTED_MESSAGE
           ? prev
-          : { ...prev, status: DISCONNECTED_STATUS }
+          : {
+            ...prev,
+            status: DISCONNECTED_STATUS,
+            feedbackMessage: DISCONNECTED_MESSAGE,
+          }
       ));
     };
 
