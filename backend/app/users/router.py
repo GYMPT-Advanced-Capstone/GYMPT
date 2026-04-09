@@ -25,7 +25,12 @@ from app.auth.utils import verify_access_token
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
 
-@router.get("/me/summary", response_model=MainSummaryResponse)
+@router.get(
+    "/me/summary",
+    response_model=MainSummaryResponse,
+    summary="메인 요약 정보 조회",
+    description="오늘 달성률, 운동 목표 현황, 이번 주 운동 여부 등 메인 화면에 필요한 요약 정보를 조회합니다.",
+)
 def get_main_summary(
     token_data: tuple[str, str] = Depends(verify_access_token),
     db: Session = Depends(get_db),
@@ -122,7 +127,12 @@ def get_main_summary(
     )
 
 
-@router.get("/me", response_model=UserResponse)
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="내 정보 조회",
+    description="로그인한 사용자의 프로필 정보를 조회합니다.",
+)
 def get_me(
     token_data: tuple[str, str] = Depends(verify_access_token),
     db: Session = Depends(get_db),
@@ -136,7 +146,12 @@ def get_me(
     return user
 
 
-@router.patch("/me/birth-date", response_model=UserResponse)
+@router.patch(
+    "/me/birth-date",
+    response_model=UserResponse,
+    summary="생년월일 수정",
+    description="로그인한 사용자의 생년월일을 수정합니다.",
+)
 def update_birth_date(
     data: BirthDateUpdate,
     token_data: tuple[str, str] = Depends(verify_access_token),
@@ -154,7 +169,12 @@ def update_birth_date(
     return user
 
 
-@router.patch("/me/weekly-target", response_model=UserResponse)
+@router.patch(
+    "/me/weekly-target",
+    response_model=UserResponse,
+    summary="주간 운동 목표 수정",
+    description="로그인한 사용자의 주간 운동 목표 횟수를 수정합니다.",
+)
 def update_weekly_target(
     data: WeeklyTargetUpdate,
     token_data: tuple[str, str] = Depends(verify_access_token),
@@ -176,6 +196,8 @@ def update_weekly_target(
     "/me/exercise-goals",
     response_model=ExerciseGoalResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="운동 목표 등록",
+    description="운동 종목과 일일 목표(횟수 또는 시간)를 등록합니다.",
 )
 def create_exercise_goal(
     data: ExerciseGoalCreateRequest,
@@ -227,7 +249,12 @@ def create_exercise_goal(
     return goal
 
 
-@router.patch("/me/exercise-goals/{goal_id}", response_model=ExerciseGoalResponse)
+@router.patch(
+    "/me/exercise-goals/{goal_id}",
+    response_model=ExerciseGoalResponse,
+    summary="운동 목표 수정",
+    description="등록된 운동 목표의 일일 목표 횟수, 시간, 임계값을 수정합니다.",
+)
 def update_exercise_goal(
     goal_id: int,
     data: ExerciseGoalUpdateRequest,

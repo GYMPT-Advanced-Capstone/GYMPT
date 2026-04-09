@@ -50,7 +50,11 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
 
 @router.post(
-    "/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED
+    "/signup",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="회원가입",
+    description="이메일 인증 여부 확인 후 회원가입을 진행합니다.",
 )
 def signup(user_data: SignupRequest, db: Session = Depends(get_db)):
     if not is_email_verified(user_data.email):
@@ -109,7 +113,12 @@ def signup(user_data: SignupRequest, db: Session = Depends(get_db)):
         )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/login",
+    response_model=TokenResponse,
+    summary="로그인",
+    description="이메일과 비밀번호로 로그인 후 Access/Refresh Token을 발급합니다.",
+)
 def login(user_data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data.email).first()
     if not user or not verify_password(user_data.pw, str(user.pw)):
@@ -140,7 +149,12 @@ def login(user_data: LoginRequest, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="로그아웃",
+    description="Access Token과 Refresh Token을 모두 무효화합니다.",
+)
 def logout(
     logout_data: LogoutRequest,
     token_data: tuple[str, str] = Depends(verify_access_token),
@@ -150,7 +164,12 @@ def logout(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/email-verify/request", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/email-verify/request",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="이메일 인증 코드 발송",
+    description="회원가입용 이메일 인증 코드를 발송합니다.",
+)
 def request_email_verify(data: EmailVerifyRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if user:
@@ -166,7 +185,12 @@ def request_email_verify(data: EmailVerifyRequest, db: Session = Depends(get_db)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/email-verify", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/email-verify",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="이메일 인증 코드 확인",
+    description="발송된 인증 코드를 확인하고 이메일 인증을 완료합니다.",
+)
 def verify_email(data: EmailVerifyConfirmRequest):
     is_valid = verify_verification_code(data.email, data.code)
     if not is_valid:
@@ -178,13 +202,23 @@ def verify_email(data: EmailVerifyConfirmRequest):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/check-email", response_model=CheckResponse)
+@router.get(
+    "/check-email",
+    response_model=CheckResponse,
+    summary="이메일 중복 확인",
+    description="이메일 사용 가능 여부를 확인합니다.",
+)
 def check_email(email: EmailStr = Query(...), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     return CheckResponse(available=user is None)
 
 
-@router.get("/check-nickname", response_model=CheckResponse)
+@router.get(
+    "/check-nickname",
+    response_model=CheckResponse,
+    summary="닉네임 중복 확인",
+    description="닉네임 사용 가능 여부를 확인합니다.",
+)
 def check_nickname(
     nickname: str = Query(..., min_length=1, max_length=100),
     db: Session = Depends(get_db),
@@ -193,7 +227,12 @@ def check_nickname(
     return CheckResponse(available=user is None)
 
 
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    summary="토큰 재발급",
+    description="Refresh Token으로 Access/Refresh Token을 재발급합니다.",
+)
 def refresh_token(data: TokenRefreshRequest):
     email = verify_refresh_token(data.refresh_token)
     settings = get_settings()
@@ -218,7 +257,12 @@ def refresh_token(data: TokenRefreshRequest):
     )
 
 
-@router.post("/password-reset/request", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/password-reset/request",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="비밀번호 재설정 코드 발송",
+    description="비밀번호 재설정을 위한 인증 코드를 발송합니다.",
+)
 def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
@@ -237,7 +281,12 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/password-reset", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/password-reset",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="비밀번호 재설정",
+    description="인증 코드 확인 후 비밀번호를 재설정합니다.",
+)
 def reset_password(data: PasswordResetConfirmRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
