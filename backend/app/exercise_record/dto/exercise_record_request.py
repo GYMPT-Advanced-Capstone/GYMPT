@@ -1,7 +1,39 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+
+class ExerciseRecordAnalysisCreateRequest(BaseModel):
+    calibration_id: int | None = Field(
+        default=None,
+        description="운동에 사용한 초기 가동범위 설정 ID",
+        json_schema_extra={"example": 1},
+    )
+    range_summary: dict[str, Any] = Field(
+        default_factory=dict,
+        description="실제 수행 가동범위 요약값",
+        json_schema_extra={
+            "example": {
+                "rangeCompletionRate": 0.86,
+                "topExtensionRate": 0.94,
+                "bodyStabilityRate": 0.88,
+            }
+        },
+    )
+    feedback_summary: dict[str, Any] = Field(
+        default_factory=dict,
+        description="운동 완료 후 피드백 요약",
+        json_schema_extra={
+            "example": {
+                "items": [
+                    "초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다.",
+                    "몸통 정렬은 안정적이었습니다.",
+                ]
+            }
+        },
+    )
 
 
 class ExerciseRecordCreateRequest(BaseModel):
@@ -39,6 +71,10 @@ class ExerciseRecordCreateRequest(BaseModel):
         ...,
         description="운동 완료 시각",
         json_schema_extra={"example": "2026-03-26T10:30:00"},
+    )
+    analysis: ExerciseRecordAnalysisCreateRequest | None = Field(
+        default=None,
+        description="자세 분석 점수 계산에 사용할 선택 분석 요약",
     )
 
     @field_validator("count", "duration", "score")
