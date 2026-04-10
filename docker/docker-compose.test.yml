@@ -16,6 +16,7 @@ services:
       retries: 20
     volumes:
       - mysql_test_data:/var/lib/mysql
+      - ./mysql-test-init.sql:/docker-entrypoint-initdb.d/01-mysql-test-init.sql:ro
 
   redis-test:
     image: redis:alpine
