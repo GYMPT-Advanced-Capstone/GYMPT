@@ -43,7 +43,9 @@ class ExerciseRecordAnalysisResponse(BaseModel):
     feedback_summary: dict[str, Any] = Field(
         ...,
         description="운동 완료 후 피드백 요약",
-        json_schema_extra={"example": {"items": ["가동범위가 목표보다 약간 짧았습니다."]}},
+        json_schema_extra={
+            "example": {"items": ["가동범위가 목표보다 약간 짧았습니다."]}
+        },
     )
     created_at: datetime = Field(..., description="분석 생성 시각")
 

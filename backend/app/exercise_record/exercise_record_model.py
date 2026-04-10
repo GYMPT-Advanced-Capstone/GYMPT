@@ -35,11 +35,15 @@ class UserExerciseCalibration(Base):
 
     id = Column(BigInteger, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False, index=True)
-    exercise_id = Column(BigInteger, ForeignKey("exercises.id"), nullable=False, index=True)
+    exercise_id = Column(
+        BigInteger, ForeignKey("exercises.id"), nullable=False, index=True
+    )
     version = Column(Integer, nullable=False, default=1)
     metrics_json = Column(JSON, nullable=False)
     created_at = Column(DateTime, nullable=False, default=func.now())
-    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime, nullable=False, default=func.now(), onupdate=func.now()
+    )
 
     exercise = relationship("Exercise")
 

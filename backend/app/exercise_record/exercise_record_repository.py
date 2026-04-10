@@ -23,7 +23,9 @@ class ExerciseRecordRepository:
     def get_by_id(self, record_id: int, user_id: int) -> ExerciseRecord | None:
         return (
             self.db.query(ExerciseRecord)
-            .options(joinedload(ExerciseRecord.exercise), joinedload(ExerciseRecord.analysis))
+            .options(
+                joinedload(ExerciseRecord.exercise), joinedload(ExerciseRecord.analysis)
+            )
             .filter(
                 ExerciseRecord.id == record_id,
                 ExerciseRecord.user_id == user_id,
@@ -50,7 +52,9 @@ class ExerciseRecordRepository:
     def get_by_date(self, user_id: int, target_date: date) -> list[ExerciseRecord]:
         return (
             self.db.query(ExerciseRecord)
-            .options(joinedload(ExerciseRecord.exercise), joinedload(ExerciseRecord.analysis))
+            .options(
+                joinedload(ExerciseRecord.exercise), joinedload(ExerciseRecord.analysis)
+            )
             .filter(
                 ExerciseRecord.user_id == user_id,
                 func.date(ExerciseRecord.completed_at) == target_date,
@@ -73,7 +77,9 @@ class ExerciseRecordRepository:
             .first()
         )
 
-    def create_analysis(self, analysis: ExerciseRecordAnalysis) -> ExerciseRecordAnalysis:
+    def create_analysis(
+        self, analysis: ExerciseRecordAnalysis
+    ) -> ExerciseRecordAnalysis:
         self.db.add(analysis)
         self.db.commit()
         self.db.refresh(analysis)

@@ -18,7 +18,9 @@ from app.exercise_calibration.service import ExerciseCalibrationService
 router = APIRouter(prefix="/api/exercise-calibrations", tags=["exercise-calibration"])
 
 
-def get_calibration_service(db: Session = Depends(get_db)) -> ExerciseCalibrationService:
+def get_calibration_service(
+    db: Session = Depends(get_db),
+) -> ExerciseCalibrationService:
     return ExerciseCalibrationService(ExerciseCalibrationRepository(db))
 
 

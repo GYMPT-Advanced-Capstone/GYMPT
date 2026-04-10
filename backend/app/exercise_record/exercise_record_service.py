@@ -4,7 +4,10 @@ from typing import Any, cast
 
 from fastapi import HTTPException, status
 
-from app.exercise_record.exercise_record_model import ExerciseRecord, ExerciseRecordAnalysis
+from app.exercise_record.exercise_record_model import (
+    ExerciseRecord,
+    ExerciseRecordAnalysis,
+)
 from app.exercise_record.exercise_record_repository import ExerciseRecordRepository
 from app.exercise_record.dto.exercise_record_request import (
     ExerciseRecordAnalysisCreateRequest,
@@ -214,9 +217,7 @@ class ExerciseRecordService:
             ),
         )
         overall_score = round(
-            (range_score * 0.45)
-            + (extension_score * 0.25)
-            + (stability_score * 0.30)
+            (range_score * 0.45) + (extension_score * 0.25) + (stability_score * 0.30)
         )
         accuracy_avg = round((range_score + extension_score + stability_score) / 3)
         return {
@@ -250,9 +251,7 @@ class ExerciseRecordService:
             default=range_score,
         )
         overall_score = round(
-            (range_score * 0.45)
-            + (extension_score * 0.25)
-            + (stability_score * 0.30)
+            (range_score * 0.45) + (extension_score * 0.25) + (stability_score * 0.30)
         )
         accuracy_avg = round((range_score + extension_score + stability_score) / 3)
         return {
