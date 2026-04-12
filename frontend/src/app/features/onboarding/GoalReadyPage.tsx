@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useGoal } from '../../context/GoalContext';
-import { userApi, goalIdStorage, formatBirthDateForApi, localExerciseGoalStorage } from '../../api/userApi';
+import { userApi, goalIdStorage, formatBirthDateForApi, localExerciseGoalStorage, onboardingStorage } from '../../api/userApi';
+import { tokenStorage } from '../../api/authApi';
 import { exerciseApi } from '../../api/exerciseApi';
 
 const EXERCISE_NAME_MAP: Record<string, string> = {
@@ -79,16 +80,18 @@ export function GoalReadyPage() {
     setLoading(true);
     setError(null);
     try {
-      // 1) localStorage에 먼저 저장 (백엔드 성공 여부 무관하게 항상 보장)
       localExerciseGoalStorage.save(goal.exerciseCounts);
 
-      // 2) 생년월일 / 주간목표 업데이트
+      const userId = tokenStorage.getUserId();
+      if (userId !== null) {
+        onboardingStorage.setDone(userId);
+      }
+
       await Promise.allSettled([
         userApi.updateBirthDate(formatBirthDateForApi(goal.birthday)),
         userApi.updateWeeklyTarget(goal.weeklyFrequency),
       ]);
 
-      // 3) 운동 목표 API 저장 시도 (실패해도 localStorage가 fallback)
       try {
         const exercises = await exerciseApi.getList();
         const nameToId = Object.fromEntries(exercises.map((e) => [e.name, e.id]));

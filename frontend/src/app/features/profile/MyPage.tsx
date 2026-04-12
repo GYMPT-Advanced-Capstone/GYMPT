@@ -253,8 +253,8 @@ export function MyPage() {
       if (refreshToken) await authApi.logout(refreshToken);
     } catch {
     } finally {
-      tokenStorage.clearTokens();
       localExerciseGoalStorage.clear();
+      tokenStorage.clearTokens();
       setLoggingOut(false);
       setShowLogoutConfirm(false);
       navigate('/');

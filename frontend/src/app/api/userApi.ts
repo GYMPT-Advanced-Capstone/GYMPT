@@ -53,9 +53,9 @@ export interface ExerciseGoalUpdateRequest {
 
 export interface LocalExerciseGoal {
   exercise_key: string;
-  exercise_name: string; 
+  exercise_name: string;
   target: number;
-  unit: string; 
+  unit: string;
 }
 
 const EXERCISE_DISPLAY: Record<string, { name: string; unit: string }> = {
@@ -110,7 +110,7 @@ export const localExerciseGoalStorage = {
 
   toSummaryItems: (goals: LocalExerciseGoal[]): ExerciseGoalSummaryItem[] =>
     goals.map((g, idx) => ({
-      exercise_id: -(idx + 1),
+      exercise_id: -(idx + 1), 
       exercise_name: g.exercise_name,
       daily_target_count: g.unit === '개' ? g.target : null,
       daily_target_duration: g.unit === '초' ? g.target : null,
@@ -189,4 +189,13 @@ export const goalIdStorage = {
     }
   },
   clear: () => localStorage.removeItem('gympt_goal_ids'),
+};
+
+export const onboardingStorage = {
+  setDone: (userId: number): void => {
+    localStorage.setItem(`gympt_onboarding_done_${userId}`, '1');
+  },
+  isDone: (userId: number): boolean => {
+    return localStorage.getItem(`gympt_onboarding_done_${userId}`) === '1';
+  },
 };
