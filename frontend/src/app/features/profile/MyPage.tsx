@@ -94,6 +94,8 @@ function fromApiItem(item: ExerciseGoalSummaryItem): DisplayGoal {
   const unit = item.daily_target_duration != null ? '초' : '개';
   const target = item.daily_target_count ?? item.daily_target_duration ?? 0;
   const key = EXERCISE_KEY_MAP[item.exercise_name] ?? '';
+  const apiGoalId = item.goal_id ?? goalIdStorage.get(item.exercise_id);
+  if (item.goal_id != null) goalIdStorage.set(item.exercise_id, item.goal_id);
   return {
     key,
     exercise_id: item.exercise_id,
@@ -102,7 +104,7 @@ function fromApiItem(item: ExerciseGoalSummaryItem): DisplayGoal {
     unit,
     today_count: item.today_count,
     today_duration: item.today_duration,
-    api_goal_id: goalIdStorage.get(item.exercise_id),
+    api_goal_id: apiGoalId ?? null,
   };
 }
 

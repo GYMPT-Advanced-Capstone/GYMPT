@@ -110,7 +110,7 @@ export const localExerciseGoalStorage = {
 
   toSummaryItems: (goals: LocalExerciseGoal[]): ExerciseGoalSummaryItem[] =>
     goals.map((g, idx) => ({
-      exercise_id: -(idx + 1), 
+      exercise_id: -(idx + 1),
       exercise_name: g.exercise_name,
       daily_target_count: g.unit === '개' ? g.target : null,
       daily_target_duration: g.unit === '초' ? g.target : null,
@@ -118,6 +118,7 @@ export const localExerciseGoalStorage = {
       today_duration: 0,
     })),
 };
+
 
 export const userApi = {
   getMe: () => request<UserProfile>('/api/v1/users/me', {}, true),
@@ -173,22 +174,26 @@ export function calcAge(birthDate: string | null): number {
 }
 
 export const goalIdStorage = {
+  _key: (): string => {
+    const userId = localStorage.getItem('gympt_user_id');
+    return userId ? `gympt_goal_ids_${userId}` : 'gympt_goal_ids';
+  },
   set: (exerciseId: number, goalId: number) => {
     const all = goalIdStorage.getAll();
     all[exerciseId] = goalId;
-    localStorage.setItem('gympt_goal_ids', JSON.stringify(all));
+    localStorage.setItem(goalIdStorage._key(), JSON.stringify(all));
   },
   get: (exerciseId: number): number | null => {
     return goalIdStorage.getAll()[exerciseId] ?? null;
   },
   getAll: (): Record<number, number> => {
     try {
-      return JSON.parse(localStorage.getItem('gympt_goal_ids') ?? '{}');
+      return JSON.parse(localStorage.getItem(goalIdStorage._key()) ?? '{}');
     } catch {
       return {};
     }
   },
-  clear: () => localStorage.removeItem('gympt_goal_ids'),
+  clear: () => localStorage.removeItem(goalIdStorage._key()),
 };
 
 export const onboardingStorage = {

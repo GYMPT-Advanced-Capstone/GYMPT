@@ -36,7 +36,6 @@ export const tokenStorage = {
     localStorage.removeItem('gympt_refresh_token');
     localStorage.removeItem('gympt_user_name');
     localStorage.removeItem('gympt_user_id');
-    localStorage.removeItem('gympt_goal_ids');
   },
   setUserName: (name: string) =>
     localStorage.setItem('gympt_user_name', name),
