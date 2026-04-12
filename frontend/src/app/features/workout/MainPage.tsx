@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { useGoal } from '../../context/GoalContext';
 import { BottomNav } from '../../components/BottomNav';
 import { Trophy, TrendingUp, Zap } from 'lucide-react';
-import { userApi, type UserProfile } from '../../api/userApi';
+import { userApi, localExerciseGoalStorage, type UserProfile } from '../../api/userApi';
 
 import squatImg from '../../../assets/exercises/squat.png';
 import pushupImg from '../../../assets/exercises/pushup.png';
@@ -11,10 +11,10 @@ import lungeImg from '../../../assets/exercises/lunge.png';
 import plankImg from '../../../assets/exercises/plank.png';
 
 const exercises = [
-  { id: 'squat',  name: '스쿼트', desc: '하체 강화', img: squatImg },
-  { id: 'pushup', name: '푸시업', desc: '상체 강화', img: pushupImg },
-  { id: 'lunge',  name: '런지', desc: '균형·하체', img: lungeImg },
-  { id: 'plank',  name: '플랭크', desc: '코어 강화', img: plankImg },
+  { id: 'squat',  name: '스쿼트', img: squatImg, desc: '하체 강화' },
+  { id: 'pushup', name: '푸시업', img: pushupImg, desc: '상체 강화' },
+  { id: 'lunge',  name: '런지', img: lungeImg, desc: '균형·하체' },
+  { id: 'plank',  name: '플랭크', img: plankImg, desc: '코어 강화' },
 ];
 
 const weeklyData = [
@@ -40,13 +40,24 @@ export function MainPage() {
   const { exerciseCounts } = goal;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [localCounts, setLocalCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     userApi.getMe().then(setProfile).catch(() => {});
+
+    const localGoals = localExerciseGoalStorage.load();
+    if (localGoals.length > 0) {
+      const counts: Record<string, number> = {};
+      localGoals.forEach((g) => { counts[g.exercise_key] = g.target; });
+      setLocalCounts(counts);
+    }
   }, []);
 
   const displayName = profile?.name ?? '';
   const weeklyTarget = profile?.weekly_target ?? goal.weeklyFrequency;
+
+  const getExerciseTarget = (id: string): number =>
+    localCounts[id] ?? exerciseCounts[id as keyof typeof exerciseCounts];
 
   const handleExerciseClick = (exerciseId: string) => {
     if (calibratedExercises[exerciseId]) {
@@ -78,6 +89,7 @@ export function MainPage() {
           paddingBottom: 88,
         }}
       >
+        {/* ── Header ── */}
         <div
           className="flex items-center px-5"
           style={{ paddingTop: 56, paddingBottom: 24 }}
@@ -104,6 +116,7 @@ export function MainPage() {
           </div>
         </div>
 
+        {/* ── Today Summary Banner ── */}
         <div className="px-5 mb-5">
           <div
             className="rounded-2xl px-5 py-4 flex items-center justify-between"
@@ -145,6 +158,7 @@ export function MainPage() {
           </div>
         </div>
 
+        {/* ── Exercise Cards 2x2 ── */}
         <div className="px-5 mb-6">
           <div className="flex items-center justify-between mb-3">
             <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700 }}>운동 시작하기</p>
@@ -156,7 +170,7 @@ export function MainPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {exercises.map((ex) => {
               const current = todayProgress[ex.id];
-              const target = exerciseCounts[ex.id as keyof typeof exerciseCounts];
+              const target = getExerciseTarget(ex.id);
               const pct = Math.min((current / target) * 100, 100);
               return (
                 <button
@@ -222,6 +236,7 @@ export function MainPage() {
           </div>
         </div>
 
+        {/* ── Weekly Calendar ── */}
         <div className="px-5 mb-6">
           <div className="flex items-center justify-between mb-3">
             <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700 }}>이번 주 운동</p>
@@ -262,6 +277,7 @@ export function MainPage() {
           </div>
         </div>
 
+        {/* ── Badges ── */}
         <div className="px-5 mb-6">
           <div className="flex items-center justify-between mb-3">
             <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700 }}>획득한 배지</p>

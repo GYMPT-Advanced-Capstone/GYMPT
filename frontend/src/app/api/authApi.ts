@@ -35,12 +35,19 @@ export const tokenStorage = {
     localStorage.removeItem('gympt_access_token');
     localStorage.removeItem('gympt_refresh_token');
     localStorage.removeItem('gympt_user_name');
+    localStorage.removeItem('gympt_user_id');
     localStorage.removeItem('gympt_goal_ids');
   },
   setUserName: (name: string) =>
     localStorage.setItem('gympt_user_name', name),
   getUserName: (): string =>
     localStorage.getItem('gympt_user_name') ?? '',
+  setUserId: (id: number) =>
+    localStorage.setItem('gympt_user_id', String(id)),
+  getUserId: (): number | null => {
+    const val = localStorage.getItem('gympt_user_id');
+    return val ? Number(val) : null;
+  },
 };
 
 async function refreshAccessToken(): Promise<string | null> {

@@ -14,6 +14,7 @@ import {
   RotateCcw,
   Gauge,
   AlertCircle,
+  Calendar,
 } from 'lucide-react';
 import { BottomNav } from '../../components/BottomNav';
 import { authApi, tokenStorage } from '../../api/authApi';
@@ -60,6 +61,13 @@ const EXERCISE_KEY_MAP: Record<string, string> = {
   런지: 'lunge',
   푸시업: 'pushup',
   플랭크: 'plank',
+};
+
+const EXERCISE_EMOJI: Record<string, string> = {
+  squat:  '🦵',
+  lunge:  '🏃',
+  pushup: '💪',
+  plank:  '⏱️',
 };
 
 /** GoalContext.exerciseCounts → LocalExerciseGoal[] */
@@ -384,6 +392,7 @@ export function MyPage() {
             label="주간 운동 횟수"
             value={weeklyTarget !== '-' ? `${weeklyTarget}회` : '-'}
             onEdit={() => openEdit('weekly')}
+            icon={<Calendar size={14} color="#3FFDD4" />}
           />
           {displayGoals.length === 0 ? (
             <div className="px-5 py-6 flex flex-col items-center gap-2">
@@ -552,14 +561,24 @@ function InfoRow({ label, value, onEdit }: { label: string; value: string; onEdi
   );
 }
 
-function GoalRow({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) {
+function GoalRow({ label, value, onEdit, icon }: { label: string; value: string; onEdit: () => void; icon?: React.ReactNode }) {
   return (
     <button
       onClick={onEdit}
       className="flex items-center justify-between w-full px-5 py-4"
       style={{ background: 'none', border: 'none', borderBottom: '1px solid #2C2C30', cursor: 'pointer' }}
     >
-      <span style={{ color: '#CCCCCC', fontSize: 14 }}>{label}</span>
+      <div className="flex items-center gap-3">
+        {icon && (
+          <div
+            className="flex items-center justify-center rounded-lg"
+            style={{ width: 30, height: 30, backgroundColor: 'rgba(63,253,212,0.08)', border: '1px solid rgba(63,253,212,0.2)' }}
+          >
+            {icon}
+          </div>
+        )}
+        <span style={{ color: '#CCCCCC', fontSize: 14 }}>{label}</span>
+      </div>
       <div className="flex items-center gap-2">
         <span style={{ color: '#3FFDD4', fontSize: 14, fontWeight: 600 }}>{value}</span>
         <ChevronRight size={15} color="#555555" />
@@ -569,6 +588,7 @@ function GoalRow({ label, value, onEdit }: { label: string; value: string; onEdi
 }
 
 function ExerciseGoalRow({ goal: g, onEdit }: { goal: DisplayGoal; onEdit: () => void }) {
+  const emoji = EXERCISE_EMOJI[g.key] ?? '🏋️';
   const todayStr =
     g.today_count > 0 ? `오늘 ${g.today_count}개 완료`
     : g.today_duration > 0 ? `오늘 ${g.today_duration}초 완료`
@@ -576,9 +596,17 @@ function ExerciseGoalRow({ goal: g, onEdit }: { goal: DisplayGoal; onEdit: () =>
 
   return (
     <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #2C2C30' }}>
-      <div className="flex flex-col gap-0.5">
-        <span style={{ color: '#CCCCCC', fontSize: 14 }}>{g.exercise_name} 목표</span>
-        <span style={{ color: '#555555', fontSize: 11 }}>{todayStr}</span>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex items-center justify-center rounded-lg"
+          style={{ width: 30, height: 30, backgroundColor: 'rgba(63,253,212,0.08)', border: '1px solid rgba(63,253,212,0.2)', fontSize: 16 }}
+        >
+          {emoji}
+        </div>
+        <div className="flex flex-col gap-0.5">
+          <span style={{ color: '#CCCCCC', fontSize: 14 }}>{g.exercise_name} 목표</span>
+          <span style={{ color: '#555555', fontSize: 11 }}>{todayStr}</span>
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <span style={{ color: '#3FFDD4', fontSize: 14, fontWeight: 600 }}>
