@@ -157,8 +157,11 @@ export function MyPage() {
       setUserProfile(profile);
 
       if (summary && summary.exercise_goals.length > 0) {
-        // ① API에 운동 목표가 있으면 그대로 사용
-        setDisplayGoals(summary.exercise_goals.map(fromApiItem));
+        const goals = summary.exercise_goals.map(fromApiItem);
+        setDisplayGoals(goals);
+        const syncCounts: Record<string, number> = {};
+        goals.forEach((g) => { if (g.key) syncCounts[g.key] = g.target; });
+        if (Object.keys(syncCounts).length > 0) localExerciseGoalStorage.save(syncCounts);
       } else {
         // ② localStorage(gympt_local_exercise_goals) 확인
         const localGoals = localExerciseGoalStorage.load();
@@ -255,7 +258,6 @@ export function MyPage() {
       if (refreshToken) await authApi.logout(refreshToken);
     } catch {
     } finally {
-      localExerciseGoalStorage.clear();
       tokenStorage.clearTokens();
       setLoggingOut(false);
       setShowLogoutConfirm(false);
