@@ -51,6 +51,73 @@ export interface ExerciseGoalUpdateRequest {
   threshold?: number | null;
 }
 
+// ---------------------------------------------------------------------------
+// 로컬 운동 목표 저장소 — 백엔드 exercise-goals API 유무와 관계없이 항상 동작
+// ---------------------------------------------------------------------------
+export interface LocalExerciseGoal {
+  exercise_key: string;   // 'squat' | 'lunge' | 'pushup' | 'plank'
+  exercise_name: string;  // '스쿼트' | '런지' | '푸시업' | '플랭크'
+  target: number;
+  unit: string;           // '개' | '초'
+}
+
+const EXERCISE_DISPLAY: Record<string, { name: string; unit: string }> = {
+  squat:  { name: '스쿼트', unit: '개' },
+  lunge:  { name: '런지',   unit: '개' },
+  pushup: { name: '푸시업', unit: '개' },
+  plank:  { name: '플랭크', unit: '초' },
+};
+
+const LOCAL_GOALS_KEY = 'gympt_local_exercise_goals';
+
+export const localExerciseGoalStorage = {
+  /** GoalExercisePage에서 설정한 exerciseCounts를 localStorage에 저장 */
+  save: (exerciseCounts: Record<string, number>): void => {
+    const goals: LocalExerciseGoal[] = Object.entries(exerciseCounts).map(
+      ([key, target]) => ({
+        exercise_key: key,
+        exercise_name: EXERCISE_DISPLAY[key]?.name ?? key,
+        target,
+        unit: EXERCISE_DISPLAY[key]?.unit ?? '개',
+      }),
+    );
+    localStorage.setItem(LOCAL_GOALS_KEY, JSON.stringify(goals));
+  },
+
+  /** 저장된 운동 목표 읽기 */
+  load: (): LocalExerciseGoal[] => {
+    try {
+      const raw = localStorage.getItem(LOCAL_GOALS_KEY);
+      return raw ? (JSON.parse(raw) as LocalExerciseGoal[]) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  /** 특정 운동 목표 업데이트 */
+  update: (key: string, newTarget: number): void => {
+    const goals = localExerciseGoalStorage.load().map((g) =>
+      g.exercise_key === key ? { ...g, target: newTarget } : g,
+    );
+    localStorage.setItem(LOCAL_GOALS_KEY, JSON.stringify(goals));
+  },
+
+  clear: (): void => localStorage.removeItem(LOCAL_GOALS_KEY),
+
+  /** LocalExerciseGoal → ExerciseGoalSummaryItem 변환 (exercise_id는 -1로 처리) */
+  toSummaryItems: (goals: LocalExerciseGoal[]): ExerciseGoalSummaryItem[] =>
+    goals.map((g, idx) => ({
+      exercise_id: -(idx + 1),   // API ID 없을 때 음수 dummy ID 사용
+      exercise_name: g.exercise_name,
+      daily_target_count: g.unit === '개' ? g.target : null,
+      daily_target_duration: g.unit === '초' ? g.target : null,
+      today_count: 0,
+      today_duration: 0,
+    })),
+};
+
+// ---------------------------------------------------------------------------
+
 export const userApi = {
   getMe: () => request<UserProfile>('/api/v1/users/me', {}, true),
 
@@ -85,6 +152,9 @@ export const userApi = {
     ),
 };
 
+// ---------------------------------------------------------------------------
+// 유틸 함수
+// ---------------------------------------------------------------------------
 export function parseBirthDate(dateStr: string | null): { year: number; month: number; day: number } {
   if (!dateStr) return { year: 2000, month: 1, day: 1 };
   const [y, m, d] = dateStr.split('-').map(Number);

@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router';
 import {
   ChevronRight,
   LogOut,
@@ -14,9 +14,9 @@ import {
   RotateCcw,
   Gauge,
   AlertCircle,
-} from "lucide-react";
-import { BottomNav } from "../../components/BottomNav";
-import { authApi, tokenStorage } from "../../api/authApi";
+} from 'lucide-react';
+import { BottomNav } from '../../components/BottomNav';
+import { authApi, tokenStorage } from '../../api/authApi';
 import {
   userApi,
   goalIdStorage,
@@ -24,22 +24,103 @@ import {
   formatBirthDateForApi,
   formatJoinDate,
   calcAge,
+  localExerciseGoalStorage,
   type UserProfile,
   type ExerciseGoalSummaryItem,
   type ExerciseGoalUpdateRequest,
-} from "../../api/userApi";
+  type LocalExerciseGoal,
+} from '../../api/userApi';
+import { useGoal } from '../../context/GoalContext';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 타입
+// ─────────────────────────────────────────────────────────────────────────────
+type DisplayGoal = {
+  key: string;          // 'squat' | 'lunge' | 'pushup' | 'plank' (local) or ''
+  exercise_id: number;  // API goal_id or dummy negative
+  exercise_name: string;
+  target: number;
+  unit: string;         // '개' | '초'
+  today_count: number;
+  today_duration: number;
+  api_goal_id: number | null; // PATCH 가능 여부
+};
 
 type EditTarget =
-  | "birthday"
-  | "weekly"
-  | { type: "exercise"; goal: ExerciseGoalSummaryItem }
+  | 'birthday'
+  | 'weekly'
+  | { type: 'exercise'; goal: DisplayGoal }
   | null;
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 헬퍼
+// ─────────────────────────────────────────────────────────────────────────────
+const EXERCISE_KEY_MAP: Record<string, string> = {
+  스쿼트: 'squat',
+  런지: 'lunge',
+  푸시업: 'pushup',
+  플랭크: 'plank',
+};
+
+/** GoalContext.exerciseCounts → LocalExerciseGoal[] */
+const GOAL_CONTEXT_META: Record<string, { name: string; unit: string }> = {
+  squat:  { name: '스쿼트', unit: '개' },
+  lunge:  { name: '런지',   unit: '개' },
+  pushup: { name: '푸시업', unit: '개' },
+  plank:  { name: '플랭크', unit: '초' },
+};
+
+function goalContextToLocalGoals(
+  exerciseCounts: Record<string, number>,
+): LocalExerciseGoal[] {
+  return Object.entries(exerciseCounts).map(([key, target]) => ({
+    exercise_key: key,
+    exercise_name: GOAL_CONTEXT_META[key]?.name ?? key,
+    target,
+    unit: GOAL_CONTEXT_META[key]?.unit ?? '개',
+  }));
+}
+
+/** API SummaryItem → DisplayGoal */
+function fromApiItem(item: ExerciseGoalSummaryItem): DisplayGoal {
+  const unit = item.daily_target_duration != null ? '초' : '개';
+  const target = item.daily_target_count ?? item.daily_target_duration ?? 0;
+  const key = EXERCISE_KEY_MAP[item.exercise_name] ?? '';
+  return {
+    key,
+    exercise_id: item.exercise_id,
+    exercise_name: item.exercise_name,
+    target,
+    unit,
+    today_count: item.today_count,
+    today_duration: item.today_duration,
+    api_goal_id: goalIdStorage.get(item.exercise_id),
+  };
+}
+
+/** LocalExerciseGoal → DisplayGoal */
+function fromLocalGoal(g: LocalExerciseGoal, idx: number): DisplayGoal {
+  return {
+    key: g.exercise_key,
+    exercise_id: -(idx + 1),
+    exercise_name: g.exercise_name,
+    target: g.target,
+    unit: g.unit,
+    today_count: 0,
+    today_duration: 0,
+    api_goal_id: null,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 컴포넌트
+// ─────────────────────────────────────────────────────────────────────────────
 export function MyPage() {
   const navigate = useNavigate();
+  const { goal: goalCtx } = useGoal();
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [exerciseGoals, setExerciseGoals] = useState<ExerciseGoalSummaryItem[]>([]);
+  const [displayGoals, setDisplayGoals] = useState<DisplayGoal[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -54,86 +135,109 @@ export function MyPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [resetTarget, setResetTarget] = useState<string | null>(null);
 
+  // ── 데이터 로드 ─────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
       const [profile, summary] = await Promise.all([
         userApi.getMe(),
-        userApi.getSummary(),
+        userApi.getSummary().catch(() => null),
       ]);
       setUserProfile(profile);
-      setExerciseGoals(summary.exercise_goals);
+
+      if (summary && summary.exercise_goals.length > 0) {
+        // ① API에 운동 목표가 있으면 그대로 사용
+        setDisplayGoals(summary.exercise_goals.map(fromApiItem));
+      } else {
+        // ② localStorage(gympt_local_exercise_goals) 확인
+        const localGoals = localExerciseGoalStorage.load();
+        if (localGoals.length > 0) {
+          setDisplayGoals(localGoals.map(fromLocalGoal));
+        } else {
+          // ③ GoalContext(gympt_goal)를 마지막 fallback으로 사용
+          const ctxGoals = goalContextToLocalGoals(goalCtx.exerciseCounts);
+          const hasRealData = Object.values(goalCtx.exerciseCounts).some((v) => v > 0);
+          if (hasRealData) {
+            // localStorage에도 저장해 이후 접근 시 활용
+            localExerciseGoalStorage.save(goalCtx.exerciseCounts);
+            setDisplayGoals(ctxGoals.map(fromLocalGoal));
+          }
+        }
+      }
     } catch (e) {
-      setFetchError((e as Error).message ?? "데이터를 불러오는 데 실패했어요.");
+      setFetchError((e as Error).message ?? '데이터를 불러오는 데 실패했어요.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [goalCtx.exerciseCounts]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
+  // ── 편집 열기 ────────────────────────────────────────────────────────────────
   const openEdit = (target: EditTarget) => {
     setSaveError(null);
-    if (target === "birthday" && userProfile) {
+    if (target === 'birthday' && userProfile) {
       setTmpBirthday(parseBirthDate(userProfile.birth_date));
     }
-    if (target === "weekly" && userProfile) {
+    if (target === 'weekly' && userProfile) {
       setTmpWeekly(userProfile.weekly_target ?? 3);
     }
-    if (target && typeof target === "object" && target.type === "exercise") {
-      const g = target.goal;
-      setTmpCount(g.daily_target_count ?? g.daily_target_duration ?? 1);
+    if (target && typeof target === 'object' && target.type === 'exercise') {
+      setTmpCount(target.goal.target);
     }
     setEditTarget(target);
   };
 
+  // ── 저장 ─────────────────────────────────────────────────────────────────────
   const saveEdit = async () => {
     if (!editTarget) return;
     setSaving(true);
     setSaveError(null);
     try {
-      if (editTarget === "birthday") {
+      if (editTarget === 'birthday') {
         const updated = await userApi.updateBirthDate(formatBirthDateForApi(tmpBirthday));
         setUserProfile(updated);
-      } else if (editTarget === "weekly") {
+
+      } else if (editTarget === 'weekly') {
         const updated = await userApi.updateWeeklyTarget(tmpWeekly);
         setUserProfile(updated);
-      } else if (typeof editTarget === "object" && editTarget.type === "exercise") {
-        const goal = editTarget.goal;
-        const goalId = goalIdStorage.get(goal.exercise_id);
-        if (!goalId) {
-          setSaveError("목표 ID를 찾을 수 없어요. 온보딩을 다시 진행해주세요.");
-          setSaving(false);
-          return;
+
+      } else if (typeof editTarget === 'object' && editTarget.type === 'exercise') {
+        const g = editTarget.goal;
+
+        // API goal_id가 있으면 PATCH
+        if (g.api_goal_id != null) {
+          const data: ExerciseGoalUpdateRequest =
+            g.unit === '개'
+              ? { daily_target_count: tmpCount }
+              : { daily_target_duration: tmpCount };
+          await userApi.updateExerciseGoal(g.api_goal_id, data);
         }
-        const data: ExerciseGoalUpdateRequest =
-          goal.daily_target_count != null
-            ? { daily_target_count: tmpCount }
-            : { daily_target_duration: tmpCount };
-        const updated = await userApi.updateExerciseGoal(goalId, data);
-        setExerciseGoals((prev) =>
-          prev.map((g) =>
-            g.exercise_id === goal.exercise_id
-              ? {
-                  ...g,
-                  daily_target_count: updated.daily_target_count,
-                  daily_target_duration: updated.daily_target_duration,
-                }
-              : g
-          )
+
+        // localStorage도 업데이트
+        if (g.key) localExerciseGoalStorage.update(g.key, tmpCount);
+
+        // 화면 즉시 반영
+        setDisplayGoals((prev) =>
+          prev.map((item) =>
+            item.exercise_id === g.exercise_id
+              ? { ...item, target: tmpCount }
+              : item,
+          ),
         );
       }
       setEditTarget(null);
     } catch (e) {
-      setSaveError((e as Error).message ?? "저장에 실패했어요.");
+      setSaveError((e as Error).message ?? '저장에 실패했어요.');
     } finally {
       setSaving(false);
     }
   };
 
+  // ── 로그아웃 ─────────────────────────────────────────────────────────────────
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
@@ -142,36 +246,35 @@ export function MyPage() {
     } catch {
     } finally {
       tokenStorage.clearTokens();
-      goalIdStorage.clear();
+      localExerciseGoalStorage.clear();
       setLoggingOut(false);
       setShowLogoutConfirm(false);
-      navigate("/");
+      navigate('/');
     }
   };
 
+  // ── 파생 값 ──────────────────────────────────────────────────────────────────
   const age = calcAge(userProfile?.birth_date ?? null);
   const birthday = parseBirthDate(userProfile?.birth_date ?? null);
   const formattedBirthday = userProfile?.birth_date
-    ? `${birthday.year}.${String(birthday.month).padStart(2, "0")}.${String(birthday.day).padStart(2, "0")}`
-    : "미등록";
-  const joinDate = userProfile?.created_at ? formatJoinDate(userProfile.created_at) : "-";
-  const weeklyTarget = userProfile?.weekly_target ?? "-";
+    ? `${birthday.year}.${String(birthday.month).padStart(2, '0')}.${String(birthday.day).padStart(2, '0')}`
+    : '미등록';
+  const joinDate = userProfile?.created_at ? formatJoinDate(userProfile.created_at) : '-';
+  const weeklyTarget = userProfile?.weekly_target ?? '-';
 
+  // ── 로딩 / 에러 ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div
-        className="flex justify-center items-start"
-        style={{ minHeight: "100dvh", backgroundColor: "#111111" }}
-      >
+      <div className="flex justify-center" style={{ minHeight: '100dvh', backgroundColor: '#111111' }}>
         <div
           className="flex flex-col items-center justify-center"
-          style={{ width: "100%", maxWidth: 390, minHeight: "100dvh", backgroundColor: "#1A1A1A" }}
+          style={{ width: '100%', maxWidth: 390, minHeight: '100dvh', backgroundColor: '#1A1A1A' }}
         >
           <div
             className="rounded-full animate-spin mb-4"
-            style={{ width: 40, height: 40, border: "3px solid #2C2C30", borderTopColor: "#3FFDD4" }}
+            style={{ width: 40, height: 40, border: '3px solid #2C2C30', borderTopColor: '#3FFDD4' }}
           />
-          <span style={{ color: "#888888", fontSize: 14 }}>정보를 불러오는 중...</span>
+          <span style={{ color: '#888888', fontSize: 14 }}>정보를 불러오는 중...</span>
         </div>
       </div>
     );
@@ -179,20 +282,20 @@ export function MyPage() {
 
   if (fetchError) {
     return (
-      <div
-        className="flex justify-center items-start"
-        style={{ minHeight: "100dvh", backgroundColor: "#111111" }}
-      >
+      <div className="flex justify-center" style={{ minHeight: '100dvh', backgroundColor: '#111111' }}>
         <div
           className="flex flex-col items-center justify-center gap-4"
-          style={{ width: "100%", maxWidth: 390, minHeight: "100dvh", backgroundColor: "#1A1A1A" }}
+          style={{ width: '100%', maxWidth: 390, minHeight: '100dvh', backgroundColor: '#1A1A1A' }}
         >
           <AlertCircle size={40} color="#FF5A5A" />
-          <span style={{ color: "#FF5A5A", fontSize: 14 }}>{fetchError}</span>
+          <span style={{ color: '#FF5A5A', fontSize: 14 }}>{fetchError}</span>
           <button
             onClick={loadData}
-            className="px-6 py-3 rounded-xl"
-            style={{ backgroundColor: "#3FFDD4", color: "#0A1A16", fontSize: 14, fontWeight: 700, border: "none", cursor: "pointer" }}
+            style={{
+              backgroundColor: '#3FFDD4', color: '#0A1A16', fontSize: 14,
+              fontWeight: 700, border: 'none', cursor: 'pointer',
+              padding: '12px 24px', borderRadius: 12,
+            }}
           >
             다시 시도
           </button>
@@ -201,184 +304,144 @@ export function MyPage() {
     );
   }
 
+  // ── 메인 렌더 ────────────────────────────────────────────────────────────────
   return (
-    <div
-      className="flex justify-center items-start"
-      style={{ minHeight: "100dvh", backgroundColor: "#111111" }}
-    >
+    <div className="flex justify-center" style={{ minHeight: '100dvh', backgroundColor: '#111111' }}>
       <div
         className="flex flex-col"
-        style={{
-          width: "100%",
-          maxWidth: "390px",
-          minHeight: "100dvh",
-          backgroundColor: "#1A1A1A",
-          paddingBottom: 80,
-        }}
+        style={{ width: '100%', maxWidth: 390, minHeight: '100dvh', backgroundColor: '#1A1A1A', paddingBottom: 80 }}
       >
+        {/* ── 헤더 / 프로필 ── */}
         <div
           className="px-6 pt-14 pb-6"
           style={{
-            background:
-              "linear-gradient(160deg, rgba(63,253,212,0.25) 0%, rgba(63,253,212,0.06) 45%, transparent 70%)",
-            borderBottom: "1px solid #2C2C30",
+            background: 'linear-gradient(160deg, rgba(63,253,212,0.25) 0%, rgba(63,253,212,0.06) 45%, transparent 70%)',
+            borderBottom: '1px solid #2C2C30',
           }}
         >
           <div className="flex items-center gap-2 mb-6">
-            <div
-              style={{
-                width: 3,
-                height: 22,
-                backgroundColor: "#3FFDD4",
-                borderRadius: 2,
-                flexShrink: 0,
-              }}
-            />
-            <h1 style={{ color: "#FFFFFF", fontSize: 22, fontWeight: 700, letterSpacing: -0.3 }}>
-              마이페이지
-            </h1>
+            <div style={{ width: 3, height: 22, backgroundColor: '#3FFDD4', borderRadius: 2 }} />
+            <h1 style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 700, letterSpacing: -0.3 }}>마이페이지</h1>
           </div>
 
           <div className="flex items-center gap-4">
             <div
               className="flex items-center justify-center rounded-full flex-shrink-0"
               style={{
-                width: 72,
-                height: 72,
-                background: "linear-gradient(135deg, rgba(63,253,212,0.25) 0%, rgba(63,253,212,0.08) 100%)",
-                border: "2px solid #3FFDD4",
+                width: 72, height: 72,
+                background: 'linear-gradient(135deg, rgba(63,253,212,0.25), rgba(63,253,212,0.08))',
+                border: '2px solid #3FFDD4',
               }}
             >
               <User size={32} color="#3FFDD4" />
             </div>
             <div className="flex flex-col">
-              <span style={{ color: "#FFFFFF", fontSize: 20, fontWeight: 700 }}>
-                {userProfile?.name ?? "-"}
-              </span>
-              <span style={{ color: "#888888", fontSize: 13, marginTop: 2 }}>
-                @{userProfile?.nickname ?? "-"}
-              </span>
+              <span style={{ color: '#FFFFFF', fontSize: 20, fontWeight: 700 }}>{userProfile?.name ?? '-'}</span>
+              <span style={{ color: '#888888', fontSize: 13, marginTop: 2 }}>@{userProfile?.nickname ?? '-'}</span>
               <div
                 className="inline-flex items-center gap-1 mt-2 px-2 py-1 rounded-full"
                 style={{
-                  backgroundColor: "rgba(63,253,212,0.1)",
-                  border: "1px solid rgba(63,253,212,0.25)",
-                  width: "fit-content",
+                  backgroundColor: 'rgba(63,253,212,0.1)',
+                  border: '1px solid rgba(63,253,212,0.25)',
+                  width: 'fit-content',
                 }}
               >
-                <span style={{ color: "#3FFDD4", fontSize: 11, fontWeight: 600 }}>
-                  Lv.1 피트니스 루키
-                </span>
+                <span style={{ color: '#3FFDD4', fontSize: 11, fontWeight: 600 }}>Lv.1 피트니스 루키</span>
               </div>
             </div>
           </div>
 
+          {/* 요약 카드 */}
           <div className="flex gap-3 mt-5">
             {[
-              { label: "나이", value: userProfile?.birth_date ? `${age}세` : "-" },
-              { label: "주간 목표", value: weeklyTarget !== "-" ? `${weeklyTarget}회` : "-" },
-              { label: "운동 종목", value: `${exerciseGoals.length}가지` },
+              { label: '나이',      value: userProfile?.birth_date ? `${age}세` : '-' },
+              { label: '주간 목표', value: weeklyTarget !== '-' ? `${weeklyTarget}회` : '-' },
+              { label: '운동 종목', value: `${displayGoals.length}가지` },
             ].map((s) => (
               <div
                 key={s.label}
                 className="flex flex-col items-center flex-1 rounded-xl py-3"
-                style={{ backgroundColor: "#2C2C30", border: "1px solid #3A3A3E" }}
+                style={{ backgroundColor: '#2C2C30', border: '1px solid #3A3A3E' }}
               >
-                <span style={{ color: "#3FFDD4", fontSize: 16, fontWeight: 700 }}>{s.value}</span>
-                <span style={{ color: "#888888", fontSize: 11, marginTop: 2 }}>{s.label}</span>
+                <span style={{ color: '#3FFDD4', fontSize: 16, fontWeight: 700 }}>{s.value}</span>
+                <span style={{ color: '#888888', fontSize: 11, marginTop: 2 }}>{s.label}</span>
               </div>
             ))}
           </div>
         </div>
 
+        {/* ── 사용자 정보 ── */}
         <Section title="사용자 정보" icon={<User size={15} color="#3FFDD4" />}>
-          <InfoRow label="이름" value={userProfile?.name ?? "-"} />
-          <InfoRow label="닉네임" value={`@${userProfile?.nickname ?? "-"}`} />
-          <InfoRow label="이메일" value={userProfile?.email ?? "-"} />
-          <InfoRow label="가입일" value={joinDate} />
-          <InfoRow
-            label="생년월일"
-            value={formattedBirthday}
-            onEdit={() => openEdit("birthday")}
-          />
+          <InfoRow label="이름"    value={userProfile?.name ?? '-'} />
+          <InfoRow label="아이디"  value={userProfile?.nickname ?? '-'} />
+          <InfoRow label="가입일"  value={joinDate} />
+          <InfoRow label="생년월일" value={formattedBirthday} onEdit={() => openEdit('birthday')} />
         </Section>
 
+        {/* ── 운동 목표 설정 ── */}
         <Section title="운동 목표 설정" icon={<Target size={15} color="#3FFDD4" />} topGap>
           <GoalRow
             label="주간 운동 횟수"
-            value={weeklyTarget !== "-" ? `${weeklyTarget}회` : "-"}
-            onEdit={() => openEdit("weekly")}
+            value={weeklyTarget !== '-' ? `${weeklyTarget}회` : '-'}
+            onEdit={() => openEdit('weekly')}
           />
-          {exerciseGoals.length === 0 ? (
+          {displayGoals.length === 0 ? (
             <div className="px-5 py-6 flex flex-col items-center gap-2">
-              <span style={{ color: "#555555", fontSize: 13 }}>등록된 운동 목표가 없어요</span>
-              <span style={{ color: "#444444", fontSize: 11 }}>온보딩에서 목표를 설정해보세요</span>
+              <span style={{ color: '#555555', fontSize: 13 }}>등록된 운동 목표가 없어요</span>
+              <span style={{ color: '#444444', fontSize: 11 }}>온보딩에서 목표를 설정해보세요</span>
             </div>
           ) : (
-            exerciseGoals.map((goal) => {
-              const valueStr =
-                goal.daily_target_count != null
-                  ? `${goal.daily_target_count}개`
-                  : goal.daily_target_duration != null
-                  ? `${goal.daily_target_duration}초`
-                  : "-";
-              const hasGoalId = goalIdStorage.get(goal.exercise_id) !== null;
-              return (
-                <ExerciseGoalRow
-                  key={goal.exercise_id}
-                  label={`${goal.exercise_name} 목표`}
-                  value={valueStr}
-                  todayCount={goal.today_count}
-                  todayDuration={goal.today_duration}
-                  canEdit={hasGoalId}
-                  onEdit={() => openEdit({ type: "exercise", goal })}
-                />
-              );
-            })
+            displayGoals.map((g) => (
+              <ExerciseGoalRow
+                key={g.exercise_id}
+                goal={g}
+                onEdit={() => openEdit({ type: 'exercise', goal: g })}
+              />
+            ))
           )}
         </Section>
 
+        {/* ── 운동 임계값 초기화 ── */}
         <Section title="운동 임계값 초기화" icon={<Gauge size={15} color="#3FFDD4" />} topGap>
           <div className="px-5 py-3">
-            <p style={{ color: "#888888", fontSize: 12, marginBottom: 14 }}>
+            <p style={{ color: '#888888', fontSize: 12, marginBottom: 14 }}>
               촬영 전 측정한 임계값을 운동별로 초기화할 수 있어요
             </p>
-            {exerciseGoals.length === 0 ? (
-              <p style={{ color: "#555555", fontSize: 12 }}>운동 목표를 먼저 설정해주세요</p>
+            {displayGoals.length === 0 ? (
+              <p style={{ color: '#555555', fontSize: 12 }}>운동 목표를 먼저 설정해주세요</p>
             ) : (
               <div className="flex flex-col gap-3">
-                {exerciseGoals.map((goal) => (
+                {displayGoals.map((g) => (
                   <div
-                    key={goal.exercise_id}
+                    key={g.exercise_id}
                     className="flex items-center justify-between px-4 rounded-xl"
-                    style={{ backgroundColor: "#242428", border: "1px solid #2C2C30", height: 52 }}
+                    style={{ backgroundColor: '#242428', border: '1px solid #2C2C30', height: 52 }}
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className="flex items-center justify-center rounded-lg"
                         style={{
-                          width: 32,
-                          height: 32,
-                          backgroundColor: "rgba(63,253,212,0.08)",
-                          border: "1px solid rgba(63,253,212,0.2)",
+                          width: 32, height: 32,
+                          backgroundColor: 'rgba(63,253,212,0.08)',
+                          border: '1px solid rgba(63,253,212,0.2)',
                         }}
                       >
                         <Dumbbell size={14} color="#3FFDD4" />
                       </div>
-                      <span style={{ color: "#CCCCCC", fontSize: 14 }}>{goal.exercise_name}</span>
+                      <span style={{ color: '#CCCCCC', fontSize: 14 }}>{g.exercise_name}</span>
                     </div>
                     <button
-                      onClick={() => setResetTarget(goal.exercise_name)}
+                      onClick={() => setResetTarget(g.exercise_name)}
                       className="flex items-center gap-1.5 px-3 rounded-lg"
                       style={{
                         height: 32,
-                        backgroundColor: "rgba(255,90,90,0.1)",
-                        border: "1px solid rgba(255,90,90,0.25)",
-                        cursor: "pointer",
+                        backgroundColor: 'rgba(255,90,90,0.1)',
+                        border: '1px solid rgba(255,90,90,0.25)',
+                        cursor: 'pointer',
                       }}
                     >
                       <RotateCcw size={12} color="#FF5A5A" />
-                      <span style={{ color: "#FF5A5A", fontSize: 12, fontWeight: 600 }}>초기화</span>
+                      <span style={{ color: '#FF5A5A', fontSize: 12, fontWeight: 600 }}>초기화</span>
                     </button>
                   </div>
                 ))}
@@ -387,27 +450,29 @@ export function MyPage() {
           </div>
         </Section>
 
+        {/* ── 계정 ── */}
         <Section title="계정" icon={<Dumbbell size={15} color="#3FFDD4" />} topGap>
           <button
             onClick={() => setShowLogoutConfirm(true)}
             className="flex items-center justify-between w-full px-4 py-4"
-            style={{ background: "none", border: "none", cursor: "pointer", borderBottom: "1px solid #2C2C30" }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', borderBottom: '1px solid #2C2C30' }}
           >
             <div className="flex items-center gap-3">
               <LogOut size={17} color="#FF5A5A" />
-              <span style={{ color: "#FF5A5A", fontSize: 15 }}>로그아웃</span>
+              <span style={{ color: '#FF5A5A', fontSize: 15 }}>로그아웃</span>
             </div>
             <ChevronRight size={16} color="#555555" />
           </button>
         </Section>
 
-        <p style={{ color: "#444444", fontSize: 11, textAlign: "center", marginTop: 24 }}>
+        <p style={{ color: '#444444', fontSize: 11, textAlign: 'center', marginTop: 24 }}>
           AI 피트니스 코치 v1.0.0
         </p>
       </div>
 
       <BottomNav />
 
+      {/* ── 편집 모달 ── */}
       {editTarget && (
         <EditModal
           editTarget={editTarget}
@@ -424,10 +489,11 @@ export function MyPage() {
         />
       )}
 
+      {/* ── 로그아웃 확인 ── */}
       {showLogoutConfirm && (
         <ConfirmSheet
           message="정말 로그아웃 하시겠어요?"
-          confirmLabel={loggingOut ? "처리 중..." : "로그아웃"}
+          confirmLabel={loggingOut ? '처리 중...' : '로그아웃'}
           confirmColor="#FF5A5A"
           onConfirm={handleLogout}
           onCancel={() => setShowLogoutConfirm(false)}
@@ -435,6 +501,7 @@ export function MyPage() {
         />
       )}
 
+      {/* ── 임계값 초기화 확인 ── */}
       {resetTarget && (
         <ConfirmSheet
           message={`${resetTarget} 임계값을 초기화할까요?`}
@@ -452,52 +519,31 @@ export function MyPage() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 서브 컴포넌트
+// ─────────────────────────────────────────────────────────────────────────────
 function Section({
-  title,
-  icon,
-  children,
-  topGap,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  topGap?: boolean;
-}) {
+  title, icon, children, topGap,
+}: { title: string; icon: React.ReactNode; children: React.ReactNode; topGap?: boolean }) {
   return (
     <div style={{ marginTop: topGap ? 16 : 0 }}>
-      <div
-        className="flex items-center gap-2 px-5 py-3"
-        style={{ borderBottom: "1px solid #2C2C30" }}
-      >
+      <div className="flex items-center gap-2 px-5 py-3" style={{ borderBottom: '1px solid #2C2C30' }}>
         {icon}
-        <span style={{ color: "#3FFDD4", fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>
-          {title}
-        </span>
+        <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{title}</span>
       </div>
-      <div style={{ backgroundColor: "#1E1E22" }}>{children}</div>
+      <div style={{ backgroundColor: '#1E1E22' }}>{children}</div>
     </div>
   );
 }
 
-function InfoRow({
-  label,
-  value,
-  onEdit,
-}: {
-  label: string;
-  value: string;
-  onEdit?: () => void;
-}) {
+function InfoRow({ label, value, onEdit }: { label: string; value: string; onEdit?: () => void }) {
   return (
-    <div
-      className="flex items-center justify-between px-5 py-4"
-      style={{ borderBottom: "1px solid #2C2C30" }}
-    >
-      <span style={{ color: "#888888", fontSize: 14 }}>{label}</span>
+    <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #2C2C30' }}>
+      <span style={{ color: '#888888', fontSize: 14 }}>{label}</span>
       <div className="flex items-center gap-2">
-        <span style={{ color: "#FFFFFF", fontSize: 14, fontWeight: 500 }}>{value}</span>
+        <span style={{ color: '#FFFFFF', fontSize: 14, fontWeight: 500 }}>{value}</span>
         {onEdit && (
-          <button onClick={onEdit} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+          <button onClick={onEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
             <Edit3 size={14} color="#3FFDD4" />
           </button>
         )}
@@ -511,72 +557,47 @@ function GoalRow({ label, value, onEdit }: { label: string; value: string; onEdi
     <button
       onClick={onEdit}
       className="flex items-center justify-between w-full px-5 py-4"
-      style={{ background: "none", border: "none", borderBottom: "1px solid #2C2C30", cursor: "pointer" }}
+      style={{ background: 'none', border: 'none', borderBottom: '1px solid #2C2C30', cursor: 'pointer' }}
     >
-      <span style={{ color: "#CCCCCC", fontSize: 14 }}>{label}</span>
+      <span style={{ color: '#CCCCCC', fontSize: 14 }}>{label}</span>
       <div className="flex items-center gap-2">
-        <span style={{ color: "#3FFDD4", fontSize: 14, fontWeight: 600 }}>{value}</span>
+        <span style={{ color: '#3FFDD4', fontSize: 14, fontWeight: 600 }}>{value}</span>
         <ChevronRight size={15} color="#555555" />
       </div>
     </button>
   );
 }
 
-function ExerciseGoalRow({
-  label,
-  value,
-  todayCount,
-  todayDuration,
-  canEdit,
-  onEdit,
-}: {
-  label: string;
-  value: string;
-  todayCount: number;
-  todayDuration: number;
-  canEdit: boolean;
-  onEdit: () => void;
-}) {
+function ExerciseGoalRow({ goal: g, onEdit }: { goal: DisplayGoal; onEdit: () => void }) {
   const todayStr =
-    todayCount > 0
-      ? `오늘 ${todayCount}개 완료`
-      : todayDuration > 0
-      ? `오늘 ${todayDuration}초 완료`
-      : "오늘 미완료";
+    g.today_count > 0 ? `오늘 ${g.today_count}개 완료`
+    : g.today_duration > 0 ? `오늘 ${g.today_duration}초 완료`
+    : '오늘 미완료';
 
   return (
-    <div
-      className="flex items-center justify-between px-5 py-4"
-      style={{ borderBottom: "1px solid #2C2C30" }}
-    >
+    <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #2C2C30' }}>
       <div className="flex flex-col gap-0.5">
-        <span style={{ color: "#CCCCCC", fontSize: 14 }}>{label}</span>
-        <span style={{ color: "#555555", fontSize: 11 }}>{todayStr}</span>
+        <span style={{ color: '#CCCCCC', fontSize: 14 }}>{g.exercise_name} 목표</span>
+        <span style={{ color: '#555555', fontSize: 11 }}>{todayStr}</span>
       </div>
       <div className="flex items-center gap-2">
-        <span style={{ color: "#3FFDD4", fontSize: 14, fontWeight: 600 }}>{value}</span>
-        {canEdit && (
-          <button onClick={onEdit} style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
-            <Edit3 size={14} color="#3FFDD4" />
-          </button>
-        )}
+        <span style={{ color: '#3FFDD4', fontSize: 14, fontWeight: 600 }}>
+          {g.target}{g.unit}
+        </span>
+        <button onClick={onEdit} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+          <Edit3 size={14} color="#3FFDD4" />
+        </button>
       </div>
     </div>
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 편집 모달
+// ─────────────────────────────────────────────────────────────────────────────
 function EditModal({
-  editTarget,
-  tmpBirthday,
-  setTmpBirthday,
-  tmpWeekly,
-  setTmpWeekly,
-  tmpCount,
-  setTmpCount,
-  onSave,
-  onClose,
-  saving,
-  saveError,
+  editTarget, tmpBirthday, setTmpBirthday, tmpWeekly, setTmpWeekly,
+  tmpCount, setTmpCount, onSave, onClose, saving, saveError,
 }: {
   editTarget: EditTarget;
   tmpBirthday: { year: number; month: number; day: number };
@@ -590,81 +611,74 @@ function EditModal({
   saving: boolean;
   saveError: string | null;
 }) {
-  const isExercise = editTarget && typeof editTarget === "object" && editTarget.type === "exercise";
-  const exerciseGoal = isExercise ? (editTarget as { type: "exercise"; goal: ExerciseGoalSummaryItem }).goal : null;
-  const isCount = exerciseGoal?.daily_target_count != null;
-  const unit = isCount ? "개" : "초";
-  const min = isCount ? 1 : 10;
-  const max = isCount ? 200 : 3600;
-  const step = isCount ? 1 : 5;
+  const isExercise =
+    editTarget != null && typeof editTarget === 'object' && editTarget.type === 'exercise';
+  const exerciseGoal = isExercise
+    ? (editTarget as { type: 'exercise'; goal: DisplayGoal }).goal
+    : null;
+
+  const isCount = exerciseGoal?.unit === '개';
+  const unit = exerciseGoal?.unit ?? '개';
+  const min  = isCount ? 1  : 10;
+  const max  = isCount ? 200 : 3600;
+  const step = isCount ? 1  : 5;
 
   const title =
-    editTarget === "birthday"
-      ? "생년월일 수정"
-      : editTarget === "weekly"
-      ? "주간 운동 횟수 수정"
-      : isExercise
-      ? `${exerciseGoal!.exercise_name} 목표 수정`
-      : "";
+    editTarget === 'birthday'  ? '생년월일 수정'
+    : editTarget === 'weekly'  ? '주간 운동 횟수 수정'
+    : isExercise               ? `${exerciseGoal!.exercise_name} 목표 수정`
+    : '';
 
   return (
     <div
       className="fixed inset-0 flex justify-center items-end"
-      style={{ zIndex: 200, backgroundColor: "rgba(0,0,0,0.65)" }}
+      style={{ zIndex: 200, backgroundColor: 'rgba(0,0,0,0.65)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="w-full rounded-t-3xl px-6 pt-5 pb-10"
-        style={{ maxWidth: 390, backgroundColor: "#242428", border: "1px solid #3A3A3E" }}
+        style={{ maxWidth: 390, backgroundColor: '#242428', border: '1px solid #3A3A3E' }}
       >
-        <div className="mx-auto mb-5 rounded-full" style={{ width: 40, height: 4, backgroundColor: "#3A3A3E" }} />
-
+        <div className="mx-auto mb-5 rounded-full" style={{ width: 40, height: 4, backgroundColor: '#3A3A3E' }} />
         <div className="flex items-center justify-between mb-5">
-          <span style={{ color: "#FFFFFF", fontSize: 17, fontWeight: 700 }}>{title}</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}>
+          <span style={{ color: '#FFFFFF', fontSize: 17, fontWeight: 700 }}>{title}</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
             <X size={20} color="#888888" />
           </button>
         </div>
 
-        {editTarget === "birthday" && (
+        {/* 생년월일 */}
+        {editTarget === 'birthday' && (
           <div className="flex flex-col gap-4">
             <div>
-              <label style={{ color: "#888888", fontSize: 12, display: "block", marginBottom: 8 }}>연도</label>
+              <label style={{ color: '#888888', fontSize: 12, display: 'block', marginBottom: 8 }}>연도</label>
               <div
                 className="flex items-center justify-between px-4"
-                style={{ backgroundColor: "#2C2C30", borderRadius: 12, height: 52, border: "1px solid #3A3A3E" }}
+                style={{ backgroundColor: '#2C2C30', borderRadius: 12, height: 52, border: '1px solid #3A3A3E' }}
               >
-                <CounterBtn
-                  disabled={tmpBirthday.year <= 1940}
-                  onClick={() => setTmpBirthday({ ...tmpBirthday, year: tmpBirthday.year - 1 })}
-                  icon={<Minus size={16} />}
-                />
-                <span style={{ color: "#3FFDD4", fontSize: 22, fontWeight: 700 }}>{tmpBirthday.year}</span>
-                <CounterBtn
-                  disabled={tmpBirthday.year >= 2015}
-                  onClick={() => setTmpBirthday({ ...tmpBirthday, year: tmpBirthday.year + 1 })}
-                  icon={<Plus size={16} />}
-                />
+                <CounterBtn disabled={tmpBirthday.year <= 1940} onClick={() => setTmpBirthday({ ...tmpBirthday, year: tmpBirthday.year - 1 })} icon={<Minus size={16} />} />
+                <span style={{ color: '#3FFDD4', fontSize: 22, fontWeight: 700 }}>{tmpBirthday.year}</span>
+                <CounterBtn disabled={tmpBirthday.year >= 2015} onClick={() => setTmpBirthday({ ...tmpBirthday, year: tmpBirthday.year + 1 })} icon={<Plus size={16} />} />
               </div>
             </div>
             <div className="flex gap-3">
-              {(["month", "day"] as const).map((field) => (
+              {(['month', 'day'] as const).map((field) => (
                 <div key={field} className="flex-1">
-                  <label style={{ color: "#888888", fontSize: 12, display: "block", marginBottom: 8 }}>
-                    {field === "month" ? "월" : "일"}
+                  <label style={{ color: '#888888', fontSize: 12, display: 'block', marginBottom: 8 }}>
+                    {field === 'month' ? '월' : '일'}
                   </label>
                   <div
                     className="flex items-center justify-between px-3"
-                    style={{ backgroundColor: "#2C2C30", borderRadius: 12, height: 52, border: "1px solid #3A3A3E" }}
+                    style={{ backgroundColor: '#2C2C30', borderRadius: 12, height: 52, border: '1px solid #3A3A3E' }}
                   >
                     <CounterBtn
                       disabled={tmpBirthday[field] <= 1}
                       onClick={() => setTmpBirthday({ ...tmpBirthday, [field]: tmpBirthday[field] - 1 })}
                       icon={<Minus size={14} />}
                     />
-                    <span style={{ color: "#3FFDD4", fontSize: 20, fontWeight: 700 }}>{tmpBirthday[field]}</span>
+                    <span style={{ color: '#3FFDD4', fontSize: 20, fontWeight: 700 }}>{tmpBirthday[field]}</span>
                     <CounterBtn
-                      disabled={tmpBirthday[field] >= (field === "month" ? 12 : 31)}
+                      disabled={tmpBirthday[field] >= (field === 'month' ? 12 : 31)}
                       onClick={() => setTmpBirthday({ ...tmpBirthday, [field]: tmpBirthday[field] + 1 })}
                       icon={<Plus size={14} />}
                     />
@@ -675,9 +689,10 @@ function EditModal({
           </div>
         )}
 
-        {editTarget === "weekly" && (
+        {/* 주간 운동 횟수 */}
+        {editTarget === 'weekly' && (
           <div>
-            <p style={{ color: "#888888", fontSize: 13, marginBottom: 16 }}>일주일에 몇 번 운동할 건가요?</p>
+            <p style={{ color: '#888888', fontSize: 13, marginBottom: 16 }}>일주일에 몇 번 운동할 건가요?</p>
             <div className="flex gap-3">
               {[1, 2, 3, 4, 5, 6, 7].map((n) => (
                 <button
@@ -686,30 +701,31 @@ function EditModal({
                   className="flex-1 flex items-center justify-center rounded-xl"
                   style={{
                     height: 52,
-                    backgroundColor: tmpWeekly === n ? "#3FFDD4" : "#2C2C30",
-                    border: `1px solid ${tmpWeekly === n ? "#3FFDD4" : "#3A3A3E"}`,
-                    color: tmpWeekly === n ? "#0A1A16" : "#CCCCCC",
+                    backgroundColor: tmpWeekly === n ? '#3FFDD4' : '#2C2C30',
+                    border: `1px solid ${tmpWeekly === n ? '#3FFDD4' : '#3A3A3E'}`,
+                    color: tmpWeekly === n ? '#0A1A16' : '#CCCCCC',
                     fontSize: 16,
                     fontWeight: tmpWeekly === n ? 700 : 400,
-                    cursor: "pointer",
+                    cursor: 'pointer',
                   }}
                 >
                   {n}
                 </button>
               ))}
             </div>
-            <p style={{ color: "#3FFDD4", fontSize: 12, textAlign: "center", marginTop: 12 }}>주 {tmpWeekly}회</p>
+            <p style={{ color: '#3FFDD4', fontSize: 12, textAlign: 'center', marginTop: 12 }}>주 {tmpWeekly}회</p>
           </div>
         )}
 
+        {/* 운동 목표 수 */}
         {isExercise && exerciseGoal && (
           <div>
-            <p style={{ color: "#888888", fontSize: 13, marginBottom: 20 }}>
+            <p style={{ color: '#888888', fontSize: 13, marginBottom: 20 }}>
               {exerciseGoal.exercise_name} 목표를 조정해보세요
             </p>
             <div
               className="flex items-center justify-between px-6 rounded-2xl"
-              style={{ backgroundColor: "#2C2C30", height: 88, border: "1px solid #3A3A3E" }}
+              style={{ backgroundColor: '#2C2C30', height: 88, border: '1px solid #3A3A3E' }}
             >
               <CounterBtn
                 disabled={tmpCount <= min}
@@ -718,10 +734,8 @@ function EditModal({
                 size={44}
               />
               <div className="flex flex-col items-center">
-                <span style={{ color: "#3FFDD4", fontSize: 44, fontWeight: 700, lineHeight: 1 }}>
-                  {tmpCount}
-                </span>
-                <span style={{ color: "#888888", fontSize: 13, marginTop: 4 }}>{unit}</span>
+                <span style={{ color: '#3FFDD4', fontSize: 44, fontWeight: 700, lineHeight: 1 }}>{tmpCount}</span>
+                <span style={{ color: '#888888', fontSize: 13, marginTop: 4 }}>{unit}</span>
               </div>
               <CounterBtn
                 disabled={tmpCount >= max}
@@ -736,10 +750,10 @@ function EditModal({
         {saveError && (
           <div
             className="flex items-center gap-2 mt-4 px-4 py-3 rounded-xl"
-            style={{ backgroundColor: "rgba(255,90,90,0.1)", border: "1px solid rgba(255,90,90,0.2)" }}
+            style={{ backgroundColor: 'rgba(255,90,90,0.1)', border: '1px solid rgba(255,90,90,0.2)' }}
           >
             <AlertCircle size={14} color="#FF5A5A" />
-            <span style={{ color: "#FF5A5A", fontSize: 13 }}>{saveError}</span>
+            <span style={{ color: '#FF5A5A', fontSize: 13 }}>{saveError}</span>
           </div>
         )}
 
@@ -749,27 +763,21 @@ function EditModal({
           className="flex items-center justify-center gap-2 w-full rounded-2xl mt-6"
           style={{
             height: 56,
-            backgroundColor: saving ? "#2C6B5E" : "#3FFDD4",
-            border: "none",
-            color: "#0A1A16",
+            backgroundColor: saving ? '#2C6B5E' : '#3FFDD4',
+            border: 'none',
+            color: '#0A1A16',
             fontSize: 16,
             fontWeight: 700,
-            cursor: saving ? "not-allowed" : "pointer",
+            cursor: saving ? 'not-allowed' : 'pointer',
           }}
         >
           {saving ? (
             <>
-              <div
-                className="rounded-full animate-spin"
-                style={{ width: 18, height: 18, border: "2px solid #0A1A16", borderTopColor: "transparent" }}
-              />
+              <div className="rounded-full animate-spin" style={{ width: 18, height: 18, border: '2px solid #0A1A16', borderTopColor: 'transparent' }} />
               저장 중...
             </>
           ) : (
-            <>
-              <Check size={18} />
-              저장하기
-            </>
+            <><Check size={18} />저장하기</>
           )}
         </button>
       </div>
@@ -778,33 +786,18 @@ function EditModal({
 }
 
 function CounterBtn({
-  onClick,
-  disabled,
-  icon,
-  size = 36,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-  icon: React.ReactNode;
-  size?: number;
-}) {
+  onClick, disabled, icon, size = 36,
+}: { onClick: () => void; disabled: boolean; icon: React.ReactNode; size?: number }) {
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       style={{
-        width: size,
-        height: size,
-        borderRadius: 10,
-        backgroundColor: disabled ? "#222226" : "#3A3A3E",
-        border: "none",
-        cursor: disabled ? "not-allowed" : "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: disabled ? "#444444" : "#FFFFFF",
-        flexShrink: 0,
-        transition: "all 0.15s",
+        width: size, height: size, borderRadius: 10,
+        backgroundColor: disabled ? '#222226' : '#3A3A3E',
+        border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: disabled ? '#444444' : '#FFFFFF', flexShrink: 0, transition: 'all 0.15s',
       }}
     >
       {icon}
@@ -813,88 +806,48 @@ function CounterBtn({
 }
 
 function ConfirmSheet({
-  message,
-  subMessage,
-  confirmLabel,
-  confirmColor,
-  onConfirm,
-  onCancel,
-  icon,
-  iconBg,
-  iconBorder,
-  disabled,
+  message, subMessage, confirmLabel, confirmColor,
+  onConfirm, onCancel, icon, iconBg, iconBorder, disabled,
 }: {
-  message: string;
-  subMessage?: string;
-  confirmLabel: string;
-  confirmColor: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  icon?: React.ReactNode;
-  iconBg?: string;
-  iconBorder?: string;
-  disabled?: boolean;
+  message: string; subMessage?: string; confirmLabel: string; confirmColor: string;
+  onConfirm: () => void; onCancel: () => void;
+  icon?: React.ReactNode; iconBg?: string; iconBorder?: string; disabled?: boolean;
 }) {
   return (
-    <div
-      className="fixed inset-0 flex justify-center items-end"
-      style={{ zIndex: 300, backgroundColor: "rgba(0,0,0,0.7)" }}
-    >
+    <div className="fixed inset-0 flex justify-center items-end" style={{ zIndex: 300, backgroundColor: 'rgba(0,0,0,0.7)' }}>
       <div
         className="w-full rounded-t-3xl px-6 pt-5 pb-10"
-        style={{ maxWidth: 390, backgroundColor: "#242428", border: "1px solid #3A3A3E" }}
+        style={{ maxWidth: 390, backgroundColor: '#242428', border: '1px solid #3A3A3E' }}
       >
-        <div className="mx-auto mb-6 rounded-full" style={{ width: 40, height: 4, backgroundColor: "#3A3A3E" }} />
+        <div className="mx-auto mb-6 rounded-full" style={{ width: 40, height: 4, backgroundColor: '#3A3A3E' }} />
         <div className="flex justify-center mb-4">
           <div
             className="flex items-center justify-center rounded-full"
             style={{
-              width: 56,
-              height: 56,
-              backgroundColor: iconBg ?? "rgba(255,90,90,0.12)",
-              border: `1px solid ${iconBorder ?? "rgba(255,90,90,0.3)"}`,
+              width: 56, height: 56,
+              backgroundColor: iconBg ?? 'rgba(255,90,90,0.12)',
+              border: `1px solid ${iconBorder ?? 'rgba(255,90,90,0.3)'}`,
             }}
           >
             {icon ?? <LogOut size={24} color="#FF5A5A" />}
           </div>
         </div>
-        <p style={{ color: "#FFFFFF", fontSize: 17, fontWeight: 700, textAlign: "center", marginBottom: 8 }}>
-          {message}
-        </p>
-        <p style={{ color: "#888888", fontSize: 13, textAlign: "center", marginBottom: 28 }}>
-          {subMessage ?? "로그아웃 후 다시 로그인이 필요해요"}
+        <p style={{ color: '#FFFFFF', fontSize: 17, fontWeight: 700, textAlign: 'center', marginBottom: 8 }}>{message}</p>
+        <p style={{ color: '#888888', fontSize: 13, textAlign: 'center', marginBottom: 28 }}>
+          {subMessage ?? '로그아웃 후 다시 로그인이 필요해요'}
         </p>
         <div className="flex gap-3">
           <button
             onClick={onCancel}
             disabled={disabled}
-            className="flex-1 flex items-center justify-center rounded-2xl"
-            style={{
-              height: 52,
-              backgroundColor: "#2C2C30",
-              border: "1px solid #3A3A3E",
-              color: "#CCCCCC",
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
+            style={{ flex: 1, height: 52, backgroundColor: '#2C2C30', border: '1px solid #3A3A3E', color: '#CCCCCC', fontSize: 15, fontWeight: 600, cursor: 'pointer', borderRadius: 16 }}
           >
             취소
           </button>
           <button
             onClick={onConfirm}
             disabled={disabled}
-            className="flex-1 flex items-center justify-center rounded-2xl"
-            style={{
-              height: 52,
-              backgroundColor: confirmColor,
-              border: "none",
-              color: "#FFFFFF",
-              fontSize: 15,
-              fontWeight: 700,
-              cursor: disabled ? "not-allowed" : "pointer",
-              opacity: disabled ? 0.7 : 1,
-            }}
+            style={{ flex: 1, height: 52, backgroundColor: confirmColor, border: 'none', color: '#FFFFFF', fontSize: 15, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.7 : 1, borderRadius: 16 }}
           >
             {confirmLabel}
           </button>
