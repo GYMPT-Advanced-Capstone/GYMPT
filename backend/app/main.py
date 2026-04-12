@@ -3,6 +3,7 @@ from importlib import import_module
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware  # ← 추가
 from fastapi.staticfiles import StaticFiles
 
 from app.auth.router import router as auth_router
@@ -36,6 +37,18 @@ app = FastAPI(
     description="AI 기반 실시간 운동 자세 분석 코칭 시스템",
     version="0.1.0",
     lifespan=lifespan,
+)
+
+# ← 여기에 추가 (app 생성 직후, mount/router 전에)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

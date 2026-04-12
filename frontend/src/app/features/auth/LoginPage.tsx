@@ -2,39 +2,58 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { User, Lock } from 'lucide-react';
 import { useGoal } from '../../context/GoalContext';
+import { authApi, tokenStorage } from '../../api/authApi';
 
-const HERO_IMAGE = 'https://images.unsplash.com/photo-1603665409265-bdc00027c217?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaXRuZXNzJTIwZ3ltJTIwZGFyayUyMHRyYWluaW5nfGVufDF8fHx8MTc3NDE3OTQ4M3ww&ixlib=rb-4.1.0&q=80&w=1080';
+const HERO_IMAGE =
+  'https://images.unsplash.com/photo-1603665409265-bdc00027c217?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaXRuZXNzJTIwZ3ltJTIwZGFyayUyMHRyYWluaW5nfGVufDF8fHx8MTc3NDE3OTQ4M3ww&ixlib=rb-4.1.0&q=80&w=1080';
 
 export function LoginPage() {
   const navigate = useNavigate();
   const { setUserName } = useGoal();
+
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
   const [pwHover, setPwHover] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const canLogin = id.trim().length > 0 && password.length > 0;
+  const canLogin = id.trim().length > 0 && password.length > 0 && !isLoading;
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (!canLogin) return;
     setLoginError('');
+    setIsLoading(true);
 
-    // 이 부분 추후 백엔드 API 연결 시 아래 localStorage 로직을 API 호출로 교체
-    const registeredEmail = localStorage.getItem('registered_email') ?? '';
-    const registeredPassword = localStorage.getItem('registered_password') ?? '';
-    const registeredName = localStorage.getItem('registered_name') ?? '';
+    try {
+      const res = await authApi.login({ email: id.trim(), pw: password });
 
-    if (!registeredEmail) {
-      setLoginError('가입된 계정이 없어요. 먼저 회원가입을 해주세요.');
-      return;
+      tokenStorage.setTokens(res.access_token, res.refresh_token);
+
+      const savedName = tokenStorage.getUserName();
+      setUserName(savedName || id.trim());
+
+      navigate('/goal/birthday');
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : '로그인에 실패했어요.';
+
+      if (
+        message.toLowerCase().includes('incorrect') ||
+        message.toLowerCase().includes('invalid') ||
+        message.toLowerCase().includes('not found') ||
+        message.includes('401')
+      ) {
+        setLoginError('아이디 또는 비밀번호가 올바르지 않아요.');
+      } else {
+        setLoginError(message);
+      }
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    if (id.trim() !== registeredEmail || password !== registeredPassword) {
-      setLoginError('아이디 또는 비밀번호가 올바르지 않아요.');
-      return;
-    }
-
-    setUserName(registeredName || id.trim());
-    navigate('/goal/birthday');
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && canLogin) handleLogin();
   };
 
   return (
@@ -92,9 +111,13 @@ export function LoginPage() {
               <User size={18} color="#666666" />
               <input
                 type="text"
-                placeholder="아이디를 입력하세요"
+                placeholder="이메일을 입력하세요"
                 value={id}
-                onChange={(e) => { setId(e.target.value); setLoginError(''); }}
+                onChange={(e) => {
+                  setId(e.target.value);
+                  setLoginError('');
+                }}
+                onKeyDown={handleKeyDown}
                 style={{
                   flex: 1,
                   background: 'transparent',
@@ -127,7 +150,11 @@ export function LoginPage() {
                 type="password"
                 placeholder="비밀번호를 입력하세요"
                 value={password}
-                onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setLoginError('');
+                }}
+                onKeyDown={handleKeyDown}
                 style={{
                   flex: 1,
                   background: 'transparent',
@@ -176,9 +203,37 @@ export function LoginPage() {
               cursor: canLogin ? 'pointer' : 'not-allowed',
               letterSpacing: 1,
               transition: 'background-color 0.2s, color 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
             }}
           >
-            로그인
+            {isLoading ? (
+              <>
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 18 18"
+                  fill="none"
+                  style={{ animation: 'spin 0.8s linear infinite' }}
+                >
+                  <circle
+                    cx="9"
+                    cy="9"
+                    r="7"
+                    stroke="#0A1A16"
+                    strokeWidth="2"
+                    strokeDasharray="30"
+                    strokeDashoffset="10"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                로그인 중...
+              </>
+            ) : (
+              '로그인'
+            )}
           </button>
 
           <div className="flex items-center justify-center mt-5">
@@ -217,6 +272,10 @@ export function LoginPage() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
