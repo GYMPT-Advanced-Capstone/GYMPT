@@ -17,6 +17,9 @@ export interface UserResponse {
   email: string;
   name: string;
   nickname: string;
+  birth_date?: string | null;   // "YYYY-MM-DD"
+  weekly_target?: number | null;
+  created_at?: string;
 }
 
 export const tokenStorage = {
@@ -76,6 +79,8 @@ async function request<T>(
 
   return data as T;
 }
+
+export { request };
 
 export const authApi = {
   signup: (data: {
