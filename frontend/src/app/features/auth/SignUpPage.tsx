@@ -2,6 +2,30 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { User, Mail, Lock, Eye, EyeOff, RefreshCw, Hash } from 'lucide-react';
 import { useGoal } from '../../context/GoalContext';
+import { authApi, tokenStorage } from '../../api/authApi';
+
+function Spinner({ color = '#3FFDD4' }: { color?: string }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}
+    >
+      <circle
+        cx="7"
+        cy="7"
+        r="5.5"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeDasharray="24"
+        strokeDashoffset="8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export function SignUpPage() {
   const navigate = useNavigate();
@@ -10,19 +34,28 @@ export function SignUpPage() {
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
-  const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState('');
-  const [emailVerified, setEmailVerified] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [codeSent, setCodeSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+
+  const [loadingSendCode, setLoadingSendCode] = useState(false);
+  const [loadingVerify, setLoadingVerify] = useState(false);
+  const [loadingSignup, setLoadingSignup] = useState(false);
+
+  const [sendCodeError, setSendCodeError] = useState('');
+  const [verifyError, setVerifyError] = useState('');
+  const [signupError, setSignupError] = useState('');
+
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const pwValid = password.length >= 8;
   const pwMatch = password === confirmPw && confirmPw.length > 0;
-  const verifyReady = codeSent && code.trim().length === 6;
+  const verifyReady = codeSent && code.trim().length === 6 && !loadingVerify;
 
   const canSubmit =
     name.trim().length > 0 &&
@@ -30,27 +63,76 @@ export function SignUpPage() {
     emailVerified &&
     pwValid &&
     pwMatch &&
-    agreed;
+    agreed &&
+    !loadingSignup;
 
-  const handleSendCode = () => {
-    // 이 부분 추후 백엔드 API 연결 시 이메일로 인증 코드 발송 구현
-    setCodeSent(true);
+  const handleSendCode = async () => {
+    if (!isEmailValid || loadingSendCode) return;
+    setSendCodeError('');
+    setLoadingSendCode(true);
+    setCodeSent(false);
     setCode('');
     setEmailVerified(false);
+
+    try {
+      const check = await authApi.checkEmail(email.trim());
+      if (!check.available) {
+        setSendCodeError('이미 가입된 이메일이에요. 로그인해주세요.');
+        return;
+      }
+
+      await authApi.sendEmailVerification(email.trim());
+      setCodeSent(true);
+    } catch (err) {
+      setSendCodeError(
+        err instanceof Error ? err.message : '코드 발송에 실패했어요.',
+      );
+    } finally {
+      setLoadingSendCode(false);
+    }
   };
 
-  const handleVerifyCode = () => {
-    // 이 부분 추후 백엔드 API 연결 시 코드 검증
-    setEmailVerified(true);
+  const handleVerifyCode = async () => {
+    if (!verifyReady) return;
+    setVerifyError('');
+    setLoadingVerify(true);
+
+    try {
+      await authApi.verifyEmailCode(email.trim(), code.trim());
+      setEmailVerified(true);
+    } catch (err) {
+      setVerifyError(
+        err instanceof Error ? err.message : '인증 코드가 올바르지 않아요.',
+      );
+    } finally {
+      setLoadingVerify(false);
+    }
   };
 
-  const handleSignUp = () => {
-    // 이 부분 추후 백엔드 API 연결 시 아래 localStorage 로직을 API 호출로 교체
-    localStorage.setItem('registered_email', email.trim());
-    localStorage.setItem('registered_password', password);
-    localStorage.setItem('registered_name', name.trim());
-    setUserName(name.trim());
-    navigate('/');
+  const handleSignUp = async () => {
+    if (!canSubmit) return;
+    setSignupError('');
+    setLoadingSignup(true);
+
+    try {
+      await authApi.signup({
+        email: email.trim(),
+        name: name.trim(),
+        nickname: nickname.trim(),
+        pw: password,
+      });
+
+      tokenStorage.setUserName(name.trim());
+      setUserName(name.trim());
+
+      navigate('/');
+    } catch (err) {
+      setSignupError(
+        err instanceof Error ? err.message : '회원가입에 실패했어요. 다시 시도해주세요.',
+      );
+    } finally {
+      setLoadingSignup(false);
+    }
   };
 
   return (
@@ -122,7 +204,9 @@ export function SignUpPage() {
           <div style={{ marginBottom: 18 }}>
             <label style={{ color: '#CCCCCC', fontSize: 14, display: 'block', marginBottom: 8 }}>
               닉네임
-              <span style={{ color: '#555555', fontSize: 12, marginLeft: 6 }}>커뮤니티에서 사용될 이름이에요</span>
+              <span style={{ color: '#555555', fontSize: 12, marginLeft: 6 }}>
+                커뮤니티에서 사용될 이름이에요
+              </span>
             </label>
             <div
               className="flex items-center gap-3 px-4"
@@ -190,6 +274,8 @@ export function SignUpPage() {
                     setCodeSent(false);
                     setCode('');
                     setEmailVerified(false);
+                    setSendCodeError('');
+                    setVerifyError('');
                   }}
                   style={{
                     flex: 1,
@@ -202,13 +288,15 @@ export function SignUpPage() {
                   className="placeholder-[#555555]"
                 />
                 {emailVerified && (
-                  <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>✓ 인증됨</span>
+                  <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                    ✓ 인증됨
+                  </span>
                 )}
               </div>
               {!emailVerified && (
                 <button
                   onClick={handleSendCode}
-                  disabled={!isEmailValid}
+                  disabled={!isEmailValid || loadingSendCode}
                   style={{
                     height: 54,
                     paddingLeft: 14,
@@ -219,11 +307,15 @@ export function SignUpPage() {
                     color: isEmailValid ? '#3FFDD4' : '#555555',
                     fontSize: 13,
                     fontWeight: 700,
-                    cursor: isEmailValid ? 'pointer' : 'not-allowed',
+                    cursor: isEmailValid && !loadingSendCode ? 'pointer' : 'not-allowed',
                     whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
                     transition: 'color 0.2s, border-color 0.2s',
                   }}
                 >
+                  {loadingSendCode ? <Spinner /> : null}
                   {codeSent ? '재전송' : '인증하기'}
                 </button>
               )}
@@ -234,7 +326,10 @@ export function SignUpPage() {
                 올바른 이메일 형식을 입력해주세요.
               </p>
             )}
-            {codeSent && !emailVerified && (
+            {sendCodeError && (
+              <p style={{ color: '#FF6B6B', fontSize: 12, marginTop: 5 }}>{sendCodeError}</p>
+            )}
+            {codeSent && !emailVerified && !sendCodeError && (
               <p style={{ color: '#3FFDD4', fontSize: 12, marginTop: 6 }}>
                 ✓ 인증 코드가 이메일로 전송되었어요.
               </p>
@@ -250,7 +345,13 @@ export function SignUpPage() {
                     backgroundColor: '#2C2C30',
                     borderRadius: 12,
                     height: 54,
-                    border: `1px solid ${code.trim() ? 'rgba(63,253,212,0.4)' : '#3A3A3E'}`,
+                    border: `1px solid ${
+                      verifyError
+                        ? 'rgba(255,80,80,0.4)'
+                        : code.trim()
+                        ? 'rgba(63,253,212,0.4)'
+                        : '#3A3A3E'
+                    }`,
                     transition: 'border-color 0.2s',
                   }}
                 >
@@ -259,7 +360,10 @@ export function SignUpPage() {
                     placeholder="인증번호 6자리"
                     value={code}
                     maxLength={6}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onChange={(e) => {
+                      setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                      setVerifyError('');
+                    }}
                     style={{
                       flex: 1,
                       minWidth: 0,
@@ -291,12 +395,19 @@ export function SignUpPage() {
                     fontWeight: 700,
                     cursor: verifyReady ? 'pointer' : 'not-allowed',
                     whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
                     transition: 'color 0.2s, border-color 0.2s',
                   }}
                 >
-                  인증 확인
+                  {loadingVerify ? <Spinner /> : '인증 확인'}
                 </button>
               </div>
+            )}
+            {verifyError && (
+              <p style={{ color: '#FF6B6B', fontSize: 12, marginTop: 5 }}>{verifyError}</p>
             )}
           </div>
 
@@ -428,7 +539,13 @@ export function SignUpPage() {
             >
               {agreed && (
                 <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
-                  <path d="M1 4L4 7.5L10 1" stroke="#0A1A16" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M1 4L4 7.5L10 1"
+                    stroke="#0A1A16"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               )}
             </button>
@@ -443,6 +560,26 @@ export function SignUpPage() {
               에 동의합니다.
             </p>
           </div>
+
+          {signupError && (
+            <div
+              className="flex items-center gap-2"
+              style={{
+                marginBottom: 16,
+                padding: '10px 14px',
+                backgroundColor: 'rgba(255,80,80,0.08)',
+                borderRadius: 10,
+                border: '1px solid rgba(255,80,80,0.25)',
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="7.5" cy="7.5" r="6.5" stroke="#FF6B6B" strokeWidth="1.4" />
+                <path d="M7.5 4.5V8" stroke="#FF6B6B" strokeWidth="1.4" strokeLinecap="round" />
+                <circle cx="7.5" cy="10.5" r="0.75" fill="#FF6B6B" />
+              </svg>
+              <p style={{ color: '#FF6B6B', fontSize: 13, lineHeight: 1.4 }}>{signupError}</p>
+            </div>
+          )}
 
           <button
             onClick={handleSignUp}
@@ -459,9 +596,20 @@ export function SignUpPage() {
               cursor: canSubmit ? 'pointer' : 'not-allowed',
               transition: 'background-color 0.2s, color 0.2s',
               marginBottom: 24,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
             }}
           >
-            계정 만들기
+            {loadingSignup ? (
+              <>
+                <Spinner color="#0A1A16" />
+                가입 중...
+              </>
+            ) : (
+              '계정 만들기'
+            )}
           </button>
 
           <div className="flex items-center justify-center pb-10" style={{ fontSize: 13 }}>
@@ -482,6 +630,10 @@ export function SignUpPage() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }

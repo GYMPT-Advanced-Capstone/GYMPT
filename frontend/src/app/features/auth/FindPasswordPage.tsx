@@ -1,8 +1,32 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ChevronLeft, Mail, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { authApi } from '../../api/authApi';
 
 type Step = 'verify' | 'reset' | 'done';
+
+function Spinner({ color = '#3FFDD4' }: { color?: string }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}
+    >
+      <circle
+        cx="7"
+        cy="7"
+        r="5.5"
+        stroke={color}
+        strokeWidth="1.8"
+        strokeDasharray="24"
+        strokeDashoffset="8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 
 export function FindPasswordPage() {
   const navigate = useNavigate();
@@ -18,28 +42,82 @@ export function FindPasswordPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  const [loadingSend, setLoadingSend] = useState(false);
+  const [loadingReset, setLoadingReset] = useState(false);
+
+  const [sendError, setSendError] = useState('');
+  const [resetError, setResetError] = useState('');
+
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-  const handleSendCode = () => {
-    // 이 부분 추후 백엔드 API 연결 시 이메일로 인증 코드 발송
-    setCodeSent(true);
-  };
-
-  const handleVerify = () => {
-    // 이 부분 추후 백엔드 API 연결 시 코드 검증
-    setStep('reset');
-  };
-
   const pwValid = newPw.length >= 8;
   const pwMatch = newPw === confirmPw && confirmPw.length > 0;
 
-  const handleReset = () => {
-    // 이 부분 실제 서비스에서는 여기서 API를 호출해 비밀번호를 변경 예정
-    setStep('done');
+  const verifyReady = codeSent && code.trim().length === 6;
+  const resetReady = pwValid && pwMatch && !loadingReset;
+
+  const handleSendCode = async () => {
+    if (!isEmailValid || loadingSend) return;
+    setSendError('');
+    setLoadingSend(true);
+    setCodeSent(false);
+    setCode('');
+
+    try {
+      await authApi.requestPasswordReset(email.trim());
+      setCodeSent(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '코드 발송에 실패했어요.';
+      if (
+        message.toLowerCase().includes('not found') ||
+        message.toLowerCase().includes('존재하지')
+      ) {
+        setSendError('가입되지 않은 이메일이에요. 이메일을 확인해주세요.');
+      } else {
+        setSendError(message);
+      }
+    } finally {
+      setLoadingSend(false);
+    }
   };
 
-  const verifyReady = codeSent && code.trim().length === 6;
-  const resetReady = pwValid && pwMatch;
+  const handleVerify = () => {
+    if (!verifyReady) return;
+    setResetError('');
+    setStep('reset');
+  };
+
+  const handleReset = async () => {
+    if (!resetReady) return;
+    setResetError('');
+    setLoadingReset(true);
+
+    try {
+      await authApi.resetPassword(email.trim(), code.trim(), newPw);
+      setStep('done');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '비밀번호 재설정에 실패했어요.';
+      if (
+        message.toLowerCase().includes('invalid') ||
+        message.toLowerCase().includes('expired') ||
+        message.toLowerCase().includes('code')
+      ) {
+        setResetError('인증 코드가 올바르지 않거나 만료되었어요. 처음부터 다시 시도해주세요.');
+      } else {
+        setResetError(message);
+      }
+    } finally {
+      setLoadingReset(false);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 'reset') {
+      setStep('verify');
+      setResetError('');
+    } else {
+      navigate(-1);
+    }
+  };
 
   return (
     <div
@@ -60,7 +138,7 @@ export function FindPasswordPage() {
           style={{ paddingTop: 56, paddingBottom: 20 }}
         >
           <button
-            onClick={() => (step === 'reset' ? setStep('verify') : navigate(-1))}
+            onClick={handleBack}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, marginRight: 8 }}
           >
             <ChevronLeft size={24} color="#FFFFFF" />
@@ -125,22 +203,24 @@ export function FindPasswordPage() {
             </div>
           ))}
           <div className="ml-2 flex gap-4">
-            {[{ s: 'verify', label: '이메일 인증' }, { s: 'reset', label: '비밀번호 재설정' }, { s: 'done', label: '완료' }].map(
-              ({ s, label }) => (
-                <span
-                  key={s}
-                  style={{
-                    fontSize: 11,
-                    color: step === s ? '#3FFDD4' : '#555',
-                    fontWeight: step === s ? 600 : 400,
-                    transition: 'color 0.2s',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {label}
-                </span>
-              )
-            )}
+            {[
+              { s: 'verify', label: '이메일 인증' },
+              { s: 'reset', label: '비밀번호 재설정' },
+              { s: 'done', label: '완료' },
+            ].map(({ s, label }) => (
+              <span
+                key={s}
+                style={{
+                  fontSize: 11,
+                  color: step === s ? '#3FFDD4' : '#555',
+                  fontWeight: step === s ? 600 : 400,
+                  transition: 'color 0.2s',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -175,7 +255,13 @@ export function FindPasswordPage() {
                       backgroundColor: '#2C2C30',
                       borderRadius: 12,
                       height: 54,
-                      border: `1px solid ${email.trim() ? (isEmailValid ? 'rgba(63,253,212,0.4)' : 'rgba(255,80,80,0.35)') : '#3A3A3E'}`,
+                      border: `1px solid ${
+                        email.trim()
+                          ? isEmailValid
+                            ? 'rgba(63,253,212,0.4)'
+                            : 'rgba(255,80,80,0.35)'
+                          : '#3A3A3E'
+                      }`,
                       transition: 'border-color 0.2s',
                     }}
                   >
@@ -184,7 +270,12 @@ export function FindPasswordPage() {
                       type="email"
                       placeholder="example@gmail.com"
                       value={email}
-                      onChange={(e) => { setEmail(e.target.value); setCodeSent(false); setCode(''); }}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setCodeSent(false);
+                        setCode('');
+                        setSendError('');
+                      }}
                       style={{
                         flex: 1,
                         background: 'transparent',
@@ -198,7 +289,7 @@ export function FindPasswordPage() {
                   </div>
                   <button
                     onClick={handleSendCode}
-                    disabled={!isEmailValid}
+                    disabled={!isEmailValid || loadingSend}
                     style={{
                       height: 54,
                       paddingLeft: 16,
@@ -209,15 +300,23 @@ export function FindPasswordPage() {
                       color: isEmailValid ? '#3FFDD4' : '#555555',
                       fontSize: 14,
                       fontWeight: 700,
-                      cursor: isEmailValid ? 'pointer' : 'not-allowed',
+                      cursor: isEmailValid && !loadingSend ? 'pointer' : 'not-allowed',
                       whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
                       transition: 'color 0.2s, border-color 0.2s',
                     }}
                   >
+                    {loadingSend ? <Spinner /> : null}
                     {codeSent ? '재전송' : '인증하기'}
                   </button>
                 </div>
-                {codeSent && (
+
+                {sendError && (
+                  <p style={{ color: '#FF6B6B', fontSize: 12, marginTop: 6 }}>{sendError}</p>
+                )}
+                {codeSent && !sendError && (
                   <p style={{ color: '#3FFDD4', fontSize: 12, marginTop: 6 }}>
                     ✓ 인증 코드가 이메일로 전송되었어요.
                   </p>
@@ -311,7 +410,13 @@ export function FindPasswordPage() {
                     backgroundColor: '#2C2C30',
                     borderRadius: 12,
                     height: 54,
-                    border: `1px solid ${newPw ? (pwValid ? 'rgba(63,253,212,0.4)' : 'rgba(255,80,80,0.4)') : '#3A3A3E'}`,
+                    border: `1px solid ${
+                      newPw
+                        ? pwValid
+                          ? 'rgba(63,253,212,0.4)'
+                          : 'rgba(255,80,80,0.4)'
+                        : '#3A3A3E'
+                    }`,
                     transition: 'border-color 0.2s',
                   }}
                 >
@@ -343,7 +448,7 @@ export function FindPasswordPage() {
                 )}
               </div>
 
-              <div style={{ marginBottom: 32 }}>
+              <div style={{ marginBottom: 20 }}>
                 <label style={{ color: '#CCCCCC', fontSize: 14, display: 'block', marginBottom: 8 }}>
                   비밀번호 확인
                 </label>
@@ -353,7 +458,13 @@ export function FindPasswordPage() {
                     backgroundColor: '#2C2C30',
                     borderRadius: 12,
                     height: 54,
-                    border: `1px solid ${confirmPw ? (pwMatch ? 'rgba(63,253,212,0.4)' : 'rgba(255,80,80,0.4)') : '#3A3A3E'}`,
+                    border: `1px solid ${
+                      confirmPw
+                        ? pwMatch
+                          ? 'rgba(63,253,212,0.4)'
+                          : 'rgba(255,80,80,0.4)'
+                        : '#3A3A3E'
+                    }`,
                     transition: 'border-color 0.2s',
                   }}
                 >
@@ -377,7 +488,9 @@ export function FindPasswordPage() {
                     onClick={() => setShowConfirm(!showConfirm)}
                     style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
-                    {showConfirm ? <EyeOff size={18} color="#666666" /> : <Eye size={18} color="#666666" />}
+                    {showConfirm
+                      ? <EyeOff size={18} color="#666666" />
+                      : <Eye size={18} color="#666666" />}
                   </button>
                 </div>
                 {confirmPw && !pwMatch && (
@@ -387,6 +500,26 @@ export function FindPasswordPage() {
                   <p style={{ color: '#3FFDD4', fontSize: 12, marginTop: 6 }}>✓ 비밀번호가 일치해요.</p>
                 )}
               </div>
+
+              {resetError && (
+                <div
+                  className="flex items-center gap-2"
+                  style={{
+                    marginBottom: 16,
+                    padding: '10px 14px',
+                    backgroundColor: 'rgba(255,80,80,0.08)',
+                    borderRadius: 10,
+                    border: '1px solid rgba(255,80,80,0.25)',
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style={{ flexShrink: 0 }}>
+                    <circle cx="7.5" cy="7.5" r="6.5" stroke="#FF6B6B" strokeWidth="1.4" />
+                    <path d="M7.5 4.5V8" stroke="#FF6B6B" strokeWidth="1.4" strokeLinecap="round" />
+                    <circle cx="7.5" cy="10.5" r="0.75" fill="#FF6B6B" />
+                  </svg>
+                  <p style={{ color: '#FF6B6B', fontSize: 13, lineHeight: 1.4 }}>{resetError}</p>
+                </div>
+              )}
 
               <button
                 onClick={handleReset}
@@ -402,9 +535,20 @@ export function FindPasswordPage() {
                   fontWeight: 700,
                   cursor: resetReady ? 'pointer' : 'not-allowed',
                   transition: 'background-color 0.2s, color 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
                 }}
               >
-                비밀번호 변경
+                {loadingReset ? (
+                  <>
+                    <Spinner color="#0A1A16" />
+                    변경 중...
+                  </>
+                ) : (
+                  '비밀번호 변경'
+                )}
               </button>
             </>
           )}
@@ -449,6 +593,10 @@ export function FindPasswordPage() {
           )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 }
