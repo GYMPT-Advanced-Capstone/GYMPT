@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { Minus, Plus } from 'lucide-react';
 import { GoalLayout } from './components/GoalLayout';
 import { useGoal } from '../../context/GoalContext';
+import { localExerciseGoalStorage } from '../../api/userApi';
 
 type ExerciseId = 'squat' | 'lunge' | 'pushup' | 'plank';
 
@@ -94,16 +95,11 @@ export function GoalExercisePage() {
   const exercise = exerciseData[id];
 
   const [count, setCount] = useState(
-    goal.exerciseCounts[id] ?? (exercise?.defaultCount || 15)
+    goal.exerciseCounts[id] || exercise.defaultCount
   );
 
-  useEffect(() => {
-    if (!exercise) {
-      navigate('/goal/exercise/squat', { replace: true });
-    }
-  }, [exercise, navigate]);
-
   if (!exercise) {
+    navigate('/goal/exercise/squat');
     return null;
   }
 
@@ -116,12 +112,17 @@ export function GoalExercisePage() {
   };
 
   const handleNext = () => {
-    updateGoal({
-      exerciseCounts: {
-        ...goal.exerciseCounts,
-        [id]: count,
-      },
-    });
+    const updatedCounts = {
+      ...goal.exerciseCounts,
+      [id]: count,
+    };
+    updateGoal({ exerciseCounts: updatedCounts });
+
+    // 마지막 운동(플랭크)일 때 localStorage에 전체 저장
+    if (id === 'plank') {
+      localExerciseGoalStorage.save(updatedCounts);
+    }
+
     navigate(exercise.nextPath);
   };
 
@@ -143,6 +144,7 @@ export function GoalExercisePage() {
           {exercise.description}
         </p>
 
+        {/* Exercise Image */}
         <div
           className="relative overflow-hidden mx-auto"
           style={{
@@ -159,6 +161,7 @@ export function GoalExercisePage() {
             alt={exercise.name}
             className="w-full h-full object-cover object-center"
           />
+          {/* Overlay gradient */}
           <div
             className="absolute inset-0"
             style={{
@@ -166,6 +169,7 @@ export function GoalExercisePage() {
                 'linear-gradient(to bottom, transparent 50%, rgba(10,10,10,0.8) 100%)',
             }}
           />
+          {/* Exercise name badge */}
           <div className="absolute bottom-4 left-0 right-0 flex justify-center">
             <div
               style={{
@@ -185,6 +189,7 @@ export function GoalExercisePage() {
           </div>
         </div>
 
+        {/* Count Selector */}
         <div
           className="flex items-center justify-between mt-8 px-6"
           style={{
@@ -194,6 +199,7 @@ export function GoalExercisePage() {
             border: '1px solid #3A3A3E',
           }}
         >
+          {/* Decrease button */}
           <button
             onClick={handleDecrease}
             style={{
@@ -213,6 +219,7 @@ export function GoalExercisePage() {
             <Minus size={20} />
           </button>
 
+          {/* Count Display */}
           <div className="flex flex-col items-center">
             <span
               style={{
@@ -229,6 +236,7 @@ export function GoalExercisePage() {
             </span>
           </div>
 
+          {/* Increase button */}
           <button
             onClick={handleIncrease}
             style={{
@@ -249,6 +257,7 @@ export function GoalExercisePage() {
           </button>
         </div>
 
+        {/* Tip */}
         <div
           className="flex items-start gap-3 mt-4 px-4 py-3 rounded-xl"
           style={{ backgroundColor: 'rgba(63,253,212,0.06)', border: '1px solid rgba(63,253,212,0.15)' }}
@@ -262,6 +271,7 @@ export function GoalExercisePage() {
         <div style={{ flex: 1 }} />
       </div>
 
+      {/* Next Button */}
       <div className="px-6 pb-10 pt-6">
         <button
           onClick={handleNext}

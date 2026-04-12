@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from 'react';
 
 export interface GoalData {
   birthday: { year: number; month: number; day: number };
@@ -23,6 +23,26 @@ const defaultGoal: GoalData = {
   },
 };
 
+const STORAGE_KEY = 'gympt_goal';
+
+function loadGoal(): GoalData {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultGoal;
+    return { ...defaultGoal, ...JSON.parse(raw) };
+  } catch {
+    return defaultGoal;
+  }
+}
+
+function saveGoal(goal: GoalData) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(goal));
+  } catch (_e) {
+    void _e;
+  }
+}
+
 const GoalContext = createContext<{
   goal: GoalData;
   updateGoal: (data: Partial<GoalData>) => void;
@@ -33,21 +53,23 @@ const GoalContext = createContext<{
 }>({
   goal: defaultGoal,
   updateGoal: () => {},
-  userName: "",
+  userName: '',
   setUserName: () => {},
   calibratedExercises: {},
   markCalibrated: () => {},
 });
 
 export function GoalProvider({ children }: { children: ReactNode }) {
-  const [goal, setGoal] = useState<GoalData>(defaultGoal);
-  const [userName, setUserName] = useState("");
-  const [calibratedExercises, setCalibratedExercises] = useState<
-    Record<string, boolean>
-  >({});
+  const [goal, setGoal] = useState<GoalData>(loadGoal);
+  const [userName, setUserName] = useState('');
+  const [calibratedExercises, setCalibratedExercises] = useState<Record<string, boolean>>({});
 
   const updateGoal = (data: Partial<GoalData>) => {
-    setGoal((prev) => ({ ...prev, ...data }));
+    setGoal((prev) => {
+      const next = { ...prev, ...data };
+      saveGoal(next);
+      return next;
+    });
   };
 
   const markCalibrated = (exerciseId: string) => {
@@ -55,16 +77,7 @@ export function GoalProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <GoalContext.Provider
-      value={{
-        goal,
-        updateGoal,
-        userName,
-        setUserName,
-        calibratedExercises,
-        markCalibrated,
-      }}
-    >
+    <GoalContext.Provider value={{ goal, updateGoal, userName, setUserName, calibratedExercises, markCalibrated }}>
       {children}
     </GoalContext.Provider>
   );

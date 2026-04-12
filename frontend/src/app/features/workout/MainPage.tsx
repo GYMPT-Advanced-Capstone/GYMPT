@@ -1,17 +1,26 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { useGoal } from '../../context/GoalContext';
 import { BottomNav } from '../../components/BottomNav';
 import { Trophy, TrendingUp, Zap } from 'lucide-react';
+import { userApi, localExerciseGoalStorage, type UserProfile } from '../../api/userApi';
 
 import squatImg from '../../../assets/exercises/squat.png';
 import pushupImg from '../../../assets/exercises/pushup.png';
 import lungeImg from '../../../assets/exercises/lunge.png';
 import plankImg from '../../../assets/exercises/plank.png';
 
+const EXERCISE_KEY_MAP: Record<string, string> = {
+  스쿼트: 'squat',
+  런지: 'lunge',
+  푸시업: 'pushup',
+  플랭크: 'plank',
+};
+
 const exercises = [
   { id: 'squat',  name: '스쿼트', img: squatImg, desc: '하체 강화' },
   { id: 'pushup', name: '푸시업', img: pushupImg, desc: '상체 강화' },
-  { id: 'lunge',  name: '런지', img: lungeImg, desc: '균형·하체' },
+  { id: 'lunge',  name: '런지',   img: lungeImg, desc: '균형·하체' },
   { id: 'plank',  name: '플랭크', img: plankImg, desc: '코어 강화' },
 ];
 
@@ -34,19 +43,49 @@ const badges = [
 
 export function MainPage() {
   const navigate = useNavigate();
-  const { goal, userName, calibratedExercises } = useGoal();
+  const { goal, calibratedExercises } = useGoal();
   const { exerciseCounts } = goal;
 
-  const handleExerciseClick = (exerciseId: string) => {
-    if (exerciseId !== "squat") {
-      navigate("/workout/camera");
-      return;
-    }
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [localCounts, setLocalCounts] = useState<Record<string, number>>(() => {
+    const localGoals = localExerciseGoalStorage.load();
+    if (localGoals.length === 0) return {};
+    const counts: Record<string, number> = {};
+    localGoals.forEach((g) => { counts[g.exercise_key] = g.target; });
+    return counts;
+  });
 
+  useEffect(() => {
+    userApi.getMe().then(setProfile).catch(() => {});
+
+    if (localExerciseGoalStorage.load().length === 0) {
+      userApi.getSummary().then((summary) => {
+        if (summary && summary.exercise_goals.length > 0) {
+          const counts: Record<string, number> = {};
+          summary.exercise_goals.forEach((g) => {
+            const key = EXERCISE_KEY_MAP[g.exercise_name];
+            if (key) counts[key] = g.daily_target_count ?? g.daily_target_duration ?? 0;
+          });
+          if (Object.keys(counts).length > 0) {
+            localExerciseGoalStorage.save(counts);
+            setLocalCounts(counts);
+          }
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  const displayName = profile?.name ?? '';
+  const weeklyTarget = profile?.weekly_target ?? goal.weeklyFrequency;
+
+  const getExerciseTarget = (id: string): number =>
+    localCounts[id] ?? exerciseCounts[id as keyof typeof exerciseCounts];
+
+  const handleExerciseClick = (exerciseId: string) => {
     if (calibratedExercises[exerciseId]) {
-      navigate("/workout/camera");
+      navigate(`/camera/${exerciseId}`);
     } else {
-      navigate(`/workout/calibration/${exerciseId}`);
+      navigate(`/calibration/${exerciseId}`);
     }
   };
 
@@ -90,9 +129,9 @@ export function MainPage() {
               🦾
             </div>
             <div>
-              <p style={{ color: '#3FFDD4', fontSize: 12, marginBottom: 2 }}>AI 트레이너</p>
+              <p style={{ color: '#888888', fontSize: 12, marginBottom: 2 }}>AI 트레이너</p>
               <p style={{ color: '#FFFFFF', fontSize: 17, fontWeight: 700 }}>
-                {userName ? `환영합니다, ${userName}님!` : '환영합니다!'}
+                {displayName ? `환영합니다, ${displayName}님!` : '환영합니다!'}
               </p>
             </div>
           </div>
@@ -150,7 +189,7 @@ export function MainPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {exercises.map((ex) => {
               const current = todayProgress[ex.id];
-              const target = exerciseCounts[ex.id as keyof typeof exerciseCounts];
+              const target = getExerciseTarget(ex.id);
               const pct = Math.min((current / target) * 100, 100);
               return (
                 <button
@@ -221,7 +260,7 @@ export function MainPage() {
             <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700 }}>이번 주 운동</p>
             <div className="flex items-center gap-1">
               <TrendingUp size={13} color="#3FFDD4" />
-              <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 600 }}>목표 {goal.weeklyFrequency}회</span>
+              <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 600 }}>목표 {weeklyTarget}회</span>
             </div>
           </div>
           <div
@@ -250,7 +289,7 @@ export function MainPage() {
             <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: '1px solid #2C2C32' }}>
               <span style={{ color: '#888', fontSize: 12 }}>이번 주 달성</span>
               <span style={{ color: '#FFFFFF', fontSize: 13, fontWeight: 700 }}>
-                <span style={{ color: '#3FFDD4' }}>3</span>/{goal.weeklyFrequency}회
+                <span style={{ color: '#3FFDD4' }}>3</span>/{weeklyTarget}회
               </span>
             </div>
           </div>

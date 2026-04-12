@@ -17,6 +17,9 @@ export interface UserResponse {
   email: string;
   name: string;
   nickname: string;
+  birth_date?: string | null;
+  weekly_target?: number | null;
+  created_at?: string;
 }
 
 export const tokenStorage = {
@@ -32,17 +35,44 @@ export const tokenStorage = {
     localStorage.removeItem('gympt_access_token');
     localStorage.removeItem('gympt_refresh_token');
     localStorage.removeItem('gympt_user_name');
+    localStorage.removeItem('gympt_user_id');
   },
   setUserName: (name: string) =>
     localStorage.setItem('gympt_user_name', name),
   getUserName: (): string =>
     localStorage.getItem('gympt_user_name') ?? '',
+  setUserId: (id: number) =>
+    localStorage.setItem('gympt_user_id', String(id)),
+  getUserId: (): number | null => {
+    const val = localStorage.getItem('gympt_user_id');
+    return val ? Number(val) : null;
+  },
 };
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = tokenStorage.getRefreshToken();
+  if (!refreshToken) return null;
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return null;
+    const data: TokenResponse = await res.json();
+    tokenStorage.setTokens(data.access_token, data.refresh_token);
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
 
 async function request<T>(
   path: string,
   options: RequestInit = {},
   withAuth = false,
+  _retry = true,
 ): Promise<T> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -51,12 +81,21 @@ async function request<T>(
 
   if (withAuth) {
     const token = tokenStorage.getAccessToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+    if (token) headers['Authorization'] = `Bearer ${token}`;
   }
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+
+  if (res.status === 401 && withAuth && _retry) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      return request<T>(path, options, withAuth, false);
+    } else {
+      tokenStorage.clearTokens();
+      window.location.href = '/';
+      throw new Error('세션이 만료됐어요. 다시 로그인해주세요.');
+    }
+  }
 
   if (res.status === 204) return undefined as T;
 
@@ -76,6 +115,8 @@ async function request<T>(
 
   return data as T;
 }
+
+export { request };
 
 export const authApi = {
   signup: (data: {
