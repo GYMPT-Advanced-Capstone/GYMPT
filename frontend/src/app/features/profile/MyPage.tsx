@@ -256,7 +256,8 @@ export function MyPage() {
     try {
       const refreshToken = tokenStorage.getRefreshToken();
       if (refreshToken) await authApi.logout(refreshToken);
-    } catch {
+    } catch (_e) {
+      void _e;
     } finally {
       tokenStorage.clearTokens();
       setLoggingOut(false);

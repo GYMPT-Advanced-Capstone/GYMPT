@@ -38,7 +38,8 @@ function loadGoal(): GoalData {
 function saveGoal(goal: GoalData) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(goal));
-  } catch {
+  } catch (_e) {
+    void _e;
   }
 }
 

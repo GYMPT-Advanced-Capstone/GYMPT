@@ -5,6 +5,11 @@ import { BottomNav } from '../../components/BottomNav';
 import { Trophy, TrendingUp, Zap } from 'lucide-react';
 import { userApi, localExerciseGoalStorage, type UserProfile } from '../../api/userApi';
 
+import squatImg from '../../../assets/exercises/squat.png';
+import pushupImg from '../../../assets/exercises/pushup.png';
+import lungeImg from '../../../assets/exercises/lunge.png';
+import plankImg from '../../../assets/exercises/plank.png';
+
 const EXERCISE_KEY_MAP: Record<string, string> = {
   스쿼트: 'squat',
   런지: 'lunge',
@@ -12,16 +17,11 @@ const EXERCISE_KEY_MAP: Record<string, string> = {
   플랭크: 'plank',
 };
 
-import squatImg from '../../../assets/exercises/squat.png';
-import pushupImg from '../../../assets/exercises/pushup.png';
-import lungeImg from '../../../assets/exercises/lunge.png';
-import plankImg from '../../../assets/exercises/plank.png';
-
 const exercises = [
-  { id: 'squat',  name: '스쿼트', img: squatImg,  desc: '하체 강화' },
+  { id: 'squat',  name: '스쿼트', img: squatImg, desc: '하체 강화' },
   { id: 'pushup', name: '푸시업', img: pushupImg, desc: '상체 강화' },
-  { id: 'lunge',  name: '런지',   img: lungeImg,  desc: '균형·하체' },
-  { id: 'plank',  name: '플랭크', img: plankImg,  desc: '코어 강화' },
+  { id: 'lunge',  name: '런지',   img: lungeImg, desc: '균형·하체' },
+  { id: 'plank',  name: '플랭크', img: plankImg, desc: '코어 강화' },
 ];
 
 const weeklyData = [
@@ -47,17 +47,18 @@ export function MainPage() {
   const { exerciseCounts } = goal;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [localCounts, setLocalCounts] = useState<Record<string, number>>({});
+  const [localCounts, setLocalCounts] = useState<Record<string, number>>(() => {
+    const localGoals = localExerciseGoalStorage.load();
+    if (localGoals.length === 0) return {};
+    const counts: Record<string, number> = {};
+    localGoals.forEach((g) => { counts[g.exercise_key] = g.target; });
+    return counts;
+  });
 
   useEffect(() => {
     userApi.getMe().then(setProfile).catch(() => {});
 
-    const localGoals = localExerciseGoalStorage.load();
-    if (localGoals.length > 0) {
-      const counts: Record<string, number> = {};
-      localGoals.forEach((g) => { counts[g.exercise_key] = g.target; });
-      setLocalCounts(counts);
-    } else {
+    if (localExerciseGoalStorage.load().length === 0) {
       userApi.getSummary().then((summary) => {
         if (summary && summary.exercise_goals.length > 0) {
           const counts: Record<string, number> = {};
