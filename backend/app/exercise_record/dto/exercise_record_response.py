@@ -40,11 +40,6 @@ class ExerciseRecordAnalysisResponse(BaseModel):
             }
         },
     )
-    feedback: list[str] = Field(
-        ...,
-        description="운동 완료 후 백엔드가 생성한 피드백 목록",
-        json_schema_extra={"example": ["가동범위가 목표보다 약간 짧았습니다."]},
-    )
     created_at: datetime = Field(..., description="분석 생성 시각")
 
 

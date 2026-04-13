@@ -182,9 +182,6 @@ def test_exercise_record_service_create_calculates_scores_from_analysis():
     assert result.analysis.range_score == 82
     assert result.analysis.extension_score == 94
     assert result.analysis.stability_score == 88
-    assert result.analysis.feedback == [
-        "초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다."
-    ]
 
 
 def test_exercise_record_service_create_calculates_scores_from_calibration_metrics():
@@ -228,14 +225,6 @@ def test_exercise_record_service_create_calculates_scores_from_calibration_metri
     assert result.analysis.extension_score == 80
     assert result.analysis.stability_score == 88
     assert result.score == 82
-    assert (
-        "초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다."
-        in result.analysis.feedback
-    )
-    assert (
-        "올라올 때 팔을 끝까지 펴는 동작이 다소 부족했습니다."
-        in result.analysis.feedback
-    )
 
 
 def test_exercise_record_service_get_calendar_validates_month():

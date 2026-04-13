@@ -12,7 +12,6 @@ from app.exercise_record.exercise_record_repository import ExerciseRecordReposit
 from app.exercise_record.dto.exercise_record_request import (
     ExerciseRecordAnalysisCreateRequest,
     ExerciseRecordCreateRequest,
-    ExerciseRepSummaryRequest,
     ExerciseRecordUpdateRequest,
 )
 from app.exercise_record.dto.exercise_record_response import (
@@ -33,7 +32,6 @@ class ExerciseRecordService:
         accuracy_avg = data.accuracy_avg
         score_summary: dict[str, int] | None = None
         range_summary: dict[str, Any] | None = None
-        feedback_items: list[str] = []
         if data.analysis is not None:
             calibration_metrics: dict[str, Any] | None = None
             if data.analysis.calibration_id is not None:
@@ -54,7 +52,6 @@ class ExerciseRecordService:
                 range_summary=range_summary,
                 calibration_metrics=calibration_metrics,
             )
-            feedback_items = self._build_feedback_items(score_summary)
             score = score_summary["score"]
             accuracy_avg = Decimal(str(score_summary["accuracy_avg"]))
 
@@ -79,7 +76,6 @@ class ExerciseRecordService:
                     extension_score=score_summary["extension_score"],
                     stability_score=score_summary["stability_score"],
                     range_summary_json=range_summary or {},
-                    feedback_items_json=feedback_items,
                 )
             )
             created_record = self._get_or_404(int(created_record.id), user_id)
@@ -152,7 +148,6 @@ class ExerciseRecordService:
             extension_score=cast(int, analysis.extension_score),
             stability_score=cast(int, analysis.stability_score),
             range_summary=cast(dict[str, Any], analysis.range_summary_json),
-            feedback=cast(list[str], analysis.feedback_items_json),
             created_at=cast(datetime, analysis.created_at),
         )
 
@@ -317,24 +312,6 @@ class ExerciseRecordService:
             summary[f"average{key[0].upper()}{key[1:]}"] = averaged_value
 
         return summary
-
-    def _build_feedback_items(self, score_summary: dict[str, int]) -> list[str]:
-        feedback_items: list[str] = []
-        if score_summary["range_score"] < 85:
-            feedback_items.append(
-                "초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다."
-            )
-        if score_summary["extension_score"] < 85:
-            feedback_items.append(
-                "올라올 때 팔을 끝까지 펴는 동작이 다소 부족했습니다."
-            )
-        if score_summary["stability_score"] < 85:
-            feedback_items.append(
-                "몸통 정렬이 흔들리지 않도록 코어를 더 단단히 유지해 주세요."
-            )
-        if not feedback_items:
-            feedback_items.append("전반적인 자세가 안정적이었습니다.")
-        return feedback_items
 
     def _score_from_summary(
         self,
