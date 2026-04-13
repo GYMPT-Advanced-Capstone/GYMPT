@@ -65,20 +65,16 @@ class ExerciseRecordService:
             accuracy_avg=accuracy_avg,
             completed_at=data.completed_at,
         )
-        created_record = self.repo.create(record)
-
+        analysis_record = None
         if data.analysis is not None and score_summary is not None:
-            self.repo.create_analysis(
-                ExerciseRecordAnalysis(
-                    exercise_record_id=created_record.id,
-                    calibration_id=data.analysis.calibration_id,
-                    range_score=score_summary["range_score"],
-                    extension_score=score_summary["extension_score"],
-                    stability_score=score_summary["stability_score"],
-                    range_summary_json=range_summary or {},
-                )
+            analysis_record = ExerciseRecordAnalysis(
+                calibration_id=data.analysis.calibration_id,
+                range_score=score_summary["range_score"],
+                extension_score=score_summary["extension_score"],
+                stability_score=score_summary["stability_score"],
+                range_summary_json=range_summary or {},
             )
-            created_record = self._get_or_404(int(created_record.id), user_id)
+        created_record = self.repo.create_with_analysis(record, analysis_record)
 
         return self._to_response(created_record)
 

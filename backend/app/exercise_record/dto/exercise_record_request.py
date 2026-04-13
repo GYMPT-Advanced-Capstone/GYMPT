@@ -43,7 +43,7 @@ class ExerciseRecordAnalysisCreateRequest(BaseModel):
         json_schema_extra={"example": "pushup"},
     )
     reps: list[ExerciseRepSummaryRequest] = Field(
-        default_factory=list,
+        ...,
         description="운동 종료 후 전송하는 반복별 raw summary",
         json_schema_extra={
             "example": [
@@ -66,6 +66,15 @@ class ExerciseRecordAnalysisCreateRequest(BaseModel):
             ]
         },
     )
+
+    @field_validator("reps")
+    @classmethod
+    def reps_must_not_be_empty(
+        cls, value: list[ExerciseRepSummaryRequest]
+    ) -> list[ExerciseRepSummaryRequest]:
+        if not value:
+            raise ValueError("reps는 최소 1개 이상이어야 합니다.")
+        return value
 
 
 class ExerciseRecordCreateRequest(BaseModel):

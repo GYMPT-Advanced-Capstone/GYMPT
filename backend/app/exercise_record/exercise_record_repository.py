@@ -20,6 +20,27 @@ class ExerciseRecordRepository:
         self.db.refresh(record)
         return record
 
+    def create_with_analysis(
+        self,
+        record: ExerciseRecord,
+        analysis: ExerciseRecordAnalysis | None = None,
+    ) -> ExerciseRecord:
+        try:
+            self.db.add(record)
+            self.db.flush()
+            if analysis is not None:
+                analysis.exercise_record_id = record.id
+                self.db.add(analysis)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        self.db.refresh(record)
+        if analysis is not None:
+            self.db.refresh(analysis)
+        return record
+
     def get_by_id(self, record_id: int, user_id: int) -> ExerciseRecord | None:
         return (
             self.db.query(ExerciseRecord)

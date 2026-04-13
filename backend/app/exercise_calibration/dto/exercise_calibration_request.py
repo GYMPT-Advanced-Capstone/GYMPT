@@ -57,7 +57,7 @@ class ExerciseCalibrationCreateRequest(BaseModel):
         json_schema_extra={"example": 3000},
     )
     samples: list[ExerciseCalibrationSampleRequest] = Field(
-        default_factory=list,
+        ...,
         description="단계별 raw 측정값 목록",
         json_schema_extra={
             "example": [
@@ -85,4 +85,13 @@ class ExerciseCalibrationCreateRequest(BaseModel):
     def must_be_positive(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("0보다 커야 합니다.")
+        return value
+
+    @field_validator("samples")
+    @classmethod
+    def samples_must_not_be_empty(
+        cls, value: list[ExerciseCalibrationSampleRequest]
+    ) -> list[ExerciseCalibrationSampleRequest]:
+        if not value:
+            raise ValueError("samples는 최소 1개 이상이어야 합니다.")
         return value

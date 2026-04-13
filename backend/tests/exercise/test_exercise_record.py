@@ -69,6 +69,13 @@ class FakeExerciseRecordRepo:
         self.created_record = record
         return record
 
+    def create_with_analysis(self, record, analysis=None):
+        created_record = self.create(record)
+        if analysis is not None:
+            analysis.exercise_record_id = created_record.id
+            self.create_analysis(analysis)
+        return created_record
+
     def create_analysis(self, analysis):
         analysis.id = 77
         analysis.created_at = datetime(2026, 3, 26, 10, 31, 0)
@@ -225,6 +232,24 @@ def test_exercise_record_service_create_calculates_scores_from_calibration_metri
     assert result.analysis.extension_score == 80
     assert result.analysis.stability_score == 88
     assert result.score == 82
+
+
+def test_exercise_record_request_rejects_empty_reps():
+    with pytest.raises(ValueError):
+        ExerciseRecordCreateRequest(
+            exercise_id=10,
+            count=10,
+            duration=72,
+            calories=Decimal("8.40"),
+            score=1,
+            accuracy_avg=Decimal("1.00"),
+            completed_at=datetime(2026, 3, 26, 10, 30, 0),
+            analysis={
+                "calibration_id": 5,
+                "exercise_type": "pushup",
+                "reps": [],
+            },
+        )
 
 
 def test_exercise_record_service_get_calendar_validates_month():

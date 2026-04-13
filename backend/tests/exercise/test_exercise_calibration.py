@@ -1,6 +1,8 @@
 from datetime import datetime
 from types import SimpleNamespace
 
+import pytest
+
 from app.exercise_calibration.dto.exercise_calibration_request import (
     ExerciseCalibrationCreateRequest,
 )
@@ -79,3 +81,15 @@ def test_exercise_calibration_service_builds_metrics_from_samples():
         },
     }
     assert result.metrics == repo.created_calibration.metrics_json
+
+
+def test_exercise_calibration_request_rejects_empty_samples():
+    with pytest.raises(ValueError):
+        ExerciseCalibrationCreateRequest(
+            exercise_id=1,
+            version=1,
+            exercise_type="pushup",
+            side="left",
+            hold_duration_ms=3000,
+            samples=[],
+        )
