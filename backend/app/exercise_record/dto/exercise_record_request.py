@@ -1,7 +1,80 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+
+class ExerciseRepSummaryRequest(BaseModel):
+    rep_index: int = Field(
+        ...,
+        description="반복 순번",
+        json_schema_extra={"example": 1},
+    )
+    metrics: dict[str, Any] = Field(
+        default_factory=dict,
+        description="반복 1회에서 측정된 raw summary",
+        json_schema_extra={
+            "example": {
+                "bottomElbowAngle": 97.0,
+                "topElbowAngle": 163.0,
+                "bodyLineAngle": 172.0,
+            }
+        },
+    )
+
+    @field_validator("rep_index")
+    @classmethod
+    def rep_index_must_be_positive(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("0보다 커야 합니다.")
+        return value
+
+
+class ExerciseRecordAnalysisCreateRequest(BaseModel):
+    calibration_id: int | None = Field(
+        default=None,
+        description="운동에 사용한 초기 가동범위 설정 ID",
+        json_schema_extra={"example": 1},
+    )
+    exercise_type: str | None = Field(
+        default=None,
+        description="운동 타입",
+        json_schema_extra={"example": "pushup"},
+    )
+    reps: list[ExerciseRepSummaryRequest] = Field(
+        ...,
+        description="운동 종료 후 전송하는 반복별 raw summary",
+        json_schema_extra={
+            "example": [
+                {
+                    "rep_index": 1,
+                    "metrics": {
+                        "bottomElbowAngle": 97.0,
+                        "topElbowAngle": 163.0,
+                        "bodyLineAngle": 172.0,
+                    },
+                },
+                {
+                    "rep_index": 2,
+                    "metrics": {
+                        "bottomElbowAngle": 95.0,
+                        "topElbowAngle": 164.0,
+                        "bodyLineAngle": 173.0,
+                    },
+                },
+            ]
+        },
+    )
+
+    @field_validator("reps")
+    @classmethod
+    def reps_must_not_be_empty(
+        cls, value: list[ExerciseRepSummaryRequest]
+    ) -> list[ExerciseRepSummaryRequest]:
+        if not value:
+            raise ValueError("reps는 최소 1개 이상이어야 합니다.")
+        return value
 
 
 class ExerciseRecordCreateRequest(BaseModel):
@@ -39,6 +112,10 @@ class ExerciseRecordCreateRequest(BaseModel):
         ...,
         description="운동 완료 시각",
         json_schema_extra={"example": "2026-03-26T10:30:00"},
+    )
+    analysis: ExerciseRecordAnalysisCreateRequest | None = Field(
+        default=None,
+        description="자세 분석 점수 계산에 사용할 선택 분석 요약",
     )
 
     @field_validator("count", "duration", "score")

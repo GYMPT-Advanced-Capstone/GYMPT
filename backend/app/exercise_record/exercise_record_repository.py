@@ -3,7 +3,11 @@ from datetime import date
 from sqlalchemy import extract, func
 from sqlalchemy.orm import Session, joinedload
 
-from app.exercise_record.exercise_record_model import ExerciseRecord
+from app.exercise_record.exercise_record_model import (
+    ExerciseRecord,
+    ExerciseRecordAnalysis,
+    UserExerciseCalibration,
+)
 
 
 class ExerciseRecordRepository:
@@ -16,10 +20,33 @@ class ExerciseRecordRepository:
         self.db.refresh(record)
         return record
 
+    def create_with_analysis(
+        self,
+        record: ExerciseRecord,
+        analysis: ExerciseRecordAnalysis | None = None,
+    ) -> ExerciseRecord:
+        try:
+            self.db.add(record)
+            self.db.flush()
+            if analysis is not None:
+                analysis.exercise_record_id = record.id
+                self.db.add(analysis)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        self.db.refresh(record)
+        if analysis is not None:
+            self.db.refresh(analysis)
+        return record
+
     def get_by_id(self, record_id: int, user_id: int) -> ExerciseRecord | None:
         return (
             self.db.query(ExerciseRecord)
-            .options(joinedload(ExerciseRecord.exercise))
+            .options(
+                joinedload(ExerciseRecord.exercise), joinedload(ExerciseRecord.analysis)
+            )
             .filter(
                 ExerciseRecord.id == record_id,
                 ExerciseRecord.user_id == user_id,
@@ -46,7 +73,9 @@ class ExerciseRecordRepository:
     def get_by_date(self, user_id: int, target_date: date) -> list[ExerciseRecord]:
         return (
             self.db.query(ExerciseRecord)
-            .options(joinedload(ExerciseRecord.exercise))
+            .options(
+                joinedload(ExerciseRecord.exercise), joinedload(ExerciseRecord.analysis)
+            )
             .filter(
                 ExerciseRecord.user_id == user_id,
                 func.date(ExerciseRecord.completed_at) == target_date,
@@ -54,6 +83,28 @@ class ExerciseRecordRepository:
             .order_by(ExerciseRecord.completed_at)
             .all()
         )
+
+    def get_calibration_by_id(
+        self,
+        user_id: int,
+        calibration_id: int,
+    ) -> UserExerciseCalibration | None:
+        return (
+            self.db.query(UserExerciseCalibration)
+            .filter(
+                UserExerciseCalibration.id == calibration_id,
+                UserExerciseCalibration.user_id == user_id,
+            )
+            .first()
+        )
+
+    def create_analysis(
+        self, analysis: ExerciseRecordAnalysis
+    ) -> ExerciseRecordAnalysis:
+        self.db.add(analysis)
+        self.db.commit()
+        self.db.refresh(analysis)
+        return analysis
 
     def update(
         self,

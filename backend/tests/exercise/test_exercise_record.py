@@ -53,24 +53,51 @@ def make_record(
 class FakeExerciseRecordRepo:
     def __init__(self):
         self.created_record = None
+        self.created_analysis = None
         self.record_by_id = None
         self.records_by_date = []
         self.calendar_dates = []
         self.deleted_record = None
+        self.calibration_by_id = None
 
     def create(self, record):
         record.id = 99
         record.exercise = Exercise(
             id=record.exercise_id, name="Push Up", description=None
         )
+        record.analysis = None
         self.created_record = record
         return record
 
+    def create_with_analysis(self, record, analysis=None):
+        created_record = self.create(record)
+        if analysis is not None:
+            analysis.exercise_record_id = created_record.id
+            self.create_analysis(analysis)
+        return created_record
+
+    def create_analysis(self, analysis):
+        analysis.id = 77
+        analysis.created_at = datetime(2026, 3, 26, 10, 31, 0)
+        self.created_analysis = analysis
+        if self.created_record is not None:
+            self.created_record.analysis = analysis
+        return analysis
+
     def get_by_id(self, record_id, user_id):
+        if (
+            self.created_record is not None
+            and self.created_record.id == record_id
+            and self.created_record.user_id == user_id
+        ):
+            return self.created_record
         return self.record_by_id
 
     def get_exercised_dates_by_month(self, user_id, year, month):
         return self.calendar_dates
+
+    def get_calibration_by_id(self, user_id, calibration_id):
+        return self.calibration_by_id
 
     def get_by_date(self, user_id, target_date):
         return self.records_by_date
@@ -115,6 +142,114 @@ def test_exercise_record_service_create_returns_response():
         accuracy_avg=Decimal("97.25"),
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
     )
+
+
+def test_exercise_record_service_create_calculates_scores_from_analysis():
+    repo = FakeExerciseRecordRepo()
+    repo.calibration_by_id = SimpleNamespace(
+        metrics_json={
+            "exerciseType": "pushup",
+            "bottom": {"elbowAngle": 92.0, "bodyLineAngle": 176.0},
+            "top": {"elbowAngle": 168.0, "bodyLineAngle": 177.0},
+        }
+    )
+    service = ExerciseRecordService(repo)
+    request = ExerciseRecordCreateRequest(
+        exercise_id=10,
+        count=10,
+        duration=72,
+        calories=Decimal("8.40"),
+        score=1,
+        accuracy_avg=Decimal("1.00"),
+        completed_at=datetime(2026, 3, 26, 10, 30, 0),
+        analysis={
+            "calibration_id": 5,
+            "exercise_type": "pushup",
+            "reps": [
+                {
+                    "rep_index": 1,
+                    "metrics": {
+                        "rangeCompletionRate": 0.82,
+                        "topExtensionRate": 0.94,
+                        "bodyStabilityRate": 0.88,
+                    },
+                }
+            ],
+        },
+    )
+
+    result = service.create(7, request)
+
+    assert repo.created_record.score == 87
+    assert repo.created_record.accuracy_avg == Decimal("88")
+    assert repo.created_analysis.calibration_id == 5
+    assert result.score == 87
+    assert result.accuracy_avg == Decimal("88")
+    assert result.analysis is not None
+    assert result.analysis.range_score == 82
+    assert result.analysis.extension_score == 94
+    assert result.analysis.stability_score == 88
+
+
+def test_exercise_record_service_create_calculates_scores_from_calibration_metrics():
+    repo = FakeExerciseRecordRepo()
+    repo.calibration_by_id = SimpleNamespace(
+        metrics_json={
+            "exerciseType": "pushup",
+            "bottom": {"elbowAngle": 92.0, "bodyLineAngle": 176.0},
+            "top": {"elbowAngle": 168.0, "bodyLineAngle": 177.0},
+        }
+    )
+    service = ExerciseRecordService(repo)
+    request = ExerciseRecordCreateRequest(
+        exercise_id=10,
+        count=10,
+        duration=72,
+        calories=Decimal("8.40"),
+        score=1,
+        accuracy_avg=Decimal("1.00"),
+        completed_at=datetime(2026, 3, 26, 10, 30, 0),
+        analysis={
+            "calibration_id": 5,
+            "exercise_type": "pushup",
+            "reps": [
+                {
+                    "rep_index": 1,
+                    "metrics": {
+                        "bottomElbowAngle": 97.0,
+                        "topElbowAngle": 163.0,
+                        "bodyLineAngle": 172.0,
+                    },
+                }
+            ],
+        },
+    )
+
+    result = service.create(7, request)
+
+    assert result.analysis is not None
+    assert result.analysis.range_score == 80
+    assert result.analysis.extension_score == 80
+    assert result.analysis.stability_score == 88
+    assert result.score == 82
+
+
+def test_exercise_record_request_rejects_empty_reps():
+    with pytest.raises(ValueError):
+        ExerciseRecordCreateRequest(
+            exercise_id=10,
+            count=10,
+            duration=72,
+            calories=Decimal("8.40"),
+            score=1,
+            accuracy_avg=Decimal("1.00"),
+            completed_at=datetime(2026, 3, 26, 10, 30, 0),
+            analysis={
+                "calibration_id": 5,
+                "exercise_type": "pushup",
+                "reps": [],
+            },
+        )
 
 
 def test_exercise_record_service_get_calendar_validates_month():
