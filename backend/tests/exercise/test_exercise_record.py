@@ -157,14 +157,17 @@ def test_exercise_record_service_create_calculates_scores_from_analysis():
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
         analysis={
             "calibration_id": 5,
-            "range_summary": {
-                "rangeCompletionRate": 0.82,
-                "topExtensionRate": 0.94,
-                "bodyStabilityRate": 0.88,
-            },
-            "feedback_summary": {
-                "items": ["초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다."]
-            },
+            "exercise_type": "pushup",
+            "reps": [
+                {
+                    "rep_index": 1,
+                    "metrics": {
+                        "rangeCompletionRate": 0.82,
+                        "topExtensionRate": 0.94,
+                        "bodyStabilityRate": 0.88,
+                    },
+                }
+            ],
         },
     )
 
@@ -179,6 +182,9 @@ def test_exercise_record_service_create_calculates_scores_from_analysis():
     assert result.analysis.range_score == 82
     assert result.analysis.extension_score == 94
     assert result.analysis.stability_score == 88
+    assert result.analysis.feedback == [
+        "초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다."
+    ]
 
 
 def test_exercise_record_service_create_calculates_scores_from_calibration_metrics():
@@ -201,14 +207,17 @@ def test_exercise_record_service_create_calculates_scores_from_calibration_metri
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
         analysis={
             "calibration_id": 5,
-            "range_summary": {
-                "averageBottomElbowAngle": 97.0,
-                "averageTopElbowAngle": 163.0,
-                "averageBodyLineAngle": 172.0,
-            },
-            "feedback_summary": {
-                "items": ["초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다."]
-            },
+            "exercise_type": "pushup",
+            "reps": [
+                {
+                    "rep_index": 1,
+                    "metrics": {
+                        "bottomElbowAngle": 97.0,
+                        "topElbowAngle": 163.0,
+                        "bodyLineAngle": 172.0,
+                    },
+                }
+            ],
         },
     )
 
@@ -219,6 +228,14 @@ def test_exercise_record_service_create_calculates_scores_from_calibration_metri
     assert result.analysis.extension_score == 80
     assert result.analysis.stability_score == 88
     assert result.score == 82
+    assert (
+        "초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다."
+        in result.analysis.feedback
+    )
+    assert (
+        "올라올 때 팔을 끝까지 펴는 동작이 다소 부족했습니다."
+        in result.analysis.feedback
+    )
 
 
 def test_exercise_record_service_get_calendar_validates_month():

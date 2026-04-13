@@ -22,11 +22,12 @@ class ExerciseCalibrationService:
         user_id: int,
         data: ExerciseCalibrationCreateRequest,
     ) -> ExerciseCalibrationResponse:
+        metrics = self._build_metrics(data)
         calibration = UserExerciseCalibration(
             user_id=user_id,
             exercise_id=data.exercise_id,
             version=data.version,
-            metrics_json=data.metrics,
+            metrics_json=metrics,
         )
         return self._to_response(self.repo.create(calibration))
 
@@ -56,3 +57,36 @@ class ExerciseCalibrationService:
             created_at=cast(datetime, calibration.created_at),
             updated_at=cast(datetime, calibration.updated_at),
         )
+
+    def _build_metrics(
+        self,
+        data: ExerciseCalibrationCreateRequest,
+    ) -> dict[str, Any]:
+        metrics: dict[str, Any] = {
+            "exerciseType": data.exercise_type,
+            "holdDurationMs": data.hold_duration_ms,
+        }
+        if data.side:
+            metrics["side"] = data.side
+
+        phase_metrics: dict[str, dict[str, Any]] = {}
+        grouped_values: dict[str, dict[str, list[float]]] = {}
+
+        for sample in data.samples:
+            grouped_values.setdefault(sample.phase, {})
+            for key, value in sample.metrics.items():
+                try:
+                    numeric = float(value)
+                except (TypeError, ValueError):
+                    continue
+                grouped_values[sample.phase].setdefault(key, []).append(numeric)
+
+        for phase, values_by_key in grouped_values.items():
+            phase_metrics[phase] = {}
+            for key, values in values_by_key.items():
+                if not values:
+                    continue
+                phase_metrics[phase][key] = round(sum(values) / len(values), 2)
+
+        metrics.update(phase_metrics)
+        return metrics

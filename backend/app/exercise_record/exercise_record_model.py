@@ -69,7 +69,7 @@ class ExerciseRecordAnalysis(Base):
     extension_score = Column(Integer, nullable=False)
     stability_score = Column(Integer, nullable=False)
     range_summary_json = Column(JSON, nullable=False)
-    feedback_summary_json = Column(JSON, nullable=False)
+    feedback_items_json = Column(JSON, nullable=False)
     created_at = Column(DateTime, nullable=False, default=func.now())
 
     record = relationship("ExerciseRecord", back_populates="analysis")

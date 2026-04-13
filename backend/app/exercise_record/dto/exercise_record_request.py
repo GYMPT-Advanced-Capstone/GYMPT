@@ -5,33 +5,65 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
 
+class ExerciseRepSummaryRequest(BaseModel):
+    rep_index: int = Field(
+        ...,
+        description="반복 순번",
+        json_schema_extra={"example": 1},
+    )
+    metrics: dict[str, Any] = Field(
+        default_factory=dict,
+        description="반복 1회에서 측정된 raw summary",
+        json_schema_extra={
+            "example": {
+                "bottomElbowAngle": 97.0,
+                "topElbowAngle": 163.0,
+                "bodyLineAngle": 172.0,
+            }
+        },
+    )
+
+    @field_validator("rep_index")
+    @classmethod
+    def rep_index_must_be_positive(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("0보다 커야 합니다.")
+        return value
+
+
 class ExerciseRecordAnalysisCreateRequest(BaseModel):
     calibration_id: int | None = Field(
         default=None,
         description="운동에 사용한 초기 가동범위 설정 ID",
         json_schema_extra={"example": 1},
     )
-    range_summary: dict[str, Any] = Field(
-        default_factory=dict,
-        description="실제 수행 가동범위 요약값",
-        json_schema_extra={
-            "example": {
-                "rangeCompletionRate": 0.86,
-                "topExtensionRate": 0.94,
-                "bodyStabilityRate": 0.88,
-            }
-        },
+    exercise_type: str | None = Field(
+        default=None,
+        description="운동 타입",
+        json_schema_extra={"example": "pushup"},
     )
-    feedback_summary: dict[str, Any] = Field(
-        default_factory=dict,
-        description="운동 완료 후 피드백 요약",
+    reps: list[ExerciseRepSummaryRequest] = Field(
+        default_factory=list,
+        description="운동 종료 후 전송하는 반복별 raw summary",
         json_schema_extra={
-            "example": {
-                "items": [
-                    "초기 설정 범위 대비 내려가는 깊이가 약간 부족했습니다.",
-                    "몸통 정렬은 안정적이었습니다.",
-                ]
-            }
+            "example": [
+                {
+                    "rep_index": 1,
+                    "metrics": {
+                        "bottomElbowAngle": 97.0,
+                        "topElbowAngle": 163.0,
+                        "bodyLineAngle": 172.0,
+                    },
+                },
+                {
+                    "rep_index": 2,
+                    "metrics": {
+                        "bottomElbowAngle": 95.0,
+                        "topElbowAngle": 164.0,
+                        "bodyLineAngle": 173.0,
+                    },
+                },
+            ]
         },
     )
 
