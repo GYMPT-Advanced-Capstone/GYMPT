@@ -33,6 +33,7 @@ from app.board.service import (
     update_comment_service,
     delete_comment_service,
 )
+from app.board import repository
 
 
 router = APIRouter(prefix="/api/v1/board", tags=["Board"])
@@ -78,6 +79,8 @@ def create_board(
         "imgpath": board.imgpath,
         "writer": current_user.nickname,
         "likes": board.likes,
+        "is_liked": False,
+        "comments_count": 0,
         "upload_date": board.upload_date,
     }
 
@@ -130,6 +133,16 @@ def update_board(
         delete_image=delete_image,
     )
 
+    is_liked = repository.is_board_liked_by_user(
+        db=db,
+        board_no=board.board_no,
+        user_id=int(current_user.id),
+    )
+    comments_count = repository.get_comment_count_by_board_no(
+        db=db,
+        board_no=board.board_no,
+    )
+
     return {
         "board_no": board.board_no,
         "title": board.title,
@@ -137,6 +150,8 @@ def update_board(
         "imgpath": board.imgpath,
         "writer": current_user.nickname,
         "likes": board.likes,
+        "is_liked": is_liked,
+        "comments_count": comments_count,
         "upload_date": board.upload_date,
     }
 
@@ -151,7 +166,10 @@ def list_boards(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return list_boards_service(db)
+    return list_boards_service(
+        db=db,
+        current_user=current_user,
+    )
 
 
 @router.get(
@@ -169,7 +187,11 @@ def get_board_detail(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return get_board_detail_service(db=db, board_no=board_no)
+    return get_board_detail_service(
+        db=db,
+        board_no=board_no,
+        current_user=current_user,
+    )
 
 
 @router.post(
