@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';  // useEffect 제거
 import { useNavigate } from 'react-router';
 import { GoalLayout } from './components/GoalLayout';
 import { ScrollPicker } from './components/ScrollPicker';
@@ -20,6 +20,9 @@ export function GoalBirthdayPage() {
   const [monthNum, setMonthNum] = useState(goal.birthday.month);
   const [dayNum, setDayNum] = useState(goal.birthday.day);
 
+  const maxDay = getDaysInMonth(yearNum, monthNum);
+  const clampedDayNum = Math.min(dayNum, maxDay);
+
   const yearItems = useMemo(
     () => Array.from({ length: 80 }, (_, i) => `${1940 + i}년`),
     []
@@ -28,24 +31,17 @@ export function GoalBirthdayPage() {
     () => Array.from({ length: 12 }, (_, i) => `${i + 1}월`),
     []
   );
-  const dayItems = useMemo(() => {
-    const count = getDaysInMonth(yearNum, monthNum);
-    return Array.from({ length: count }, (_, i) => `${i + 1}일`);
-  }, [yearNum, monthNum]);
-
-  useEffect(() => {
-    const maxDay = getDaysInMonth(yearNum, monthNum);
-    if (dayNum > maxDay) {
-      setDayNum(maxDay);
-    }
-  }, [yearNum, monthNum]);
+  const dayItems = useMemo(
+    () => Array.from({ length: maxDay }, (_, i) => `${i + 1}일`),
+    [maxDay]
+  );
 
   const yearValue = `${yearNum}년`;
   const monthValue = `${monthNum}월`;
-  const dayValue = `${dayNum}일`;
+  const dayValue = `${clampedDayNum}일`;
 
   const handleNext = () => {
-    updateGoal({ birthday: { year: yearNum, month: monthNum, day: dayNum } });
+    updateGoal({ birthday: { year: yearNum, month: monthNum, day: clampedDayNum } });
     navigate('/goal/body');
   };
 
