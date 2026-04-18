@@ -7,6 +7,7 @@ import { CameraAnalysisPage } from "./features/workout/CameraAnalysisPage";
 import { RangeCalibrationPage } from "./features/workout/RangeCalibrationPage";
 
 import { GoalBirthdayPage } from "./features/onboarding/GoalBirthdayPage";
+import { GoalBodyPage } from "./features/onboarding/GoalBodyPage";
 import { GoalWeeklyPage } from "./features/onboarding/GoalWeeklyPage";
 import { GoalExercisePage } from "./features/onboarding/GoalExercisePage";
 import { GoalExerciseAllPage } from "./features/onboarding/GoalExerciseAllPage";
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
   { path: "/find-password", Component: FindPasswordPage },
 
   { path: "/goal/birthday", Component: GoalBirthdayPage },
+  { path: "/goal/body", Component: GoalBodyPage },
   { path: "/goal/weekly", Component: GoalWeeklyPage },
   { path: "/goal/exercise/:exerciseId", Component: GoalExercisePage },
   { path: "/goal/exercises", Component: GoalExerciseAllPage },
