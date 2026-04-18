@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';  // useEffect 제거
 import { useNavigate } from 'react-router';
 import { GoalLayout } from './components/GoalLayout';
 import { ScrollPicker } from './components/ScrollPicker';
@@ -20,12 +20,8 @@ export function GoalBirthdayPage() {
   const [monthNum, setMonthNum] = useState(goal.birthday.month);
   const [dayNum, setDayNum] = useState(goal.birthday.day);
 
-  const adjustDayIfNeeded = (newYear: number, newMonth: number, currentDay: number) => {
-    const maxDay = getDaysInMonth(newYear, newMonth);
-    if (currentDay > maxDay) {
-      setDayNum(maxDay);
-    }
-  };
+  const maxDay = getDaysInMonth(yearNum, monthNum);
+  const clampedDayNum = Math.min(dayNum, maxDay);
 
   const yearItems = useMemo(
     () => Array.from({ length: 80 }, (_, i) => `${1940 + i}년`),
@@ -35,18 +31,22 @@ export function GoalBirthdayPage() {
     () => Array.from({ length: 12 }, (_, i) => `${i + 1}월`),
     []
   );
-  const dayItems = useMemo(() => {
-    const count = getDaysInMonth(yearNum, monthNum);
-    return Array.from({ length: count }, (_, i) => `${i + 1}일`);
-  }, [yearNum, monthNum]);
+  const dayItems = useMemo(
+    () => Array.from({ length: maxDay }, (_, i) => `${i + 1}일`),
+    [maxDay]
+  );
+
+  const yearValue = `${yearNum}년`;
+  const monthValue = `${monthNum}월`;
+  const dayValue = `${clampedDayNum}일`;
 
   const handleNext = () => {
-    updateGoal({ birthday: { year: yearNum, month: monthNum, day: dayNum } });
-    navigate('/goal/weekly');
+    updateGoal({ birthday: { year: yearNum, month: monthNum, day: clampedDayNum } });
+    navigate('/goal/body');
   };
 
   return (
-    <GoalLayout step={1} totalSteps={3} onBack={() => navigate('/')}>
+    <GoalLayout step={1} totalSteps={4} onBack={() => navigate('/')}>
       <div className="px-6 pt-4 flex flex-col flex-1">
         <h1
           style={{
@@ -54,19 +54,19 @@ export function GoalBirthdayPage() {
             fontSize: 22,
             fontWeight: 700,
             lineHeight: 1.35,
-            marginTop: 15,
-            marginBottom: 9,
+            marginBottom: 12,
             whiteSpace: 'nowrap',
           }}
         >
           생년월일이 어떻게 되시나요?
         </h1>
-        <p style={{ color: '#888888', fontSize: 14, lineHeight: 1.6, marginBottom: 40 }}>
+        <p style={{ color: '#888888', fontSize: 14, lineHeight: 1.6, marginBottom: 28 }}>
           나이는 신체 수준을 파악하여 운동 플랜을 제공하는데
           <br />
           필요해요. 절대 외부에 공개되지 않아요.
         </p>
 
+        {/* Date Display Box */}
         <div
           className="flex items-center justify-center mb-6"
           style={{
@@ -81,39 +81,37 @@ export function GoalBirthdayPage() {
           </span>
         </div>
 
+        {/* Scroll Pickers */}
         <div
           className="rounded-2xl overflow-hidden"
           style={{ backgroundColor: '#2C2C30', border: '1px solid #3A3A3E' }}
         >
           <div className="flex">
+            {/* Year picker */}
             <div style={{ flex: 5 }}>
               <ScrollPicker
                 items={yearItems}
-                value={`${yearNum}년`}
-                onChange={(v) => {
-                  const newYear = parseInt(v);
-                  setYearNum(newYear);
-                  adjustDayIfNeeded(newYear, monthNum, dayNum);
-                }}
+                value={yearValue}
+                onChange={(v) => setYearNum(parseInt(v))}
               />
             </div>
+            {/* Divider */}
             <div style={{ width: 1, backgroundColor: '#3A3A3E', alignSelf: 'stretch' }} />
+            {/* Month picker */}
             <div style={{ flex: 3 }}>
               <ScrollPicker
                 items={monthItems}
-                value={`${monthNum}월`}
-                onChange={(v) => {
-                  const newMonth = parseInt(v);
-                  setMonthNum(newMonth);
-                  adjustDayIfNeeded(yearNum, newMonth, dayNum);
-                }}
+                value={monthValue}
+                onChange={(v) => setMonthNum(parseInt(v))}
               />
             </div>
+            {/* Divider */}
             <div style={{ width: 1, backgroundColor: '#3A3A3E', alignSelf: 'stretch' }} />
+            {/* Day picker */}
             <div style={{ flex: 3 }}>
               <ScrollPicker
                 items={dayItems}
-                value={`${dayNum}일`}
+                value={dayValue}
                 onChange={(v) => setDayNum(parseInt(v))}
               />
             </div>
@@ -123,6 +121,7 @@ export function GoalBirthdayPage() {
         <div style={{ flex: 1 }} />
       </div>
 
+      {/* Next Button */}
       <div className="px-6 pb-10 pt-6">
         <button
           onClick={handleNext}
@@ -136,7 +135,6 @@ export function GoalBirthdayPage() {
             fontSize: 17,
             fontWeight: 700,
             cursor: 'pointer',
-            marginBottom: 50,
           }}
         >
           다음

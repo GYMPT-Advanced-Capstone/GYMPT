@@ -12,7 +12,6 @@ const exerciseData: Record<
   {
     name: string;
     unit: string;
-    step: number;
     nextPath: string;
     prevPath: string;
     image: string;
@@ -27,7 +26,6 @@ const exerciseData: Record<
   squat: {
     name: '스쿼트',
     unit: '개',
-    step: 3,
     nextPath: '/goal/exercise/lunge',
     prevPath: '/goal/weekly',
     image:
@@ -42,7 +40,6 @@ const exerciseData: Record<
   lunge: {
     name: '런지',
     unit: '개',
-    step: 4,
     nextPath: '/goal/exercise/pushup',
     prevPath: '/goal/exercise/squat',
     image:
@@ -57,7 +54,6 @@ const exerciseData: Record<
   pushup: {
     name: '푸시업',
     unit: '개',
-    step: 5,
     nextPath: '/goal/exercise/plank',
     prevPath: '/goal/exercise/lunge',
     image:
@@ -72,7 +68,6 @@ const exerciseData: Record<
   plank: {
     name: '플랭크',
     unit: '초',
-    step: 6,
     nextPath: '/goal/ready',
     prevPath: '/goal/exercise/pushup',
     image:
@@ -127,7 +122,7 @@ export function GoalExercisePage() {
   };
 
   return (
-    <GoalLayout step={exercise.step} onBack={() => navigate(exercise.prevPath)}>
+    <GoalLayout step={4} totalSteps={4} onBack={() => navigate(exercise.prevPath)}>
       <div className="px-6 pt-2 flex flex-col flex-1">
         <h1
           style={{
@@ -287,7 +282,7 @@ export function GoalExercisePage() {
             cursor: 'pointer',
           }}
         >
-          {exercise.step === 6 ? '시작하기' : '다음'}
+          {id === 'plank' ? '시작하기' : '다음'}
         </button>
       </div>
     </GoalLayout>

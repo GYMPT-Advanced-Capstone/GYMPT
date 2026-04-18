@@ -93,15 +93,16 @@ export function GoalExerciseAllPage() {
 
   return (
     <GoalLayout
-      step={3}
-      totalSteps={3}
+      step={4}
+      totalSteps={4}
       onBack={() => navigate("/goal/weekly")}
     >
+      {/* Title */}
       <div className="px-6 pt-8 pb-4">
         <h1
           style={{
             color: "#F1F5F9",
-            fontSize: 22,
+            fontSize: 24,
             fontWeight: 700,
             lineHeight: 1.35,
             marginBottom: 6,
@@ -110,11 +111,12 @@ export function GoalExerciseAllPage() {
         >
           {"운동별 목표 횟수를\n설정해볼까요?"}
         </h1>
-        <p style={{ color: "#888888", fontSize: 14, marginBottom: 20 }}>
+        <p style={{ color: "#94A3B8", fontSize: 14 }}>
           언제든지 변경할 수 있어요.
         </p>
       </div>
 
+      {/* Exercise Cards */}
       <div className="px-6 flex flex-col gap-4 flex-1" style={{ marginTop: 20 }}>
         {exercises.map((ex) => {
           const count = counts[ex.id];
@@ -132,6 +134,7 @@ export function GoalExerciseAllPage() {
               }}
             >
               <div className="flex items-center justify-between">
+                {/* Left: emoji + name */}
                 <div className="flex items-center gap-3">
                   <div
                     className="flex items-center justify-center rounded-xl flex-shrink-0"
@@ -167,6 +170,7 @@ export function GoalExerciseAllPage() {
                   </div>
                 </div>
 
+                {/* Right: stepper */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() =>
@@ -238,6 +242,7 @@ export function GoalExerciseAllPage() {
         })}
       </div>
 
+      {/* Next Button */}
       <div className="px-6 pb-16 pt-5">
         <button
           onClick={handleNext}
