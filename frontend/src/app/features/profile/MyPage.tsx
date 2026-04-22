@@ -26,6 +26,8 @@ import {
   formatJoinDate,
   calcAge,
   localExerciseGoalStorage,
+  bodyStorage,
+  type BodyData,
   type UserProfile,
   type ExerciseGoalSummaryItem,
   type ExerciseGoalUpdateRequest,
@@ -33,29 +35,24 @@ import {
 } from '../../api/userApi';
 import { useGoal } from '../../context/GoalContext';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 타입
-// ─────────────────────────────────────────────────────────────────────────────
 type DisplayGoal = {
-  key: string;          // 'squat' | 'lunge' | 'pushup' | 'plank' (local) or ''
-  exercise_id: number;  // API goal_id or dummy negative
+  key: string;
+  exercise_id: number;
   exercise_name: string;
   target: number;
-  unit: string;         // '개' | '초'
+  unit: string;
   today_count: number;
   today_duration: number;
-  api_goal_id: number | null; // PATCH 가능 여부
+  api_goal_id: number | null;
 };
 
 type EditTarget =
   | 'birthday'
   | 'weekly'
+  | 'weight'
   | { type: 'exercise'; goal: DisplayGoal }
   | null;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 헬퍼
-// ─────────────────────────────────────────────────────────────────────────────
 const EXERCISE_KEY_MAP: Record<string, string> = {
   스쿼트: 'squat',
   런지: 'lunge',
@@ -70,7 +67,6 @@ const EXERCISE_EMOJI: Record<string, string> = {
   plank:  '⏱️',
 };
 
-/** GoalContext.exerciseCounts → LocalExerciseGoal[] */
 const GOAL_CONTEXT_META: Record<string, { name: string; unit: string }> = {
   squat:  { name: '스쿼트', unit: '개' },
   lunge:  { name: '런지',   unit: '개' },
@@ -89,7 +85,6 @@ function goalContextToLocalGoals(
   }));
 }
 
-/** API SummaryItem → DisplayGoal */
 function fromApiItem(item: ExerciseGoalSummaryItem): DisplayGoal {
   const unit = item.daily_target_duration != null ? '초' : '개';
   const target = item.daily_target_count ?? item.daily_target_duration ?? 0;
@@ -108,7 +103,6 @@ function fromApiItem(item: ExerciseGoalSummaryItem): DisplayGoal {
   };
 }
 
-/** LocalExerciseGoal → DisplayGoal */
 function fromLocalGoal(g: LocalExerciseGoal, idx: number): DisplayGoal {
   return {
     key: g.exercise_key,
@@ -122,9 +116,6 @@ function fromLocalGoal(g: LocalExerciseGoal, idx: number): DisplayGoal {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 컴포넌트
-// ─────────────────────────────────────────────────────────────────────────────
 export function MyPage() {
   const navigate = useNavigate();
   const { goal: goalCtx } = useGoal();
@@ -144,17 +135,36 @@ export function MyPage() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const [bodyData, setBodyData] = useState<BodyData | null>(() => bodyStorage.load());
 
-  // ── 데이터 로드 ─────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
       const [profile, summary] = await Promise.all([
-        userApi.getMe(),
+        userApi.getMe().catch(() => null),
         userApi.getSummary().catch(() => null),
       ]);
-      setUserProfile(profile);
+
+      if (profile) {
+        setUserProfile(profile);
+      } else {
+        const userId = tokenStorage.getUserId();
+        const userName = tokenStorage.getUserName();
+        if (userId && userName) {
+          setUserProfile({
+            id: userId,
+            email: `user${userId}@gympt.com`,
+            name: userName,
+            nickname: userName,
+            birth_date: null,
+            weekly_target: 3,
+            created_at: new Date().toISOString(),
+          });
+        } else {
+          throw new Error('로그인이 필요해요');
+        }
+      }
 
       if (summary && summary.exercise_goals.length > 0) {
         const goals = summary.exercise_goals.map(fromApiItem);
@@ -163,16 +173,13 @@ export function MyPage() {
         goals.forEach((g) => { if (g.key) syncCounts[g.key] = g.target; });
         if (Object.keys(syncCounts).length > 0) localExerciseGoalStorage.save(syncCounts);
       } else {
-        // ② localStorage(gympt_local_exercise_goals) 확인
         const localGoals = localExerciseGoalStorage.load();
         if (localGoals.length > 0) {
           setDisplayGoals(localGoals.map(fromLocalGoal));
         } else {
-          // ③ GoalContext(gympt_goal)를 마지막 fallback으로 사용
           const ctxGoals = goalContextToLocalGoals(goalCtx.exerciseCounts);
           const hasRealData = Object.values(goalCtx.exerciseCounts).some((v) => v > 0);
           if (hasRealData) {
-            // localStorage에도 저장해 이후 접근 시 활용
             localExerciseGoalStorage.save(goalCtx.exerciseCounts);
             setDisplayGoals(ctxGoals.map(fromLocalGoal));
           }
@@ -189,7 +196,6 @@ export function MyPage() {
     loadData();
   }, [loadData]);
 
-  // ── 편집 열기 ────────────────────────────────────────────────────────────────
   const openEdit = (target: EditTarget) => {
     setSaveError(null);
     if (target === 'birthday' && userProfile) {
@@ -198,13 +204,15 @@ export function MyPage() {
     if (target === 'weekly' && userProfile) {
       setTmpWeekly(userProfile.weekly_target ?? 3);
     }
+    if (target === 'weight') {
+      setTmpCount(bodyData?.weight ?? 65);
+    }
     if (target && typeof target === 'object' && target.type === 'exercise') {
       setTmpCount(target.goal.target);
     }
     setEditTarget(target);
   };
 
-  // ── 저장 ─────────────────────────────────────────────────────────────────────
   const saveEdit = async () => {
     if (!editTarget) return;
     setSaving(true);
@@ -218,10 +226,13 @@ export function MyPage() {
         const updated = await userApi.updateWeeklyTarget(tmpWeekly);
         setUserProfile(updated);
 
+      } else if (editTarget === 'weight') {
+        bodyStorage.updateWeight(tmpCount);
+        setBodyData(bodyStorage.load());
+
       } else if (typeof editTarget === 'object' && editTarget.type === 'exercise') {
         const g = editTarget.goal;
 
-        // API goal_id가 있으면 PATCH
         if (g.api_goal_id != null) {
           const data: ExerciseGoalUpdateRequest =
             g.unit === '개'
@@ -230,10 +241,8 @@ export function MyPage() {
           await userApi.updateExerciseGoal(g.api_goal_id, data);
         }
 
-        // localStorage도 업데이트
         if (g.key) localExerciseGoalStorage.update(g.key, tmpCount);
 
-        // 화면 즉시 반영
         setDisplayGoals((prev) =>
           prev.map((item) =>
             item.exercise_id === g.exercise_id
@@ -250,7 +259,6 @@ export function MyPage() {
     }
   };
 
-  // ── 로그아웃 ─────────────────────────────────────────────────────────────────
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
@@ -266,7 +274,6 @@ export function MyPage() {
     }
   };
 
-  // ── 파생 값 ──────────────────────────────────────────────────────────────────
   const age = calcAge(userProfile?.birth_date ?? null);
   const birthday = parseBirthDate(userProfile?.birth_date ?? null);
   const formattedBirthday = userProfile?.birth_date
@@ -274,8 +281,8 @@ export function MyPage() {
     : '미등록';
   const joinDate = userProfile?.created_at ? formatJoinDate(userProfile.created_at) : '-';
   const weeklyTarget = userProfile?.weekly_target ?? '-';
+  const weight = bodyData?.weight ?? null;
 
-  // ── 로딩 / 에러 ──────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="flex justify-center" style={{ minHeight: '100dvh', backgroundColor: '#111111' }}>
@@ -317,14 +324,12 @@ export function MyPage() {
     );
   }
 
-  // ── 메인 렌더 ────────────────────────────────────────────────────────────────
   return (
     <div className="flex justify-center" style={{ minHeight: '100dvh', backgroundColor: '#111111' }}>
       <div
         className="flex flex-col"
         style={{ width: '100%', maxWidth: 390, minHeight: '100dvh', backgroundColor: '#1A1A1A', paddingBottom: 80 }}
       >
-        {/* ── 헤더 / 프로필 ── */}
         <div
           className="px-6 pt-14 pb-6"
           style={{
@@ -364,7 +369,6 @@ export function MyPage() {
             </div>
           </div>
 
-          {/* 요약 카드 */}
           <div className="flex gap-3 mt-5">
             {[
               { label: '나이',      value: userProfile?.birth_date ? `${age}세` : '-' },
@@ -383,15 +387,14 @@ export function MyPage() {
           </div>
         </div>
 
-        {/* ── 사용자 정보 ── */}
         <Section title="사용자 정보" icon={<User size={15} color="#3FFDD4" />}>
           <InfoRow label="이름"    value={userProfile?.name ?? '-'} />
           <InfoRow label="아이디"  value={userProfile?.nickname ?? '-'} />
           <InfoRow label="가입일"  value={joinDate} />
           <InfoRow label="생년월일" value={formattedBirthday} onEdit={() => openEdit('birthday')} />
+          <InfoRow label="체중"    value={weight !== null ? `${weight}kg` : '미등록'} onEdit={() => openEdit('weight')} />
         </Section>
 
-        {/* ── 운동 목표 설정 ── */}
         <Section title="운동 목표 설정" icon={<Target size={15} color="#3FFDD4" />} topGap>
           <GoalRow
             label="주간 운동 횟수"
@@ -415,7 +418,6 @@ export function MyPage() {
           )}
         </Section>
 
-        {/* ── 운동 임계값 초기화 ── */}
         <Section title="운동 임계값 초기화" icon={<Gauge size={15} color="#3FFDD4" />} topGap>
           <div className="px-5 py-3">
             <p style={{ color: '#888888', fontSize: 12, marginBottom: 14 }}>
@@ -464,7 +466,6 @@ export function MyPage() {
           </div>
         </Section>
 
-        {/* ── 계정 ── */}
         <Section title="계정" icon={<Dumbbell size={15} color="#3FFDD4" />} topGap>
           <button
             onClick={() => setShowLogoutConfirm(true)}
@@ -486,7 +487,6 @@ export function MyPage() {
 
       <BottomNav />
 
-      {/* ── 편집 모달 ── */}
       {editTarget && (
         <EditModal
           editTarget={editTarget}
@@ -503,7 +503,6 @@ export function MyPage() {
         />
       )}
 
-      {/* ── 로그아웃 확인 ── */}
       {showLogoutConfirm && (
         <ConfirmSheet
           message="정말 로그아웃 하시겠어요?"
@@ -515,7 +514,6 @@ export function MyPage() {
         />
       )}
 
-      {/* ── 임계값 초기화 확인 ── */}
       {resetTarget && (
         <ConfirmSheet
           message={`${resetTarget} 임계값을 초기화할까요?`}
@@ -533,9 +531,6 @@ export function MyPage() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 서브 컴포넌트
-// ─────────────────────────────────────────────────────────────────────────────
 function Section({
   title, icon, children, topGap,
 }: { title: string; icon: React.ReactNode; children: React.ReactNode; topGap?: boolean }) {
@@ -625,9 +620,6 @@ function ExerciseGoalRow({ goal: g, onEdit }: { goal: DisplayGoal; onEdit: () =>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 편집 모달
-// ─────────────────────────────────────────────────────────────────────────────
 function EditModal({
   editTarget, tmpBirthday, setTmpBirthday, tmpWeekly, setTmpWeekly,
   tmpCount, setTmpCount, onSave, onClose, saving, saveError,
@@ -659,6 +651,7 @@ function EditModal({
   const title =
     editTarget === 'birthday'  ? '생년월일 수정'
     : editTarget === 'weekly'  ? '주간 운동 횟수 수정'
+    : editTarget === 'weight'  ? '체중 수정'
     : isExercise               ? `${exerciseGoal!.exercise_name} 목표 수정`
     : '';
 
@@ -680,7 +673,6 @@ function EditModal({
           </button>
         </div>
 
-        {/* 생년월일 */}
         {editTarget === 'birthday' && (
           <div className="flex flex-col gap-4">
             <div>
@@ -722,7 +714,6 @@ function EditModal({
           </div>
         )}
 
-        {/* 주간 운동 횟수 */}
         {editTarget === 'weekly' && (
           <div>
             <p style={{ color: '#888888', fontSize: 13, marginBottom: 16 }}>일주일에 몇 번 운동할 건가요?</p>
@@ -750,7 +741,35 @@ function EditModal({
           </div>
         )}
 
-        {/* 운동 목표 수 */}
+        {editTarget === 'weight' && (
+          <div>
+            <p style={{ color: '#888888', fontSize: 13, marginBottom: 20 }}>
+              체중을 조정해보세요
+            </p>
+            <div
+              className="flex items-center justify-between px-6 rounded-2xl"
+              style={{ backgroundColor: '#2C2C30', height: 88, border: '1px solid #3A3A3E' }}
+            >
+              <CounterBtn
+                disabled={tmpCount <= 30}
+                onClick={() => setTmpCount(Math.max(30, tmpCount - 1))}
+                icon={<Minus size={20} />}
+                size={44}
+              />
+              <div className="flex flex-col items-center">
+                <span style={{ color: '#3FFDD4', fontSize: 44, fontWeight: 700, lineHeight: 1 }}>{tmpCount}</span>
+                <span style={{ color: '#888888', fontSize: 13, marginTop: 4 }}>kg</span>
+              </div>
+              <CounterBtn
+                disabled={tmpCount >= 200}
+                onClick={() => setTmpCount(Math.min(200, tmpCount + 1))}
+                icon={<Plus size={20} />}
+                size={44}
+              />
+            </div>
+          </div>
+        )}
+
         {isExercise && exerciseGoal && (
           <div>
             <p style={{ color: '#888888', fontSize: 13, marginBottom: 20 }}>

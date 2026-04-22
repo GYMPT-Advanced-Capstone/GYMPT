@@ -52,10 +52,10 @@ export interface ExerciseGoalUpdateRequest {
 }
 
 export interface LocalExerciseGoal {
-  exercise_key: string;
-  exercise_name: string;
+  exercise_key: string;   // 'squat' | 'lunge' | 'pushup' | 'plank'
+  exercise_name: string;  // '스쿼트' | '런지' | '푸시업' | '플랭크'
   target: number;
-  unit: string;
+  unit: string;           // '개' | '초'
 }
 
 const EXERCISE_DISPLAY: Record<string, { name: string; unit: string }> = {
@@ -118,7 +118,6 @@ export const localExerciseGoalStorage = {
       today_duration: 0,
     })),
 };
-
 
 export const userApi = {
   getMe: () => request<UserProfile>('/api/v1/users/me', {}, true),
@@ -202,5 +201,35 @@ export const onboardingStorage = {
   },
   isDone: (userId: number): boolean => {
     return localStorage.getItem(`gympt_onboarding_done_${userId}`) === '1';
+  },
+};
+
+export interface BodyData {
+  height: number;
+  weight: number;
+}
+
+const BODY_KEY = 'gympt_body';
+
+function getBodyKey(): string {
+  const userId = localStorage.getItem('gympt_user_id');
+  return userId ? `${BODY_KEY}_${userId}` : BODY_KEY;
+}
+
+export const bodyStorage = {
+  save: (data: BodyData): void => {
+    localStorage.setItem(getBodyKey(), JSON.stringify(data));
+  },
+  load: (): BodyData | null => {
+    try {
+      const raw = localStorage.getItem(getBodyKey());
+      return raw ? (JSON.parse(raw) as BodyData) : null;
+    } catch {
+      return null;
+    }
+  },
+  updateWeight: (weight: number): void => {
+    const current = bodyStorage.load() ?? { height: 170, weight };
+    bodyStorage.save({ ...current, weight });
   },
 };

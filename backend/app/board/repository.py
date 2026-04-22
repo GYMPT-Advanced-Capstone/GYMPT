@@ -1,4 +1,4 @@
-from sqlalchemy import case, select, update
+from sqlalchemy import case, select, update, func
 from sqlalchemy.orm import Session
 
 from app.board.models import Board, Comment, Like
@@ -74,17 +74,51 @@ def update_board(
     return board
 
 
-def get_board_list(db: Session) -> list[tuple[Board, str]]:
+def get_board_list(
+    db: Session,
+    current_user_id: int,
+) -> list[tuple[Board, str, bool, int]]:
+    liked_subquery = (
+        select(Like.board_no.label("board_no"))
+        .where(Like.writer_id == current_user_id)
+        .subquery()
+    )
+
+    comments_count_subquery = (
+        select(
+            Comment.board_no.label("board_no"),
+            func.count(Comment.comment_no).label("comments_count"),
+        )
+        .group_by(Comment.board_no)
+        .subquery()
+    )
+
     stmt = (
-        select(Board, User.nickname)
+        select(
+            Board,
+            User.nickname,
+            case(
+                (liked_subquery.c.board_no.is_not(None), True),
+                else_=False,
+            ).label("is_liked"),
+            func.coalesce(comments_count_subquery.c.comments_count, 0).label(
+                "comments_count"
+            ),
+        )
         .join(User, Board.writer_id == User.id)
+        .outerjoin(liked_subquery, liked_subquery.c.board_no == Board.board_no)
+        .outerjoin(
+            comments_count_subquery,
+            comments_count_subquery.c.board_no == Board.board_no,
+        )
         .order_by(Board.upload_date.desc(), Board.board_no.desc())
     )
 
     result = db.execute(stmt).all()
-    rows = [(board, nickname) for board, nickname in result]
-
-    return rows
+    return [
+        (board, nickname, is_liked, comments_count)
+        for board, nickname, is_liked, comments_count in result
+    ]
 
 
 def get_board_detail(db: Session, board_no: int) -> tuple[Board, str] | None:
@@ -113,6 +147,24 @@ def get_comments_by_board_no(db: Session, board_no: int) -> list[tuple[Comment, 
 
     result = db.execute(stmt).all()
     return [(comment, nickname) for comment, nickname in result]
+
+
+def get_comment_count_by_board_no(db: Session, board_no: int) -> int:
+    stmt = select(func.count(Comment.comment_no)).where(Comment.board_no == board_no)
+    result = db.execute(stmt).scalar_one()
+    return int(result)
+
+
+def is_board_liked_by_user(
+    db: Session,
+    board_no: int,
+    user_id: int,
+) -> bool:
+    stmt = select(Like.likes_no).where(
+        Like.board_no == board_no,
+        Like.writer_id == user_id,
+    )
+    return db.execute(stmt).scalar_one_or_none() is not None
 
 
 def delete_board(db: Session, board: Board) -> None:
