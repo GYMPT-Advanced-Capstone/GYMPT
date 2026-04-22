@@ -179,8 +179,14 @@ def update_board_service(
     return updated_board
 
 
-def list_boards_service(db: Session) -> list[BoardResponse]:
-    rows = repository.get_board_list(db)
+def list_boards_service(
+    db: Session,
+    current_user: User,
+) -> list[BoardResponse]:
+    rows = repository.get_board_list(
+        db=db,
+        current_user_id=int(current_user.id),
+    )
 
     return [
         BoardResponse(
@@ -191,12 +197,18 @@ def list_boards_service(db: Session) -> list[BoardResponse]:
             writer=nickname,
             likes=board.likes,
             upload_date=board.upload_date,
+            is_liked=is_liked,
+            comments_count=comments_count,
         )
-        for board, nickname in rows
+        for board, nickname, is_liked, comments_count in rows
     ]
 
 
-def get_board_detail_service(db: Session, board_no: int) -> BoardDetailResponse:
+def get_board_detail_service(
+    db: Session,
+    board_no: int,
+    current_user: User,
+) -> BoardDetailResponse:
     result = repository.get_board_detail(db=db, board_no=board_no)
 
     if result is None:
@@ -207,6 +219,16 @@ def get_board_detail_service(db: Session, board_no: int) -> BoardDetailResponse:
 
     board, nickname = result
     comment_rows = repository.get_comments_by_board_no(db=db, board_no=board_no)
+
+    is_liked = repository.is_board_liked_by_user(
+        db=db,
+        board_no=board_no,
+        user_id=int(current_user.id),
+    )
+    comments_count = repository.get_comment_count_by_board_no(
+        db=db,
+        board_no=board_no,
+    )
 
     comments = [
         CommentResponse(
@@ -228,6 +250,8 @@ def get_board_detail_service(db: Session, board_no: int) -> BoardDetailResponse:
         likes=board.likes,
         upload_date=board.upload_date,
         comments=comments,
+        is_liked=is_liked,
+        comments_count=comments_count,
     )
 
 

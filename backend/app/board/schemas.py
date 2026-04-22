@@ -40,6 +40,16 @@ class BoardResponse(BaseModel):
         description="게시글 작성 시각",
         json_schema_extra={"example": "2026-03-27T10:30:00"},
     )
+    is_liked: bool = Field(
+        ...,
+        description="현재 로그인한 사용자의 좋아요 여부",
+        json_schema_extra={"example": True},
+    )
+    comments_count: int = Field(
+        ...,
+        description="해당 게시글에 달린 댓글 수",
+        json_schema_extra={"example": 3},
+    )
 
 
 class LikeToggleResponse(BaseModel):
