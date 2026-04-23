@@ -5,6 +5,13 @@ import { useEffect, useState, useCallback } from "react";
 import axios, { AxiosError } from "axios";
 import { BottomNav } from "../../components/BottomNav";
 
+// --- 이미지 주소 업데이트 (더 확실한 링크로 교체) ---
+const DUMMY_IMAGES = {
+  gym_dark: "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?q=80&w=1000&auto=format&fit=crop",
+  workout_gear: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?q=80&w=1000&auto=format&fit=crop", // 주소 변경
+  cardio_vibe: "https://images.unsplash.com/photo-1593079831268-3381b0db4a77?q=80&w=1000&auto=format&fit=crop"
+};
+
 interface Post {
   board_no: number;
   writer: string;
@@ -27,7 +34,33 @@ interface Comment {
 
 export function Community() {
   const navigate = useNavigate();
-  const [posts, setPosts] = useState<Post[]>([]);
+  
+  // 좋아요 0, 댓글 0으로 초기화하여 실제 기능 테스트가 가능하게 설정
+  const [posts, setPosts] = useState<Post[]>([
+    {
+      board_no: 999,
+      writer: "GYMPT_마스터",
+      upload_date: "2024-03-24T10:00:00",
+      title: "오늘 데드리프트 180kg 성공! 🔥",
+      content: "3개월 정체기 끝! 다들 오늘 오운완 하셨나요?",
+      imgpath: DUMMY_IMAGES.gym_dark,
+      likes: 0,
+      is_liked: false,
+      comments_count: 0
+    },
+    {
+      board_no: 998,
+      writer: "식단요정",
+      upload_date: "2024-03-24T11:30:00",
+      title: "다이어트 꿀팁 공유 🥗",
+      content: "단백질 함량 꼭 체크하세요! 궁금한 점은 댓글로!",
+      imgpath: DUMMY_IMAGES.workout_gear,
+      likes: 0,
+      is_liked: false,
+      comments_count: 0
+    }
+  ]);
+
   const [activeCommentPostId, setActiveCommentPostId] = useState<number | null>(null);
 
   const getAuthHeader = useCallback(() => {
@@ -44,7 +77,9 @@ export function Community() {
     if (!headers) return;
     try {
       const response = await axios.get('http://localhost:8000/api/v1/board/', { headers });
-      setPosts(response.data);
+      if (response.data && response.data.length > 0) {
+        setPosts(response.data);
+      }
     } catch (error) {
       const err = error as AxiosError;
       console.error("데이터 로드 에러:", err.message);
@@ -52,26 +87,20 @@ export function Community() {
     }
   }, [navigate, getAuthHeader]);
 
-  // [중요] 린트 에러 우회: 이펙트 안에서 직접 실행하지 않고 비동기 함수로 래핑
   useEffect(() => {
     let isMounted = true;
-    const loadInitialData = async () => {
+    const loadData = async () => {
       await fetchPosts();
     };
-    
-    if (isMounted) {
-      loadInitialData();
-    }
-    
-    return () => {
-      isMounted = false;
-    };
+    if (isMounted) loadData();
+    return () => { isMounted = false; };
   }, [fetchPosts]);
 
   const handleDeletePost = (board_no: number) => {
     setPosts(prev => prev.filter(p => p.board_no !== board_no));
   };
 
+  // 좋아요 기능: 서버 통신 실패 시에도 로컬 상태를 먼저 업데이트하여 UI 반응 속도 확보
   const handleLikeUpdate = (board_no: number) => {
     setPosts(prev => prev.map(p => {
       if (p.board_no === board_no) {
@@ -146,21 +175,26 @@ function PostCard({ post, index, onDelete, onLikeUpdate, onOpenComments }: {
   post: Post; index: number; onDelete: (no: number) => void; onLikeUpdate: (no: number) => void; onOpenComments: () => void;
 }) {
   const navigate = useNavigate();
+  // 이미지 경로 처리 최적화
   const imageUrls = post.imgpath
     ? (Array.isArray(post.imgpath) ? post.imgpath : post.imgpath.split(',')).map(path => 
-        path.startsWith('http') ? path : `http://localhost:8000${path.trim()}`
+        path.trim().startsWith('http') ? path.trim() : `http://localhost:8000${path.trim()}`
       ) : [];
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    // 1. 먼저 UI를 업데이트 (사용자 경험 향상)
+    onLikeUpdate(post.board_no);
+    
+    // 2. 서버 통신 시도 (실패해도 UI는 이미 변해있음)
     try {
       const token = localStorage.getItem("gympt_access_token");
       await axios.post(`http://localhost:8000/api/v1/board/${post.board_no}/likes`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      onLikeUpdate(post.board_no); 
     } catch (error) { 
-      console.error("좋아요 실패:", (error as Error).message); 
+      console.error("좋아요 동기화 실패:", (error as Error).message);
+      // 서버 에러 시 다시 롤백하고 싶다면 여기서 onLikeUpdate를 한 번 더 호출할 수 있음
     }
   };
 
@@ -195,12 +229,19 @@ function PostCard({ post, index, onDelete, onLikeUpdate, onOpenComments }: {
       </div>
       <div className="px-4" onClick={() => navigate(`/community/${post.board_no}`)}>
         <div className="w-full aspect-square rounded-[16px] overflow-hidden bg-white/5 border border-white/5">
-          {imageUrls.length > 0 ? <img src={imageUrls[0]} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex flex-col items-center justify-center gap-2"><ImageIcon size={32} className="text-white/20" /></div>}
+          {imageUrls.length > 0 ? (
+            <img src={imageUrls[0]} className="w-full h-full object-cover" alt="" 
+                 onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=No+Image'; }} />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+              <ImageIcon size={32} className="text-white/20" />
+            </div>
+          )}
         </div>
       </div>
       <div className="p-5 pt-4 flex flex-col gap-3">
         <div className="flex items-center gap-4">
-          <button onClick={handleLike} className={`flex items-center gap-1.5 ${post.is_liked ? 'text-[#3FFDD4]' : 'text-white/60'}`}>
+          <button onClick={handleLike} className={`flex items-center gap-1.5 transition-colors ${post.is_liked ? 'text-[#3FFDD4]' : 'text-white/60'}`}>
             <Heart size={22} className={post.is_liked ? 'fill-[#3FFDD4] stroke-[#3FFDD4]' : ''} /><span className="text-[14px] font-medium">{post.likes}</span>
           </button>
           <button onClick={(e) => { e.stopPropagation(); onOpenComments(); }} className="flex items-center gap-1.5 text-white/60">
@@ -234,20 +275,10 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
     }
   }, [postId]);
 
-  // [중요] 린트 에러 우회: 이펙트 안에서 직접 실행하지 않고 비동기 함수로 래핑
   useEffect(() => {
     let isMounted = true;
-    const loadInitialComments = async () => {
-      await fetchComments();
-    };
-    
-    if (isMounted) {
-      loadInitialComments();
-    }
-
-    return () => {
-      isMounted = false;
-    };
+    if (isMounted) fetchComments();
+    return () => { isMounted = false; };
   }, [fetchComments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -255,6 +286,7 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
     if (!commentInput.trim()) return;
     const token = localStorage.getItem("gympt_access_token");
 
+    // UI 우선 업데이트용 임시 데이터 (실제 데이터는 서버 응답으로 교체)
     try {
       if (editingCommentId) {
         const response = await axios.patch(`http://localhost:8000/api/v1/board/comments/${editingCommentId}`, 
@@ -274,7 +306,13 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
       setCommentInput("");
     } catch (error) {
       console.error("댓글 전송 에러:", (error as Error).message);
-      alert("요청 처리 중 오류가 발생했습니다.");
+      // 서버가 꺼져있어도 테스트하고 싶다면 아래 주석을 해제하세요.
+      /*
+      const tempComment = { comment_no: Date.now(), content: commentInput, writer: "테스터", create_at: new Date().toISOString(), board_no: postId };
+      setComments(prev => [tempComment, ...prev]);
+      onCountUpdate(postId, 'plus');
+      setCommentInput("");
+      */
     }
   };
 
@@ -294,7 +332,6 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
       onCountUpdate(postId, 'minus');
     } catch (error) {
       console.error("댓글 삭제 에러:", (error as Error).message);
-      alert("삭제 권한이 없습니다.");
     }
   };
 
@@ -327,7 +364,11 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
                 </div>
               </div>
             </div>
-          )) : <div className="flex flex-col items-center justify-center py-20 text-white/10"><span className="text-[14px]">첫 댓글을 남겨보세요!</span></div>}
+          )) : (
+            <div className="flex flex-col items-center justify-center py-20 text-white/10">
+              <span className="text-[14px]">첫 댓글을 남겨보세요!</span>
+            </div>
+          )}
         </div>
         <div className="p-4 bg-[#1A1A1A] border-t border-white/10 pb-10">
           <form onSubmit={handleSubmit} className="flex items-center gap-3 bg-white/5 rounded-full px-4 py-2.5 border border-white/10 focus-within:border-[#3FFDD4]/30 transition-colors">
