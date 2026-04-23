@@ -80,7 +80,7 @@ def get_board_list(
 ) -> list[tuple[Board, str, bool, int]]:
     liked_subquery = (
         select(Like.board_no.label("board_no"))
-        .where(Like.writer_id == int(current_user_id)) 
+        .where(Like.writer_id == int(current_user_id))
         .subquery()
     )
 
@@ -296,4 +296,3 @@ def delete_comment(
     except Exception:
         db.rollback()
         raise
-    
