@@ -30,6 +30,24 @@ interface Comment {
   board_no: number;
 }
 
+// PostCard 컴포넌트용 타입 정의
+interface PostCardProps {
+  post: Post;
+  index: number;
+  onDelete: (no: number) => void;
+  onLikeUpdate: (no: number) => void;
+  onOpenComments: () => void;
+  onApiError: (error: unknown) => void;
+}
+
+// CommentsBottomSheet 컴포넌트용 타입 정의
+interface BottomSheetProps {
+  onClose: () => void;
+  postId: number;
+  onCountUpdate: (id: number, type: 'plus' | 'minus') => void;
+  onApiError: (error: unknown) => void;
+}
+
 export function Community() {
   const navigate = useNavigate();
   
@@ -60,13 +78,13 @@ export function Community() {
 
   const [activeCommentPostId, setActiveCommentPostId] = useState<number | null>(null);
 
-  // 401 에러 발생 시 로그인 페이지로 강제 이동하는 로직
-  const handleApiError = useCallback((error: any) => {
+  // 401 에러 발생 시 로그인 페이지("/")로 이동하는 핸들러
+  const handleApiError = useCallback((error: unknown) => {
     const err = error as AxiosError;
     if (err.response?.status === 401) {
       alert("세션이 만료되었습니다. 다시 로그인해주세요.");
       localStorage.removeItem("gympt_access_token");
-      navigate("/"); // http://localhost:5173/ 경로로 이동
+      navigate("/");
     }
     console.error("API 에러:", err.message);
   }, [navigate]);
@@ -162,7 +180,7 @@ export function Community() {
   );
 }
 
-function PostCard({ post, index, onDelete, onLikeUpdate, onOpenComments, onApiError }: any) {
+function PostCard({ post, index, onDelete, onLikeUpdate, onOpenComments, onApiError }: PostCardProps) {
   const navigate = useNavigate();
   const imageUrls = post.imgpath ? (Array.isArray(post.imgpath) ? post.imgpath : post.imgpath.split(',')).map((path: string) => 
     path.trim().startsWith('http') ? path.trim() : `http://localhost:8000${path.trim()}`
@@ -239,7 +257,7 @@ function PostCard({ post, index, onDelete, onLikeUpdate, onOpenComments, onApiEr
   );
 }
 
-function CommentsBottomSheet({ onClose, postId, onCountUpdate, onApiError }: any) {
+function CommentsBottomSheet({ onClose, postId, onCountUpdate, onApiError }: BottomSheetProps) {
   const [commentInput, setCommentInput] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
@@ -340,7 +358,7 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate, onApiError }: any
               className="flex-1 bg-transparent text-white outline-none text-[14px] placeholder:text-white/20" 
             />
             {editingCommentId && <button type="button" onClick={() => { setEditingCommentId(null); setCommentInput(""); }} className="text-white/40 text-[12px]">취소</button>}
-            <button type="submit" disabled={!commentInput.trim()} className={commentInput.trim() ? 'text-[#3FFDD4]' : 'text-white/10'}><Send size={18} /></button>
+            <button type="submit" disabled={!commentInput.trim()} className={commentInput.trim() ? 'text-[#3FFDD4]' : 'text-white/10'}><Send size={18} /> </button>
           </form>
         </div>
       </motion.div>
