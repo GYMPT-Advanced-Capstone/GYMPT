@@ -14,6 +14,7 @@ def mock_env_vars(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("MYSQL_DATABASE", "test_db")
     monkeypatch.setenv("SECRET_KEY", "test_secret_key_for_testing_only")
     monkeypatch.setenv("ALGORITHM", "HS256")
+    monkeypatch.setenv("REDIS_PASSWORD", "test_redis_password")
     monkeypatch.setenv("MAIL_USERNAME", "test@gmail.com")
     monkeypatch.setenv("MAIL_PASSWORD", "testpassword")
     monkeypatch.setenv("MAIL_FROM", "test@gmail.com")
