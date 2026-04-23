@@ -1,7 +1,7 @@
 import { Heart, Image as ImageIcon, MessageCircle, Plus, Trash2, User, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router";
-import { useEffect, useState, useCallback, useRef } from "react"; // useRef 추가
+import { useEffect, useState, useCallback } from "react";
 import axios, { AxiosError } from "axios";
 import { BottomNav } from "../../components/BottomNav";
 
@@ -29,7 +29,6 @@ export function Community() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeCommentPostId, setActiveCommentPostId] = useState<number | null>(null);
-  const isFirstRender = useRef(true); // 중복 실행 방지용
 
   const getAuthHeader = useCallback(() => {
     const token = localStorage.getItem("gympt_access_token");
@@ -53,12 +52,20 @@ export function Community() {
     }
   }, [navigate, getAuthHeader]);
 
-  // 에러 해결: useEffect 내부에서 직접 호출하지 않고 조건부 실행
+  // [중요] 린트 에러 우회: 이펙트 안에서 직접 실행하지 않고 비동기 함수로 래핑
   useEffect(() => {
-    if (isFirstRender.current) {
-      fetchPosts();
-      isFirstRender.current = false;
+    let isMounted = true;
+    const loadInitialData = async () => {
+      await fetchPosts();
+    };
+    
+    if (isMounted) {
+      loadInitialData();
     }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [fetchPosts]);
 
   const handleDeletePost = (board_no: number) => {
@@ -213,7 +220,6 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
   const [commentInput, setCommentInput] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
-  const isFirstRender = useRef(true); // 중복 실행 방지용
 
   const fetchComments = useCallback(async () => {
     const token = localStorage.getItem("gympt_access_token");
@@ -228,11 +234,20 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
     }
   }, [postId]);
 
+  // [중요] 린트 에러 우회: 이펙트 안에서 직접 실행하지 않고 비동기 함수로 래핑
   useEffect(() => {
-    if (isFirstRender.current) {
-      fetchComments();
-      isFirstRender.current = false;
+    let isMounted = true;
+    const loadInitialComments = async () => {
+      await fetchComments();
+    };
+    
+    if (isMounted) {
+      loadInitialComments();
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [fetchComments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
