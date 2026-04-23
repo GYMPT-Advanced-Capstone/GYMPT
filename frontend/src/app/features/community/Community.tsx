@@ -1,4 +1,4 @@
-import { Heart, Image as ImageIcon, MessageCircle, Plus, Trash2, User, Send, X } from "lucide-react";
+import { Heart, Image as ImageIcon, MessageCircle, Plus, Trash2, User, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router";
 import { useEffect, useState, useCallback } from "react";

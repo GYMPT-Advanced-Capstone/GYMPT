@@ -296,3 +296,4 @@ def delete_comment(
     except Exception:
         db.rollback()
         raise
+    
