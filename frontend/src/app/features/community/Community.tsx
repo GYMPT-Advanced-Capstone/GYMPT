@@ -1,8 +1,8 @@
 import { Heart, Image as ImageIcon, MessageCircle, Plus, Trash2, User, Send } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router";
-import { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import { useEffect, useState, useCallback, useRef } from "react"; // useRef 추가
+import axios, { AxiosError } from "axios";
 import { BottomNav } from "../../components/BottomNav";
 
 interface Post {
@@ -25,19 +25,12 @@ interface Comment {
   board_no: number;
 }
 
-// 에러 객체 타입을 위한 인터페이스 (any 에러 방지)
-interface AxiosErrorResponse {
-  response?: {
-    status: number;
-  };
-}
-
 export function Community() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<Post[]>([]);
   const [activeCommentPostId, setActiveCommentPostId] = useState<number | null>(null);
+  const isFirstRender = useRef(true); // 중복 실행 방지용
 
-  // getAuthHeader를 useCallback으로 감싸고 navigate를 의존성에 추가 (린트 에러 해결)
   const getAuthHeader = useCallback(() => {
     const token = localStorage.getItem("gympt_access_token");
     if (!token) {
@@ -54,14 +47,18 @@ export function Community() {
       const response = await axios.get('http://localhost:8000/api/v1/board/', { headers });
       setPosts(response.data);
     } catch (error) {
-      const err = error as AxiosErrorResponse;
-      console.error("게시글 로드 중 에러 발생:", err);
+      const err = error as AxiosError;
+      console.error("데이터 로드 에러:", err.message);
       if (err.response?.status === 401) navigate("/login");
     }
   }, [navigate, getAuthHeader]);
 
+  // 에러 해결: useEffect 내부에서 직접 호출하지 않고 조건부 실행
   useEffect(() => {
-    fetchPosts();
+    if (isFirstRender.current) {
+      fetchPosts();
+      isFirstRender.current = false;
+    }
   }, [fetchPosts]);
 
   const handleDeletePost = (board_no: number) => {
@@ -155,7 +152,9 @@ function PostCard({ post, index, onDelete, onLikeUpdate, onOpenComments }: {
         headers: { Authorization: `Bearer ${token}` }
       });
       onLikeUpdate(post.board_no); 
-    } catch (error) { console.error("좋아요 업데이트 실패:", error); }
+    } catch (error) { 
+      console.error("좋아요 실패:", (error as Error).message); 
+    }
   };
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -168,7 +167,7 @@ function PostCard({ post, index, onDelete, onLikeUpdate, onOpenComments }: {
       });
       onDelete(post.board_no);
     } catch (error) { 
-      console.error("게시글 삭제 실패:", error);
+      console.error("삭제 실패:", (error as Error).message);
       alert("삭제 권한이 없습니다."); 
     }
   };
@@ -214,6 +213,7 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
   const [commentInput, setCommentInput] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
+  const isFirstRender = useRef(true); // 중복 실행 방지용
 
   const fetchComments = useCallback(async () => {
     const token = localStorage.getItem("gympt_access_token");
@@ -224,12 +224,15 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
       });
       setComments(response.data.comments || []);
     } catch (error) {
-      console.error("댓글 불러오기 실패:", error);
+      console.error("댓글 로딩 에러:", (error as Error).message);
     }
   }, [postId]);
 
   useEffect(() => {
-    fetchComments();
+    if (isFirstRender.current) {
+      fetchComments();
+      isFirstRender.current = false;
+    }
   }, [fetchComments]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -255,7 +258,7 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
       }
       setCommentInput("");
     } catch (error) {
-      console.error("댓글 작업 중 에러:", error);
+      console.error("댓글 전송 에러:", (error as Error).message);
       alert("요청 처리 중 오류가 발생했습니다.");
     }
   };
@@ -275,7 +278,7 @@ function CommentsBottomSheet({ onClose, postId, onCountUpdate }: { onClose: () =
       setComments(prev => prev.filter(c => c.comment_no !== comment_no));
       onCountUpdate(postId, 'minus');
     } catch (error) {
-      console.error("댓글 삭제 에러:", error);
+      console.error("댓글 삭제 에러:", (error as Error).message);
       alert("삭제 권한이 없습니다.");
     }
   };
