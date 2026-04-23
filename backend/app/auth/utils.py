@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 def get_redis_client():
     settings = get_settings()
     return redis.Redis(
-        host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0, decode_responses=True
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        password=settings.REDIS_PASSWORD,
+        db=0,
+        decode_responses=True,
     )
 
 
