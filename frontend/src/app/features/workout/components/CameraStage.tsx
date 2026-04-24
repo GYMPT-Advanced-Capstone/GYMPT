@@ -15,6 +15,7 @@ interface CameraStageProps {
   hideStageButton?: boolean;
   idleIntroLine1?: string;
   idleIntroLine2?: string;
+  stageMinHeightClassName?: string;
 }
 
 const TEXT = {
@@ -97,6 +98,7 @@ export function CameraStage({
   hideStageButton = false,
   idleIntroLine1,
   idleIntroLine2,
+  stageMinHeightClassName = "min-h-[700px]",
 }: CameraStageProps) {
   const requestButtonLabel =
     cameraStatus === "loading"
@@ -107,7 +109,7 @@ export function CameraStage({
 
   return (
     <section className="rounded-[20px] border border-[#242933] bg-[#15181E] p-[10px]">
-      <div className="relative min-h-[700px] overflow-hidden rounded-[16px] bg-[#171A20]">
+      <div className={`relative overflow-hidden rounded-[16px] bg-[#171A20] ${stageMinHeightClassName}`}>
         <video
           autoPlay
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${

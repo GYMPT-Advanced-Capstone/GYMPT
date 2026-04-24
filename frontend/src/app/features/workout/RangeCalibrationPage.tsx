@@ -3,30 +3,16 @@ import { useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { useGoal } from "../../context/GoalContext";
-import squatImg from "../../../assets/exercises/squat.png";
 import { CameraStage } from "./components/CameraStage";
+import { WORKOUT_EXERCISES } from "./config/exercises";
 import { useCameraPreview } from "./hooks/useCameraPreview";
+import { usePushupCalibration } from "./hooks/usePushupCalibration";
 import { usePoseLandmarker } from "./hooks/usePoseLandmarker";
-
-const TEXT = {
-  title: "스쿼트 범위 설정",
-  minimum: "최초 1회",
-  noticeTitle: "관절 가동 범위 설정",
-  noticeGuide: "본인의 관절 최대 가동 범위를 설정하는 단계입니다.",
-  activeGuide: "고통을 느끼지 전까지 무릎을 최대한 굽혀주세요.",
-  modelError: "AI 자세 분석을 시작할 수 없습니다.",
-  retry: "다시 시도",
-  completeTitle: "가동 범위 설정 완료!",
-  start: "자세 설정 시작",
-  detect: "자세 인식 중...",
-  finish: "가동 범위 설정 완료",
-  next: "다음",
-} as const;
 
 function CalibrationCompleteStage() {
   return (
     <section className="rounded-[20px] border border-[#242933] bg-[#15181E] p-[10px]">
-      <div className="relative min-h-[700px] overflow-hidden rounded-[16px] bg-[#171A20]">
+      <div className="relative min-h-[420px] overflow-hidden rounded-[16px] bg-[#171A20] md:min-h-[540px]">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute left-5 top-5 h-7 w-7 border-l-[4px] border-t-[4px] border-[#3FFDD4]" />
           <div className="absolute right-5 top-5 h-7 w-7 border-r-[4px] border-t-[4px] border-[#3FFDD4]" />
@@ -39,7 +25,7 @@ function CalibrationCompleteStage() {
             <CheckCircle2 className="text-[#3FFDD4]" size={62} strokeWidth={2.2} />
           </div>
           <p className="text-[28px] font-extrabold tracking-[-0.2px] text-[#3FFDD4]">
-            {TEXT.completeTitle}
+            초기 범위 설정 완료
           </p>
         </div>
       </div>
@@ -47,33 +33,14 @@ function CalibrationCompleteStage() {
   );
 }
 
-function resolveActionLabel(params: {
-  isCalibrationComplete: boolean;
-  isStreaming: boolean;
-  canCompleteCalibration: boolean;
-  isPoseError: boolean;
-}): string {
-  const { isCalibrationComplete, isStreaming, canCompleteCalibration, isPoseError } = params;
-  if (isCalibrationComplete) {
-    return TEXT.next;
-  }
-  if (isPoseError) {
-    return TEXT.retry;
-  }
-  if (!isStreaming) {
-    return TEXT.start;
-  }
-  if (canCompleteCalibration) {
-    return TEXT.finish;
-  }
-  return TEXT.detect;
-}
-
 export function RangeCalibrationPage() {
   const navigate = useNavigate();
   const { exerciseId } = useParams<{ exerciseId: string }>();
   const { markCalibrated } = useGoal();
-  const [isCalibrationComplete, setIsCalibrationComplete] = useState(false);
+  const resolvedExerciseId = exerciseId ?? "squat";
+  const exercise = WORKOUT_EXERCISES[resolvedExerciseId] ?? WORKOUT_EXERCISES.squat;
+  const isPushup = resolvedExerciseId === "pushup";
+  const [isLegacyCalibrationComplete, setIsLegacyCalibrationComplete] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -86,61 +53,133 @@ export function RangeCalibrationPage() {
   } = useCameraPreview(videoRef);
 
   const {
+    step,
+    phase,
+    capturedSide,
+    calibrationError,
+    isSavingCalibration,
+    isCalibrationComplete,
+    noticeMessage: pushupNoticeMessage,
+    onPoseLandmarks,
+    startCalibration,
+    resetCalibration,
+  } = usePushupCalibration({
+    enabled: isStreaming && isPushup,
+    exerciseId: exercise.backendExerciseId,
+    onSuccess: () => {
+      markCalibrated(resolvedExerciseId);
+      stopCamera();
+    },
+  });
+
+  const {
     poseStatus,
     poseErrorMessage,
     hasPoseLandmarks,
   } = usePoseLandmarker({
-    enabled: isStreaming && !isCalibrationComplete,
+    enabled: isStreaming && !(isPushup ? isCalibrationComplete : isLegacyCalibrationComplete),
     videoRef,
     canvasRef,
+    onPoseLandmarks: isPushup ? onPoseLandmarks : undefined,
   });
 
-  const resolvedExerciseId = exerciseId ?? "squat";
-  const isPoseError = poseStatus === "error";
+  const calibrationComplete = isPushup ? isCalibrationComplete : isLegacyCalibrationComplete;
 
-  let noticeMessage: string = TEXT.noticeGuide;
-  if (isStreaming) {
-    noticeMessage = TEXT.activeGuide;
+  const isPoseError = poseStatus === "error";
+  const isCapturing = step === "top_counting" || step === "bottom_counting";
+
+  let noticeMessage = calibrationError ?? pushupNoticeMessage ?? exercise.calibrationIntro;
+  if (isPushup && isStreaming && step !== "idle") {
+    noticeMessage = phase === "top" ? exercise.calibrationActiveTop : exercise.calibrationActiveBottom;
+  } else if (isStreaming) {
+    noticeMessage = exercise.calibrationActiveBottom;
   }
   if (isPoseError) {
-    noticeMessage = poseErrorMessage ?? TEXT.modelError;
+    noticeMessage = poseErrorMessage ?? "AI 자세 분석을 시작할 수 없습니다.";
+  }
+  if (pushupNoticeMessage) {
+    noticeMessage = pushupNoticeMessage;
+  }
+  if (capturedSide) {
+    noticeMessage = `${noticeMessage} 현재 ${capturedSide === "left" ? "왼쪽" : "오른쪽"} 측면 기준으로 측정 중입니다.`;
   }
 
   const handlePrimaryAction = () => {
-    if (isCalibrationComplete) {
-      markCalibrated(resolvedExerciseId);
-      navigate("/workout/camera");
+    if (calibrationComplete) {
+      navigate(`/workout/camera/${resolvedExerciseId}`);
       return;
     }
-
     if (isPoseError) {
       stopCamera();
       void requestCamera();
       return;
     }
-
     if (!isStreaming) {
+      if (isPushup) {
+        resetCalibration();
+        startCalibration();
+      }
       void requestCamera();
       return;
     }
-
-    setIsCalibrationComplete(true);
-    stopCamera();
+    if (!isPushup) {
+      setIsLegacyCalibrationComplete(true);
+      markCalibrated(resolvedExerciseId);
+      stopCamera();
+      return;
+    }
+    if (step === "idle") {
+      startCalibration();
+      return;
+    }
+    if (!hasPoseLandmarks || isCapturing || isSavingCalibration) {
+      return;
+    }
   };
 
-  const canCompleteCalibration = isStreaming && hasPoseLandmarks;
-  const actionLabel = resolveActionLabel({
-    isCalibrationComplete,
-    isStreaming,
-    canCompleteCalibration,
-    isPoseError,
-  });
-  const actionDisabled = !isCalibrationComplete && !isPoseError && isStreaming && !canCompleteCalibration;
+  const actionLabel = (() => {
+    if (calibrationComplete) {
+      return "다음";
+    }
+    if (isSavingCalibration) {
+      return "저장 중...";
+    }
+    if (isPoseError) {
+      return "다시 시도";
+    }
+    if (!isStreaming) {
+      return "자세 설정 시작";
+    }
+    if (isPushup) {
+      if (step === "idle") {
+        return "자세 설정 시작";
+      }
+      if (step === "transition_to_bottom") {
+        return "다음 단계 안내 중...";
+      }
+      if (step === "top_waiting" || step === "top_counting") {
+        return "탑 자세 자동 측정 중...";
+      }
+      if (step === "bottom_waiting" || step === "bottom_counting") {
+        return "바텀 자세 자동 측정 중...";
+      }
+    }
+    return "측정 중...";
+  })();
+
+  const actionDisabled = (
+    isSavingCalibration
+    || step === "transition_to_bottom"
+    || step === "top_waiting"
+    || step === "top_counting"
+    || step === "bottom_waiting"
+    || step === "bottom_counting"
+  );
 
   return (
     <div className="flex min-h-[100dvh] items-start justify-center bg-[#080A0D]">
       <div
-        className="flex w-full max-w-[430px] flex-col px-4 pb-7 pt-3"
+        className="flex w-full max-w-[960px] flex-col px-4 pb-7 pt-3"
         style={{ minHeight: "100dvh", backgroundColor: "#090B0E" }}
       >
         <header className="flex items-center justify-between pt-3">
@@ -154,23 +193,25 @@ export function RangeCalibrationPage() {
               <ArrowLeft size={23} />
             </button>
             <img
-              alt={TEXT.title}
+              alt={exercise.calibrationTitle}
               className="h-8 w-8 object-contain"
               decoding="async"
               height={32}
-              src={squatImg}
+              src={exercise.iconSrc}
               width={32}
             />
-            <h1 className="text-[18px] font-extrabold leading-none text-white">{TEXT.title}</h1>
+            <h1 className="text-[18px] font-extrabold leading-none text-white">{exercise.calibrationTitle}</h1>
           </div>
 
           <div className="rounded-full border-2 border-[#39F4D3] bg-[#102C28] px-4 py-[4px]">
-            <span className="text-[13px] font-bold text-[#3FFDD4]">{TEXT.minimum}</span>
+            <span className="text-[13px] font-bold text-[#3FFDD4]">
+              {isPushup ? `${phase === "top" ? "1" : "2"}/2 단계` : "최초 1회"}
+            </span>
           </div>
         </header>
 
         <main className="mt-4 flex flex-1 flex-col gap-4">
-          {isCalibrationComplete ? (
+          {calibrationComplete ? (
             <CalibrationCompleteStage />
           ) : (
             <CameraStage
@@ -179,11 +220,12 @@ export function RangeCalibrationPage() {
               cameraStatus={cameraStatus}
               isStreaming={isStreaming}
               noticeMessage={noticeMessage}
-              noticeTitle={TEXT.noticeTitle}
+              noticeTitle="관절 가동 범위 설정"
               onRequestCamera={requestCamera}
               hideStageButton
               idleIntroLine1="카메라 권한을 허용하면"
-              idleIntroLine2="스쿼트 가동 범위 분석이 시작됩니다."
+              idleIntroLine2={isPushup ? "푸쉬업 초기 범위 측정이 시작됩니다." : "스쿼트 가동 범위 분석이 시작됩니다."}
+              stageMinHeightClassName="min-h-[420px] md:min-h-[540px]"
               videoRef={videoRef}
             />
           )}
