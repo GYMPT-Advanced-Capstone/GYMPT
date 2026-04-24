@@ -207,13 +207,18 @@ class PushupFeedbackProcessor:
         return "mid"
 
     @staticmethod
-    def _resolve_warning(observation: dict[str, float]) -> tuple[str | None, str | None]:
+    def _resolve_warning(
+        observation: dict[str, float],
+    ) -> tuple[str | None, str | None]:
         hip_offset = observation["hipLineOffset"]
         if hip_offset >= PUSHUP_HIP_OFFSET_THRESHOLD:
             return "hip_sag", PUSHUP_SAG_MESSAGE
         if hip_offset <= -PUSHUP_HIP_OFFSET_THRESHOLD:
             return "hip_high", PUSHUP_PIKE_MESSAGE
-        if abs(180.0 - observation["bodyLineAngle"]) > PUSHUP_BODY_LINE_TOLERANCE_DEGREES:
+        if (
+            abs(180.0 - observation["bodyLineAngle"])
+            > PUSHUP_BODY_LINE_TOLERANCE_DEGREES
+        ):
             return "body_line_bad", PUSHUP_BODY_LINE_MESSAGE
         return None, None
 
@@ -317,7 +322,7 @@ class PushupFeedbackProcessor:
         ac = cls._distance(a, c)
         if ab == 0 or bc == 0:
             return 0.0
-        cos_value = ((ab ** 2) + (bc ** 2) - (ac ** 2)) / (2 * ab * bc)
+        cos_value = ((ab**2) + (bc**2) - (ac**2)) / (2 * ab * bc)
         cos_value = max(-1.0, min(1.0, cos_value))
         return degrees(acos(cos_value))
 

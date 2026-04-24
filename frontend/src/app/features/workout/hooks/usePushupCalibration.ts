@@ -129,7 +129,12 @@ export function usePushupCalibration({
   }, []);
 
   useEffect(() => {
-    resetCalibration();
+    const resetTimeout = window.setTimeout(() => {
+      resetCalibration();
+    }, 0);
+    return () => {
+      window.clearTimeout(resetTimeout);
+    };
   }, [exerciseId, resetCalibration]);
 
   useEffect(() => {
