@@ -11,11 +11,11 @@ class Settings(BaseSettings):
     MYSQL_SSL_VERIFY_CERT: bool = True
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    REDIS_HOST: str = "redis"
-    REDIS_PORT: int = 6379
+    REDIS_HOST: str
+    REDIS_PORT: int
     REDIS_PASSWORD: str
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
+    REFRESH_TOKEN_EXPIRE_DAYS: int
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
     MAIL_FROM: str
