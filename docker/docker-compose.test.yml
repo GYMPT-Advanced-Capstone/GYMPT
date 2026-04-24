@@ -21,6 +21,7 @@ services:
   redis-test:
     image: redis:alpine
     container_name: gympt_redis_test
+    command: redis-server --requirepass test_redis_password_for_swagger_only
     ports:
       - "6380:6379"
 
