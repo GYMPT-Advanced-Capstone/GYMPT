@@ -83,11 +83,11 @@ export function MainPage() {
 
   const handleExerciseClick = (exerciseId: string) => {
     if (calibratedExercises[exerciseId]) {
-      navigate(`/camera/${exerciseId}`);
+      navigate(`/workout/camera`);
     } else {
-      navigate(`/calibration/${exerciseId}`);
+      navigate(`/workout/calibration/${exerciseId}`);
     }
-  };
+};
 
   const todayProgress: Record<string, number> = {
     squat: 8,
