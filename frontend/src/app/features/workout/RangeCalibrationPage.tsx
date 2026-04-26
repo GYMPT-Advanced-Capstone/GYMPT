@@ -88,17 +88,19 @@ export function RangeCalibrationPage() {
   const isPoseError = poseStatus === "error";
   const isCapturing = step === "top_counting" || step === "bottom_counting";
 
-  let noticeMessage = calibrationError ?? pushupNoticeMessage ?? exercise.calibrationIntro;
-  if (isPushup && isStreaming && step !== "idle") {
+  let noticeMessage = exercise.calibrationIntro;
+  if (isPushup && pushupNoticeMessage) {
+    noticeMessage = pushupNoticeMessage;
+  } else if (isPushup && isStreaming && step !== "idle") {
     noticeMessage = phase === "top" ? exercise.calibrationActiveTop : exercise.calibrationActiveBottom;
   } else if (isStreaming) {
     noticeMessage = exercise.calibrationActiveBottom;
   }
+  if (calibrationError) {
+    noticeMessage = calibrationError;
+  }
   if (isPoseError) {
     noticeMessage = poseErrorMessage ?? "AI 자세 분석을 시작할 수 없습니다.";
-  }
-  if (pushupNoticeMessage) {
-    noticeMessage = pushupNoticeMessage;
   }
   if (capturedSide) {
     noticeMessage = `${noticeMessage} 현재 ${capturedSide === "left" ? "왼쪽" : "오른쪽"} 측면 기준으로 측정 중입니다.`;

@@ -277,7 +277,7 @@ class PushupFeedbackProcessor:
     def _resolve_representative_feedback(self, state: Any) -> tuple[str, str]:
         warning_counts = dict(state.current_rep_warning_counts or {})
         if state.current_rep_max_depth < PUSHUP_BOTTOM_GOOD_DEPTH:
-            warning_counts["depth_low"] = warning_counts.get("depth_low", 0) + 1
+            return "depth_low", PUSHUP_DEPTH_MESSAGE
 
         if not warning_counts:
             return "good", PUSHUP_GOOD_MESSAGE
@@ -290,7 +290,7 @@ class PushupFeedbackProcessor:
         }
         selected_code = sorted(
             warning_counts.items(),
-            key=lambda item: (-item[1], -priority.get(item[0], 0)),
+            key=lambda item: (-priority.get(item[0], 0), -item[1]),
         )[0][0]
         message_map = {
             "depth_low": PUSHUP_DEPTH_MESSAGE,

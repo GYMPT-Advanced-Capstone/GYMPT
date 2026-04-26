@@ -122,7 +122,16 @@ export function useWorkoutVoiceCoach({
     }
   }, [clearNotice, enabled, scheduleNoticeUpdate]);
 
-  const isLandmarkLost = enabled && (poseStatus === "error" || !hasPoseLandmarks);
+  useEffect(() => {
+    return () => {
+      clearNotice();
+      if (canSpeak()) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, [clearNotice]);
+
+  const isLandmarkLost = enabled && poseStatus === "ready" && !hasPoseLandmarks;
 
   useEffect(() => {
     if (!enabled) {
