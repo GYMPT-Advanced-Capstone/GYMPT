@@ -286,7 +286,7 @@ def update_exercise_goal(
         and data.threshold is None
     ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="수정할 항목을 하나 이상 입력해주세요.",
         )
     if data.daily_target_count is not None:
