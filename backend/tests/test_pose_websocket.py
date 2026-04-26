@@ -126,7 +126,7 @@ def test_pose_websocket_pushup_feedback_counts_and_sends_rep_summary():
             {
                 "type": "pose_landmarks",
                 "exerciseType": "pushup",
-                    "timestampMs": 1300,
+                "timestampMs": 1300,
                 "trackedLandmarks": {
                     "shoulder": {"x": 0.4, "y": 0.4},
                     "elbow": {"x": 0.5, "y": 0.42},
