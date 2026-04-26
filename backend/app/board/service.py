@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from pathlib import Path
 
@@ -6,13 +8,20 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.board import repository
-from app.board.models import Board, Comment
-from app.board.schemas import BoardDetailResponse, BoardResponse, CommentResponse
+from app.board.models import Board, BoardImage, Comment
+from app.board.schemas import (
+    BoardDetailResponse,
+    BoardImageResponse,
+    BoardResponse,
+    CommentResponse,
+)
 from app.users.models import User
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 BOARD_UPLOAD_DIR = BASE_DIR / "static" / "board"
+
+MAX_BOARD_IMAGES = 5
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 ALLOWED_CONTENT_TYPES = {
@@ -62,15 +71,28 @@ def _save_image_file(image: UploadFile) -> str:
     save_path = BOARD_UPLOAD_DIR / filename
 
     try:
-        with save_path.open("wb") as f:
+        with save_path.open("wb") as file_obj:
             while chunk := image.file.read(8192):
-                f.write(chunk)
+                file_obj.write(chunk)
     except Exception:
         if save_path.exists():
             save_path.unlink()
         raise
 
     return f"/static/board/{filename}"
+
+
+def _save_image_files(images: list[UploadFile]) -> list[str]:
+    saved_paths: list[str] = []
+
+    try:
+        for image in images:
+            saved_paths.append(_save_image_file(image))
+    except Exception:
+        _delete_image_files(saved_paths)
+        raise
+
+    return saved_paths
 
 
 def _delete_image_file(imgpath: str | None) -> None:
@@ -84,50 +106,131 @@ def _delete_image_file(imgpath: str | None) -> None:
         file_path.unlink()
 
 
+def _delete_image_files(imgpaths: list[str]) -> None:
+    for imgpath in imgpaths:
+        _delete_image_file(imgpath)
+
+
+def _normalize_upload_files(images: list[UploadFile] | None) -> list[UploadFile]:
+    if not images:
+        return []
+
+    return [image for image in images if image.filename]
+
+
+def _normalize_keep_image_ids(keep_image_ids: list[int] | None) -> list[int]:
+    if not keep_image_ids:
+        return []
+
+    result: list[int] = []
+    seen: set[int] = set()
+
+    for image_id in keep_image_ids:
+        if image_id not in seen:
+            seen.add(image_id)
+            result.append(image_id)
+
+    return result
+
+
+def _validate_max_image_count(count: int) -> None:
+    if count > MAX_BOARD_IMAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"게시글 이미지는 최대 {MAX_BOARD_IMAGES}장까지 업로드할 수 있습니다.",
+        )
+
+
+def _serialize_images(images: list[BoardImage]) -> list[BoardImageResponse]:
+    return [
+        BoardImageResponse(
+            image_id=image.image_id,
+            imgpath=image.imgpath,
+            sort_order=image.sort_order,
+        )
+        for image in images
+    ]
+
+
+def _serialize_images_summary(images: list[BoardImage]) -> list[BoardImageResponse]:
+    return _serialize_images(images[:1])
+
+
+def _to_board_response(
+    board: Board,
+    writer: str,
+    is_liked: bool,
+    comments_count: int,
+    *,
+    summary: bool = False,
+) -> BoardResponse:
+    images = (
+        _serialize_images_summary(board.images)
+        if summary
+        else _serialize_images(board.images)
+    )
+
+    return BoardResponse(
+        board_no=board.board_no,
+        title=board.title,
+        content=board.content,
+        images=images,
+        writer=writer,
+        likes=board.likes,
+        upload_date=board.upload_date,
+        is_liked=is_liked,
+        comments_count=comments_count,
+    )
+
+
+def _reorder_images(board: Board) -> None:
+    for index, image in enumerate(board.images, start=1):
+        image.sort_order = index
+
+
 def create_board_service(
     db: Session,
     current_user: User,
     title: str,
     content: str,
-    image: UploadFile | None = None,
-) -> Board:
-    imgpath = None
-    created_imgpath = None
+    images: list[UploadFile] | None = None,
+) -> BoardResponse:
+    upload_images = _normalize_upload_files(images)
+    _validate_max_image_count(len(upload_images))
 
-    if image is not None and image.filename:
-        created_imgpath = _save_image_file(image)
-        imgpath = created_imgpath
-
-    user_id = int(current_user.id)
+    saved_imgpaths = _save_image_files(upload_images)
 
     try:
-        return repository.create_board(
+        board = repository.create_board(
             db=db,
             title=title,
             content=content,
-            imgpath=imgpath,
-            writer_id=user_id,
+            writer_id=int(current_user.id),
+            image_paths=saved_imgpaths,
         )
-    except repository.BoardCommitError:
-        _delete_image_file(created_imgpath)
-        raise
-    except repository.BoardRefreshError:
-        raise
     except Exception:
-        _delete_image_file(created_imgpath)
+        _delete_image_files(saved_imgpaths)
         raise
+
+    return _to_board_response(
+        board=board,
+        writer=str(current_user.nickname),
+        is_liked=False,
+        comments_count=0,
+    )
 
 
 def update_board_service(
     db: Session,
     board_no: int,
     current_user: User,
-    title: str | None = None,
-    content: str | None = None,
-    image: UploadFile | None = None,
-    delete_image: bool = False,
-) -> Board:
-    board = repository.get_board_by_id(db, board_no)
+    title: str,
+    content: str,
+    keep_image_ids: list[int] | None = None,
+    new_images: list[UploadFile] | None = None,
+) -> BoardResponse:
+    board = repository.get_board_by_id_with_images(db=db, board_no=board_no)
+
     if board is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -140,43 +243,84 @@ def update_board_service(
             detail="본인이 작성한 게시글만 수정할 수 있습니다.",
         )
 
-    if image is not None and image.filename and delete_image:
+    upload_images = _normalize_upload_files(new_images)
+    keep_ids = _normalize_keep_image_ids(keep_image_ids)
+
+    current_images_by_id = {image.image_id: image for image in board.images}
+
+    invalid_keep_ids = [
+        image_id for image_id in keep_ids if image_id not in current_images_by_id
+    ]
+
+    if invalid_keep_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미지 업로드와 삭제를 동시에 요청할 수 없습니다.",
+            detail="유지 요청한 이미지 중 해당 게시글에 속하지 않은 이미지가 있습니다.",
         )
 
-    old_imgpath = board.imgpath
-    imgpath = old_imgpath
-    new_imgpath = None
+    final_image_count = len(keep_ids) + len(upload_images)
+    _validate_max_image_count(final_image_count)
 
-    if delete_image:
-        imgpath = None
-    elif image is not None and image.filename:
-        new_imgpath = _save_image_file(image)
-        imgpath = new_imgpath
+    keep_id_set = set(keep_ids)
+
+    images_to_keep = [image for image in board.images if image.image_id in keep_id_set]
+
+    images_to_delete = [
+        image for image in board.images if image.image_id not in keep_id_set
+    ]
+
+    delete_imgpaths = [image.imgpath for image in images_to_delete]
+
+    saved_imgpaths = _save_image_files(upload_images)
 
     try:
-        updated_board = repository.update_board(
+        board.title = title
+        board.content = content
+
+        for image in images_to_delete:
+            board.images.remove(image)
+            db.delete(image)
+
+        board.images[:] = images_to_keep
+
+        for imgpath in saved_imgpaths:
+            board.images.append(
+                BoardImage(
+                    imgpath=imgpath,
+                    sort_order=len(board.images) + 1,
+                )
+            )
+
+        _reorder_images(board)
+
+        updated_board = repository.update_board_with_images(
             db=db,
             board=board,
-            title=title,
-            content=content,
-            imgpath=imgpath,
         )
-    except repository.BoardCommitError:
-        _delete_image_file(new_imgpath)
-        raise
-    except repository.BoardRefreshError:
-        raise
+
     except Exception:
-        _delete_image_file(new_imgpath)
+        _delete_image_files(saved_imgpaths)
         raise
 
-    if delete_image or new_imgpath is not None:
-        _delete_image_file(old_imgpath)
+    _delete_image_files(delete_imgpaths)
 
-    return updated_board
+    is_liked = repository.is_board_liked_by_user(
+        db=db,
+        board_no=updated_board.board_no,
+        user_id=int(current_user.id),
+    )
+
+    comments_count = repository.get_comment_count_by_board_no(
+        db=db,
+        board_no=updated_board.board_no,
+    )
+
+    return _to_board_response(
+        board=updated_board,
+        writer=str(current_user.nickname),
+        is_liked=is_liked,
+        comments_count=comments_count,
+    )
 
 
 def list_boards_service(
@@ -189,16 +333,12 @@ def list_boards_service(
     )
 
     return [
-        BoardResponse(
-            board_no=board.board_no,
-            title=board.title,
-            content=board.content,
-            imgpath=board.imgpath,
+        _to_board_response(
+            board=board,
             writer=nickname,
-            likes=board.likes,
-            upload_date=board.upload_date,
             is_liked=is_liked,
             comments_count=comments_count,
+            summary=True,
         )
         for board, nickname, is_liked, comments_count in rows
     ]
@@ -218,40 +358,43 @@ def get_board_detail_service(
         )
 
     board, nickname = result
-    comment_rows = repository.get_comments_by_board_no(db=db, board_no=board_no)
-
-    is_liked = repository.is_board_liked_by_user(
-        db=db,
-        board_no=board_no,
-        user_id=int(current_user.id),
-    )
-    comments_count = repository.get_comment_count_by_board_no(
-        db=db,
-        board_no=board_no,
-    )
 
     comments = [
         CommentResponse(
             comment_no=comment.comment_no,
             content=comment.content,
             create_at=comment.create_at,
-            writer=comment_nickname,
+            writer=comment_writer,
             board_no=comment.board_no,
         )
-        for comment, comment_nickname in comment_rows
+        for comment, comment_writer in repository.get_comments_by_board_no(
+            db=db,
+            board_no=board_no,
+        )
     ]
+
+    is_liked = repository.is_board_liked_by_user(
+        db=db,
+        board_no=board_no,
+        user_id=int(current_user.id),
+    )
+
+    comments_count = repository.get_comment_count_by_board_no(
+        db=db,
+        board_no=board_no,
+    )
 
     return BoardDetailResponse(
         board_no=board.board_no,
         title=board.title,
         content=board.content,
-        imgpath=board.imgpath,
+        images=_serialize_images(board.images),
         writer=nickname,
         likes=board.likes,
         upload_date=board.upload_date,
-        comments=comments,
         is_liked=is_liked,
         comments_count=comments_count,
+        comments=comments,
     )
 
 
@@ -260,7 +403,7 @@ def delete_board_service(
     board_no: int,
     current_user: User,
 ) -> None:
-    board = repository.get_board_by_id(db, board_no)
+    board = repository.get_board_by_id_with_images(db=db, board_no=board_no)
 
     if board is None:
         raise HTTPException(
@@ -274,9 +417,11 @@ def delete_board_service(
             detail="본인이 작성한 게시글만 삭제할 수 있습니다.",
         )
 
-    old_imgpath = board.imgpath
+    image_paths = [image.imgpath for image in board.images]
+
     repository.delete_board(db=db, board=board)
-    _delete_image_file(old_imgpath)
+
+    _delete_image_files(image_paths)
 
 
 def toggle_board_like_service(
@@ -285,6 +430,7 @@ def toggle_board_like_service(
     current_user: User,
 ) -> tuple[Board, bool]:
     board = repository.get_board_by_id(db, board_no)
+
     if board is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -304,22 +450,13 @@ def toggle_board_like_service(
                 writer_id=int(current_user.id),
                 board_no=board_no,
             )
-            repository.increment_board_likes(
-                db=db,
-                board_no=board_no,
-            )
+            repository.increment_board_likes(db=db, board_no=board_no)
             liked = True
         else:
-            deleted_rows = repository.delete_like(
-                db=db,
-                like=existing_like,
-            )
+            deleted_rows = repository.delete_like(db=db, like=existing_like)
 
             if deleted_rows > 0:
-                repository.decrement_board_likes(
-                    db=db,
-                    board_no=board_no,
-                )
+                repository.decrement_board_likes(db=db, board_no=board_no)
 
             liked = False
 
@@ -345,7 +482,8 @@ def create_comment_service(
     current_user: User,
     content: str,
 ) -> Comment:
-    board = repository.get_board_by_id(db, board_no)
+    board = repository.get_board_by_id(db=db, board_no=board_no)
+
     if board is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -366,7 +504,8 @@ def update_comment_service(
     current_user: User,
     content: str,
 ) -> Comment:
-    comment = repository.get_comment_by_id(db, comment_no)
+    comment = repository.get_comment_by_id(db=db, comment_no=comment_no)
+
     if comment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -391,7 +530,8 @@ def delete_comment_service(
     comment_no: int,
     current_user: User,
 ) -> None:
-    comment = repository.get_comment_by_id(db, comment_no)
+    comment = repository.get_comment_by_id(db=db, comment_no=comment_no)
+
     if comment is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -404,7 +544,4 @@ def delete_comment_service(
             detail="본인이 작성한 댓글만 삭제할 수 있습니다.",
         )
 
-    repository.delete_comment(
-        db=db,
-        comment=comment,
-    )
+    repository.delete_comment(db=db, comment=comment)
