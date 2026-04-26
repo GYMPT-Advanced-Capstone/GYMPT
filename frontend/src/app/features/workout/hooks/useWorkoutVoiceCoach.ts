@@ -4,7 +4,6 @@ interface UseWorkoutVoiceCoachParams {
   enabled: boolean;
   hasPoseLandmarks: boolean;
   poseStatus: string;
-  fullRepCount: number;
   goalCount: number;
   repEvent: {
     count: number;

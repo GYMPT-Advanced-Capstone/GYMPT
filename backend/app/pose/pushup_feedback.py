@@ -146,7 +146,13 @@ class PushupFeedbackProcessor:
         hip = self._point(tracked_landmarks.get("hip"))
         ankle = self._point(tracked_landmarks.get("ankle"))
 
-        if not all([shoulder, elbow, wrist, hip, ankle]):
+        if (
+            shoulder is None
+            or elbow is None
+            or wrist is None
+            or hip is None
+            or ankle is None
+        ):
             return None
 
         elbow_angle = self._angle(shoulder, elbow, wrist)
@@ -226,7 +232,7 @@ class PushupFeedbackProcessor:
         self,
         state: Any,
         observation: dict[str, float],
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         calibration = state.calibration_metrics
         average_body_line = observation["bodyLineAngle"]
         if state.current_rep_body_line_samples > 0:
