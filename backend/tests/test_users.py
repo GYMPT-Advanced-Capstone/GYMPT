@@ -411,3 +411,48 @@ def test_update_exercise_goal_invalid_threshold(
     )
 
     assert response.status_code == 422
+
+
+# PATCH /me/body
+def test_update_body_success(client, mock_redis_client, access_token, fake_user):
+    test_client, mock_db = client
+    mock_redis_client.get.return_value = None
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+
+    response = test_client.patch(
+        "/api/v1/users/me/body",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"height": 175, "weight": 70},
+    )
+
+    assert response.status_code == 200
+    assert fake_user.height == 175
+    assert fake_user.weight == 70
+
+
+def test_update_body_user_not_found(client, mock_redis_client, access_token):
+    test_client, mock_db = client
+    mock_redis_client.get.return_value = None
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    response = test_client.patch(
+        "/api/v1/users/me/body",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"height": 175, "weight": 70},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "유저를 찾을 수 없습니다."
+
+
+def test_update_body_invalid_range(client, mock_redis_client, access_token):
+    test_client, _ = client
+    mock_redis_client.get.return_value = None
+
+    response = test_client.patch(
+        "/api/v1/users/me/body",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={"height": 50, "weight": 70},
+    )
+
+    assert response.status_code == 422
