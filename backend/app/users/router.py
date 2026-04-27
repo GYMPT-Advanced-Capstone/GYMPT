@@ -9,7 +9,12 @@ from app.core.database import get_db
 from app.exercise.exercise_model import Exercise
 from app.exercise_record.exercise_record_model import ExerciseRecord
 from app.users.models import User, UserExerciseGoal
-from app.users.schemas import BirthDateUpdate, UserResponse, WeeklyTargetUpdate
+from app.users.schemas import (
+    BirthDateUpdate,
+    BodyUpdate,
+    UserResponse,
+    WeeklyTargetUpdate,
+)
 from app.users.dto.user_request import (
     ExerciseGoalCreateRequest,
     ExerciseGoalUpdateRequest,
@@ -187,6 +192,30 @@ def update_weekly_target(
             status_code=status.HTTP_404_NOT_FOUND, detail="유저를 찾을 수 없습니다."
         )
     user.weekly_target = data.weekly_target  # type: ignore[assignment]
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.patch(
+    "/me/body",
+    response_model=UserResponse,
+    summary="키, 체중 수정",
+    description="로그인한 사용자의 키와 체중을 수정합니다.",
+)
+def update_body(
+    data: BodyUpdate,
+    token_data: tuple[str, str] = Depends(verify_access_token),
+    db: Session = Depends(get_db),
+):
+    email, _ = token_data
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="유저를 찾을 수 없습니다."
+        )
+    user.height = data.height  # type: ignore[assignment]
+    user.weight = data.weight  # type: ignore[assignment]
     db.commit()
     db.refresh(user)
     return user

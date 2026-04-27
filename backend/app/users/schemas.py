@@ -42,6 +42,16 @@ class UserResponse(UserBase):
         description="주간 운동 목표 횟수",
         json_schema_extra={"example": 3},
     )
+    height: int | None = Field(
+        default=None,
+        description="키 (cm)",
+        json_schema_extra={"example": 170},
+    )
+    weight: int | None = Field(
+        default=None,
+        description="몸무게 (kg)",
+        json_schema_extra={"example": 65},
+    )
     created_at: datetime = Field(
         ...,
         description="가입일시",
@@ -64,4 +74,21 @@ class WeeklyTargetUpdate(BaseModel):
         le=7,
         description="주간 운동 목표 횟수 (1~7)",
         json_schema_extra={"example": 3},
+    )
+
+
+class BodyUpdate(BaseModel):
+    height: int = Field(
+        ...,
+        ge=100,
+        le=220,
+        description="키 (cm)",
+        json_schema_extra={"example": 170},
+    )
+    weight: int = Field(
+        ...,
+        ge=30,
+        le=200,
+        description="몸무게 (kg)",
+        json_schema_extra={"example": 65},
     )
