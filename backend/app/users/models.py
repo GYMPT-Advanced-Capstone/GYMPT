@@ -25,6 +25,8 @@ class User(Base):
     nickname = Column(String(100), unique=True, nullable=False)
     birth_date = Column(Date, nullable=True)
     weekly_target = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    weight = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     exercise_records = relationship("ExerciseRecord", back_populates="user")
