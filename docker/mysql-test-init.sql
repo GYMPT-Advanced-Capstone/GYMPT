@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS `exercises` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+/* "email": "user@example.com",
+      "pw": "password123" */
 INSERT INTO `user` (`email`, `pw`, `name`, `nickname`, `birth_date`, `weekly_target`)
 SELECT
   'user@example.com',

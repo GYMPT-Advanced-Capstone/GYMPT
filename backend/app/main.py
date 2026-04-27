@@ -55,11 +55,6 @@ app.add_middleware(
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
-
-
 app.include_router(exercise_router)
 app.include_router(exercise_calibration_router)
 app.include_router(exercise_record_router)

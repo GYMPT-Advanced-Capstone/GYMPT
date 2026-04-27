@@ -4,6 +4,7 @@ import { useGoal } from '../../context/GoalContext';
 import { BottomNav } from '../../components/BottomNav';
 import { Trophy, TrendingUp, Zap } from 'lucide-react';
 import { userApi, localExerciseGoalStorage, type UserProfile } from '../../api/userApi';
+import { workoutApi } from '../../api/workoutApi';
 
 import squatImg from '../../../assets/exercises/squat.png';
 import pushupImg from '../../../assets/exercises/pushup.png';
@@ -24,6 +25,13 @@ const exercises = [
   { id: 'plank',  name: '플랭크', img: plankImg, desc: '코어 강화' },
 ];
 
+const EXERCISE_ID_MAP: Record<string, number> = {
+  pushup: 1,
+  squat: 2,
+  lunge: 3,
+  plank: 4,
+};
+
 const weeklyData = [
   { day: '월', done: true },
   { day: '화', done: true },
@@ -43,7 +51,7 @@ const badges = [
 
 export function MainPage() {
   const navigate = useNavigate();
-  const { goal, calibratedExercises } = useGoal();
+  const { goal, calibratedExercises, markCalibrated } = useGoal();
   const { exerciseCounts } = goal;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -81,13 +89,26 @@ export function MainPage() {
   const getExerciseTarget = (id: string): number =>
     localCounts[id] ?? exerciseCounts[id as keyof typeof exerciseCounts];
 
-  const handleExerciseClick = (exerciseId: string) => {
+  const handleExerciseClick = async (exerciseId: string) => {
     if (calibratedExercises[exerciseId]) {
-      navigate(`/workout/camera`);
-    } else {
+      navigate(`/workout/camera/${exerciseId}`);
+      return;
+    }
+
+    const backendExerciseId = EXERCISE_ID_MAP[exerciseId];
+    if (!backendExerciseId) {
+      navigate(`/workout/calibration/${exerciseId}`);
+      return;
+    }
+
+    try {
+      await workoutApi.getLatestCalibration(backendExerciseId);
+      markCalibrated(exerciseId);
+      navigate(`/workout/camera/${exerciseId}`);
+    } catch {
       navigate(`/workout/calibration/${exerciseId}`);
     }
-};
+  };
 
   const todayProgress: Record<string, number> = {
     squat: 8,
