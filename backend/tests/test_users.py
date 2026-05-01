@@ -428,6 +428,8 @@ def test_update_body_success(client, mock_redis_client, access_token, fake_user)
     assert response.status_code == 200
     assert fake_user.height == 175
     assert fake_user.weight == 70
+    assert response.json()["height"] == 175
+    assert response.json()["weight"] == 70
 
 
 def test_update_body_user_not_found(client, mock_redis_client, access_token):
