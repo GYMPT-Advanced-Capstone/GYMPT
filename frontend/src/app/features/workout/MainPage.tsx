@@ -19,10 +19,10 @@ const EXERCISE_KEY_MAP: Record<string, string> = {
 };
 
 const exercises = [
-  { id: 'squat',  name: '스쿼트', img: squatImg, desc: '하체 강화' },
-  { id: 'pushup', name: '푸시업', img: pushupImg, desc: '상체 강화' },
-  { id: 'lunge',  name: '런지',   img: lungeImg, desc: '균형·하체' },
-  { id: 'plank',  name: '플랭크', img: plankImg, desc: '코어 강화' },
+  { id: 'squat',  name: '스쿼트', img: squatImg,  desc: '하체 강화', imgScale: 1.55, imgX:  -9, imgY: -10 },
+  { id: 'pushup', name: '푸시업', img: pushupImg, desc: '상체 강화', imgScale: 2.40, imgX: -20, imgY: -25 },
+  { id: 'lunge',  name: '런지',   img: lungeImg,  desc: '균형·하체', imgScale: 2.40, imgX: -30, imgY: -30 },
+  { id: 'plank',  name: '플랭크', img: plankImg,  desc: '코어 강화', imgScale: 2.20, imgX: -11, imgY: -20 },
 ];
 
 const EXERCISE_ID_MAP: Record<string, number> = {
@@ -245,10 +245,13 @@ export function MainPage() {
                     src={ex.img}
                     alt={ex.name}
                     style={{
-                      width: 58,
-                      height: 58,
+                      width: 60,
+                      height: 60,
                       objectFit: 'contain',
-                      marginBottom: 10
+                      marginTop: -14,
+                      marginBottom: 32,
+                      transform: `translate(${ex.imgX}px, ${ex.imgY}px) scale(${ex.imgScale})`,
+                      transformOrigin: 'top left',
                     }}
                   />
                   <p style={{ color: '#FFFFFF', fontSize: 15, fontWeight: 700, marginBottom: 2 }}>{ex.name}</p>
