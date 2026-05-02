@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { User, Lock } from 'lucide-react';
 import { useGoal } from '../../context/GoalContext';
 import { authApi, tokenStorage } from '../../api/authApi';
-import { userApi, onboardingStorage, localExerciseGoalStorage } from '../../api/userApi';
+import { userApi, onboardingStorage } from '../../api/userApi';
 
 const HERO_IMAGE =
   'https://images.unsplash.com/photo-1603665409265-bdc00027c217?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmaXRuZXNzJTIwZ3ltJTIwZGFyayUyMHRyYWluaW5nfGVufDF8fHx8MTc3NDE3OTQ4M3ww&ixlib=rb-4.1.0&q=80&w=1080';
@@ -41,15 +41,10 @@ export function LoginPage() {
           return;
         }
 
-        const localGoals = localExerciseGoalStorage.load();
-        if (localGoals.length > 0) {
-          navigate('/main');
-          return;
-        }
-
         try {
           const summary = await userApi.getSummary();
           if (summary && summary.exercise_goals.length > 0) {
+            onboardingStorage.setDone(profile.id);
             navigate('/main');
           } else {
             navigate('/goal/birthday');
