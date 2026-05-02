@@ -36,11 +36,6 @@ export function LoginPage() {
         tokenStorage.setUserName(profile.name);
         setUserName(profile.name);
 
-        if (onboardingStorage.isDone(profile.id)) {
-          navigate('/main');
-          return;
-        }
-
         try {
           const summary = await userApi.getSummary();
           if (summary && summary.exercise_goals.length > 0) {
@@ -50,7 +45,11 @@ export function LoginPage() {
             navigate('/goal/birthday');
           }
         } catch {
-          navigate('/goal/birthday');
+          if (onboardingStorage.isDone(profile.id)) {
+            navigate('/main');
+          } else {
+            navigate('/goal/birthday');
+          }
         }
       } catch {
         setUserName(id.trim());
