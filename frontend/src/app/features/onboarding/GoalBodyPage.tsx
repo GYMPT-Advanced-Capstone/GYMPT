@@ -18,6 +18,7 @@ export function GoalBodyPage() {
     try {
       await userApi.updateBody(heightNum, weightNum);
     } catch {
+      // ignore error
     }
     navigate('/goal/weekly');
   };
