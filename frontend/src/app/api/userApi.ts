@@ -7,6 +7,8 @@ export interface UserProfile {
   nickname: string;
   birth_date: string | null;
   weekly_target: number | null;
+  height: number | null;
+  weight: number | null;
   created_at: string;
 }
 
@@ -52,10 +54,10 @@ export interface ExerciseGoalUpdateRequest {
 }
 
 export interface LocalExerciseGoal {
-  exercise_key: string;   // 'squat' | 'lunge' | 'pushup' | 'plank'
-  exercise_name: string;  // '스쿼트' | '런지' | '푸시업' | '플랭크'
+  exercise_key: string;
+  exercise_name: string;
   target: number;
-  unit: string;           // '개' | '초'
+  unit: string;
 }
 
 const EXERCISE_DISPLAY: Record<string, { name: string; unit: string }> = {
@@ -135,6 +137,13 @@ export const userApi = {
     request<UserProfile>(
       '/api/v1/users/me/weekly-target',
       { method: 'PATCH', body: JSON.stringify({ weekly_target }) },
+      true,
+    ),
+
+  updateBody: (height: number, weight: number) =>
+    request<UserProfile>(
+      '/api/v1/users/me/body',
+      { method: 'PATCH', body: JSON.stringify({ height, weight }) },
       true,
     ),
 
