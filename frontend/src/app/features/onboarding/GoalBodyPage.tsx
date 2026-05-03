@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GoalLayout } from './components/GoalLayout';
 import { ScrollPicker } from './components/ScrollPicker';
-import { bodyStorage } from '../../api/userApi';
+import { bodyStorage, userApi } from '../../api/userApi';
 
 const HEIGHT_ITEMS = Array.from({ length: 121 }, (_, i) => `${100 + i}cm`);
 const WEIGHT_ITEMS = Array.from({ length: 171 }, (_, i) => `${30 + i}kg`);
@@ -13,8 +13,13 @@ export function GoalBodyPage() {
   const [heightNum, setHeightNum] = useState(saved?.height ?? 170);
   const [weightNum, setWeightNum] = useState(saved?.weight ?? 65);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     bodyStorage.save({ height: heightNum, weight: weightNum });
+    try {
+      await userApi.updateBody(heightNum, weightNum);
+    } catch {
+      // ignore error
+    }
     navigate('/goal/weekly');
   };
 
