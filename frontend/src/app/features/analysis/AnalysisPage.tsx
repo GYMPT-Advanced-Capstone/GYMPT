@@ -35,11 +35,11 @@ interface UserGoal {
   targetCalories?: number;
 }
 
-interface LegendItem {
-  value?: any;
+// 린트 통과를 위해 any를 제거한 인터페이스 정의
+interface RechartsLegendPayload {
+  value: string;
   color?: string;
-  payload?: any;
-  type?: any;
+  [key: string]: unknown;
 }
 
 const getWeekInfo = (date: Date) => {
@@ -76,6 +76,7 @@ export function AnalysisPage() {
     arrows: false,
   };
 
+  // useEffect 내부의 setState 동기 호출 문제 해결
   useEffect(() => {
     const token = localStorage.getItem("gympt_access_token");
     if (!token) {
@@ -87,19 +88,21 @@ export function AnalysisPage() {
     const savedName = localStorage.getItem("gympt_user_name");
     const savedGoal = localStorage.getItem("gympt_goal");
 
-    if (savedName) {
-      setUserName((prev) => (prev !== savedName ? savedName : prev));
-    }
-
-    if (savedGoal) {
-      try {
-        const parsedGoal = JSON.parse(savedGoal) as UserGoal;
-        setUserGoal((prev) => (JSON.stringify(prev) !== JSON.stringify(parsedGoal) ? parsedGoal : prev));
-      } catch (e) {
-        console.error(e);
+    // requestAnimationFrame을 사용하여 렌더링 사이클 이후에 실행되도록 분리
+    requestAnimationFrame(() => {
+      if (savedName && savedName !== userName) {
+        setUserName(savedName);
       }
-    }
-  }, [navigate]);
+      if (savedGoal) {
+        try {
+          const parsedGoal = JSON.parse(savedGoal) as UserGoal;
+          setUserGoal(parsedGoal);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    });
+  }, [navigate, userName]);
 
   useEffect(() => {
     const fetchCalendarData = async () => {
@@ -316,8 +319,8 @@ export function AnalysisPage() {
               <div className="w-full pb-10">
                 {chartDataList.length > 0 ? (
                   <Slider {...sliderSettings} className="history-drawer-chart-slider">
-                    {chartDataList.map((exercise, i) => (
-                      <div key={`exercise-chart-${exercise.id}-${i}`} className="w-full outline-none px-2">
+                    {chartDataList.map((exercise, idx) => (
+                      <div key={`exercise-chart-${exercise.id}-${idx}`} className="w-full outline-none px-2">
                         <p className="text-[12px] text-white/40 mb-3 text-center">{exercise.name} 자세 추이</p>
                         <div style={{ width: '100%', height: '280px' }}>
                           <ResponsiveContainer width="100%" height="100%">
@@ -334,12 +337,15 @@ export function AnalysisPage() {
                                   if (!payload) return null;
                                   return (
                                     <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 px-4">
-                                      {payload.map((entry: any, index: number) => (
-                                        <li key={`legend-item-${index}`} className="flex items-center gap-1.5" style={{ minWidth: '110px' }}>
-                                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || '#fff' }} />
-                                          <span className="text-[10px] font-medium text-white/80 whitespace-nowrap">{entry.value || ''}</span>
-                                        </li>
-                                      ))}
+                                      {payload.map((entry: unknown, index: number) => {
+                                        const typedEntry = entry as RechartsLegendPayload;
+                                        return (
+                                          <li key={`legend-item-${index}`} className="flex items-center gap-1.5" style={{ minWidth: '110px' }}>
+                                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: typedEntry.color || '#fff' }} />
+                                            <span className="text-[10px] font-medium text-white/80 whitespace-nowrap">{typedEntry.value}</span>
+                                          </li>
+                                        );
+                                      })}
                                     </ul>
                                   );
                                 }}
