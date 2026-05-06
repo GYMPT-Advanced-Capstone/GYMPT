@@ -1,0 +1,39 @@
+services:
+  frontend:
+    image: gympt-frontend
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+      - VITE_WS_URL=${VITE_WS_URL}
+    depends_on:
+      - backend
+
+  backend:
+    image: gympt-backend
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - SECRET_KEY=${SECRET_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    container_name: gympt_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}

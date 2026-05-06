@@ -6,13 +6,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { BottomNav } from "../../components/BottomNav";
 import axios from "axios";
 
-// 🚨 슬라이더 라이브러리 및 CSS
+// 🚨 슬라이더 이름을 Slider로 통일
 import Slider from "react-slick";
-const SliderComponent = (Slider as any).default || Slider;
 import "slick-carousel/slick/slick.css"; 
 import "slick-carousel/slick/slick-theme.css";
 
-// 인터페이스 정의 (서버 응답 데이터 구조)
+// 인터페이스 정의
 interface ExerciseRecord {
   id: number;
   exercise_name: string;
@@ -34,6 +33,11 @@ interface ExerciseRecord {
   };
 }
 
+interface UserGoal {
+  weeklyFrequency: number;
+  targetCalories?: number;
+}
+
 const getWeekInfo = (date: Date) => {
   const targetDate = new Date(date);
   targetDate.setHours(0, 0, 0, 0);
@@ -53,7 +57,7 @@ export function AnalysisPage() {
 
   const [exercisedDates, setExercisedDates] = useState<number[]>([]);
   const [dailyRecords, setDailyRecords] = useState<ExerciseRecord[]>([]);
-  const [userGoal, setUserGoal] = useState<any>(null);
+  const [userGoal, setUserGoal] = useState<UserGoal | null>(null);
   const [userName, setUserName] = useState("사용자");
 
   const viewYear = currentDate.getFullYear();
@@ -72,16 +76,26 @@ export function AnalysisPage() {
     const token = localStorage.getItem("gympt_access_token");
     const name = localStorage.getItem("gympt_user_name");
     const goal = localStorage.getItem("gympt_goal");
+    
     if (!token) {
       alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
       navigate("/");
       return;
     }
-    if (name) setUserName(name);
-    if (goal) {
-      try { setUserGoal(JSON.parse(goal)); } catch (e) { console.error("Goal 파싱 에러", e); }
+
+    if (name && name !== userName) {
+      setUserName(name);
     }
-  }, [navigate]);
+    
+    if (goal && !userGoal) {
+      try { 
+        const parsedGoal = JSON.parse(goal);
+        setUserGoal(parsedGoal); 
+      } catch (e) { 
+        console.error("Goal 파싱 에러", e); 
+      }
+    }
+  }, [navigate, userName, userGoal]);
 
   useEffect(() => {
     const fetchCalendarData = async () => {
@@ -91,10 +105,7 @@ export function AnalysisPage() {
           params: { year: viewYear, month: viewMonth },
           headers: { Authorization: `Bearer ${token}` }
         });
-
-        const dates = response.data.exercised_dates.map((d: string) => 
-          parseInt(d.split("-")[2])
-        );
+        const dates = response.data.exercised_dates.map((d: string) => parseInt(d.split("-")[2]));
         setExercisedDates(dates);
       } catch (error) {
         console.error("캘린더 데이터 조회 실패:", error);
@@ -112,12 +123,11 @@ export function AnalysisPage() {
       const response = await axios.get(`/api/exercise-records/${targetDateStr}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      setDailyRecords(response.data);  
+      setDailyRecords(response.data);
       setIsDrawerOpen(true);
     } catch (error) {
       console.error("상세 기록 조회 실패:", error);
-      setDailyRecords([]);  
+      setDailyRecords([]);
       setIsDrawerOpen(true);
     }
   };
@@ -132,7 +142,7 @@ export function AnalysisPage() {
     return dailyRecords.map((record) => {
       const COLORS = {
         elbow: { user: "#00FFB2", ideal: "#80FFD9" },
-        hip: { user: "#BF78FF", ideal: "#D9AFFF" }  
+        hip: { user: "#BF78FF", ideal: "#D9AFFF" }
       };
 
       let bars = [
@@ -283,7 +293,6 @@ export function AnalysisPage() {
           </motion.div>
         </div>
 
-        {/* 상세 분석 드로어 */}
         <div style={{ display: isDrawerOpen ? 'flex' : 'none', position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setIsDrawerOpen(false)}>
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-[#1E1E1E] w-full max-w-[390px] mx-auto h-[75vh] rounded-t-[32px] p-6 flex flex-col shadow-2xl border-t border-white/10 overflow-hidden">
             <div className="w-10 h-1 bg-white/20 rounded-full self-center mb-6" />
@@ -299,10 +308,10 @@ export function AnalysisPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto hide-scrollbar">
-              <div className="flex items-center gap-2 mb-4"><Activity size={16} className="text-[#FFB000]" /><h4 className="text-[15px] font-semibold">운동별 자세 분석</h4></div>
+              <div className="flex items-center gap-2 mb-4"><Activity size={16} className="text-[#FFB000]" /><h4 className="text-[15px] font-semibold">운동별 자세 분석 (5일 비교)</h4></div>
               <div className="w-full pb-10">
                 {chartDataList.length > 0 ? (
-                  <SliderComponent {...sliderSettings} className="history-drawer-chart-slider">
+                  <Slider {...sliderSettings} className="history-drawer-chart-slider">
                     {chartDataList.map((exercise, i) => (
                       <div key={`drawer-slide-${exercise.id}-${i}`} className="w-full outline-none px-2">
                         <p className="text-[12px] text-white/40 mb-3 text-center">{exercise.name} 자세 추이</p>
@@ -316,16 +325,19 @@ export function AnalysisPage() {
                               <Legend 
                                 verticalAlign="bottom" align="center" iconSize={8} iconType="circle"
                                 wrapperStyle={{ paddingTop: '30px', width: '100%', left: 0, display: 'flex', justifyContent: 'center' }} 
-                                content={(props) => (
-                                  <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 px-4">
-                                    {props.payload?.map((entry: any, index: number) => (
-                                      <li key={`item-${index}`} className="flex items-center gap-1.5" style={{ minWidth: '110px' }}>
-                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                        <span className="text-[10px] font-medium text-white/80 whitespace-nowrap">{entry.value}</span>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
+                                content={(props) => {
+                                  const { payload } = props;
+                                  return (
+                                    <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 px-4">
+                                      {payload?.map((entry: any, index: number) => (
+                                        <li key={`item-${index}`} className="flex items-center gap-1.5" style={{ minWidth: '110px' }}>
+                                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                          <span className="text-[10px] font-medium text-white/80 whitespace-nowrap">{entry.value}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  );
+                                }}
                               />
                               {exercise.bars.map((bar) => (
                                 <Bar key={bar.key} dataKey={bar.key} name={bar.name} fill={bar.fill} radius={[2, 2, 0, 0]} barSize={10} />
@@ -335,7 +347,7 @@ export function AnalysisPage() {
                         </div>
                       </div>
                     ))}
-                  </SliderComponent>
+                  </Slider>
                 ) : (
                   <div className="w-full py-10 text-center text-white/30 text-[14px]">기록된 데이터가 없습니다.</div>
                 )}
@@ -367,7 +379,7 @@ function DetailRow({ label, value, valueColor }: { label: string, value: string,
   );
 }
 
-function AnimatedProgressBar({ label, percent, gradientFrom, gradientTo, delay }: any) {
+function AnimatedProgressBar({ label, percent, gradientFrom, gradientTo, delay }: { label: string, percent: number, gradientFrom: string, gradientTo: string, delay: number }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex justify-between">
