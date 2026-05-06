@@ -5,13 +5,10 @@ import { useNavigate } from "react-router";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { BottomNav } from "../../components/BottomNav";
 import axios from "axios";
-
-// 🚨 슬라이더 이름을 Slider로 통일
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css"; 
 import "slick-carousel/slick/slick-theme.css";
 
-// 인터페이스 정의
 interface ExerciseRecord {
   id: number;
   exercise_name: string;
@@ -36,6 +33,13 @@ interface ExerciseRecord {
 interface UserGoal {
   weeklyFrequency: number;
   targetCalories?: number;
+}
+
+interface LegendItem {
+  value?: any;
+  color?: string;
+  payload?: any;
+  type?: any;
 }
 
 const getWeekInfo = (date: Date) => {
@@ -74,28 +78,28 @@ export function AnalysisPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("gympt_access_token");
-    const name = localStorage.getItem("gympt_user_name");
-    const goal = localStorage.getItem("gympt_goal");
-    
     if (!token) {
       alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
       navigate("/");
       return;
     }
 
-    if (name && name !== userName) {
-      setUserName(name);
+    const savedName = localStorage.getItem("gympt_user_name");
+    const savedGoal = localStorage.getItem("gympt_goal");
+
+    if (savedName) {
+      setUserName((prev) => (prev !== savedName ? savedName : prev));
     }
-    
-    if (goal && !userGoal) {
-      try { 
-        const parsedGoal = JSON.parse(goal);
-        setUserGoal(parsedGoal); 
-      } catch (e) { 
-        console.error("Goal 파싱 에러", e); 
+
+    if (savedGoal) {
+      try {
+        const parsedGoal = JSON.parse(savedGoal) as UserGoal;
+        setUserGoal((prev) => (JSON.stringify(prev) !== JSON.stringify(parsedGoal) ? parsedGoal : prev));
+      } catch (e) {
+        console.error(e);
       }
     }
-  }, [navigate, userName, userGoal]);
+  }, [navigate]);
 
   useEffect(() => {
     const fetchCalendarData = async () => {
@@ -105,10 +109,10 @@ export function AnalysisPage() {
           params: { year: viewYear, month: viewMonth },
           headers: { Authorization: `Bearer ${token}` }
         });
-        const dates = response.data.exercised_dates.map((d: string) => parseInt(d.split("-")[2]));
+        const dates = response.data.exercised_dates.map((d: string) => parseInt(d.split("-")[2], 10));
         setExercisedDates(dates);
       } catch (error) {
-        console.error("캘린더 데이터 조회 실패:", error);
+        console.error(error);
       }
     };
     fetchCalendarData();
@@ -126,7 +130,7 @@ export function AnalysisPage() {
       setDailyRecords(response.data);
       setIsDrawerOpen(true);
     } catch (error) {
-      console.error("상세 기록 조회 실패:", error);
+      console.error(error);
       setDailyRecords([]);
       setIsDrawerOpen(true);
     }
@@ -259,7 +263,7 @@ export function AnalysisPage() {
                 const isExercised = exercisedDates.includes(date);
                 const isToday = now.getFullYear() === viewYear && (now.getMonth() + 1) === viewMonth && now.getDate() === date;
                 return (
-                  <button key={date} onClick={() => handleDateClick(date)} className="relative h-10 flex flex-col items-center justify-center">
+                  <button key={`cal-date-${date}`} onClick={() => handleDateClick(date)} className="relative h-10 flex flex-col items-center justify-center">
                     <div className={`w-8 h-8 flex items-center justify-center rounded-full text-[14px] transition-all
                       ${isSelected ? 'bg-gradient-to-br from-[#00FFB2] to-[#00CC8E] text-[#111] font-bold shadow-lg scale-110' : 
                         isToday ? 'border border-[#00FFB2] text-[#00FFB2]' : 'text-gray-300'}`}>
@@ -303,7 +307,7 @@ export function AnalysisPage() {
               <DetailRow label="총 운동 시간" value={`${Math.floor(daySummary.duration / 60)}분 ${daySummary.duration % 60}초`} valueColor="text-[#00FFB2]" />
               <DetailRow label="평균 점수" value={`${daySummary.score}점`} valueColor="text-[#5C9DFF]" />
               {daySummary.exerciseCounts.map((item, idx) => (
-                <DetailRow key={`count-${idx}`} label={item.label} value={item.value} valueColor="text-[#BF78FF]" />
+                <DetailRow key={`count-row-${idx}`} label={item.label} value={item.value} valueColor="text-[#BF78FF]" />
               ))}
             </div>
 
@@ -313,7 +317,7 @@ export function AnalysisPage() {
                 {chartDataList.length > 0 ? (
                   <Slider {...sliderSettings} className="history-drawer-chart-slider">
                     {chartDataList.map((exercise, i) => (
-                      <div key={`drawer-slide-${exercise.id}-${i}`} className="w-full outline-none px-2">
+                      <div key={`exercise-chart-${exercise.id}-${i}`} className="w-full outline-none px-2">
                         <p className="text-[12px] text-white/40 mb-3 text-center">{exercise.name} 자세 추이</p>
                         <div style={{ width: '100%', height: '280px' }}>
                           <ResponsiveContainer width="100%" height="100%">
@@ -327,12 +331,13 @@ export function AnalysisPage() {
                                 wrapperStyle={{ paddingTop: '30px', width: '100%', left: 0, display: 'flex', justifyContent: 'center' }} 
                                 content={(props) => {
                                   const { payload } = props;
+                                  if (!payload) return null;
                                   return (
                                     <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 px-4">
-                                      {payload?.map((entry: any, index: number) => (
-                                        <li key={`item-${index}`} className="flex items-center gap-1.5" style={{ minWidth: '110px' }}>
-                                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-                                          <span className="text-[10px] font-medium text-white/80 whitespace-nowrap">{entry.value}</span>
+                                      {payload.map((entry: any, index: number) => (
+                                        <li key={`legend-item-${index}`} className="flex items-center gap-1.5" style={{ minWidth: '110px' }}>
+                                          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color || '#fff' }} />
+                                          <span className="text-[10px] font-medium text-white/80 whitespace-nowrap">{entry.value || ''}</span>
                                         </li>
                                       ))}
                                     </ul>
