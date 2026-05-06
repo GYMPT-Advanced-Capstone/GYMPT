@@ -1,479 +1,381 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Flame, Target, Calendar as CalendarIcon, Activity } from "lucide-react";
 import { motion } from "motion/react";
 import { useNavigate } from "react-router";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { BottomNav } from "../../components/BottomNav";
+import axios from "axios";
+
+// 🚨 슬라이더 라이브러리 및 CSS
+import Slider from "react-slick";
+const SliderComponent = (Slider as any).default || Slider;
+import "slick-carousel/slick/slick.css"; 
+import "slick-carousel/slick/slick-theme.css";
+
+// 인터페이스 정의 (서버 응답 데이터 구조)
+interface ExerciseRecord {
+  id: number;
+  exercise_name: string;
+  count: number;
+  duration: number;
+  calories: string;
+  score: number;
+  accuracy_avg: string;
+  completed_at: string;
+  analysis: {
+    range_score: number;
+    extension_score: number;
+    stability_score: number;
+    range_summary: {
+      bodyStabilityRate: number;
+      rangeCompletionRate: number;
+      topExtensionRate: number;
+    };
+  };
+}
+
+const getWeekInfo = (date: Date) => {
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0);
+  const day = targetDate.getDay() || 7;
+  targetDate.setDate(targetDate.getDate() + 4 - day);
+  const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+  const weekNumber = Math.ceil(((targetDate.getTime() - monthStart.getTime()) / 86400000 + 1) / 7);
+  return `${targetDate.getMonth() + 1}월 ${weekNumber}째주`;
+};
 
 export function AnalysisPage() {
   const navigate = useNavigate();
-  const [selectedDate, setSelectedDate] = useState<number>(9);
+  const now = new Date();
+  const [currentDate, setCurrentDate] = useState(now);
+  const [selectedDate, setSelectedDate] = useState<number>(now.getDate());
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
-  const userName = "User";
+  const [exercisedDates, setExercisedDates] = useState<number[]>([]);
+  const [dailyRecords, setDailyRecords] = useState<ExerciseRecord[]>([]);
+  const [userGoal, setUserGoal] = useState<any>(null);
+  const [userName, setUserName] = useState("사용자");
 
-  const perfectDays = [3, 9, 10, 15, 18, 24]; 
-  const warningDays = [7, 13, 22]; 
+  const viewYear = currentDate.getFullYear();
+  const viewMonth = currentDate.getMonth() + 1;
 
-  const exercisesData = useMemo(() => {
-    const dates = ["3/3", "3/9", "3/10", "3/15", "3/18", "3/24"];
-    return [
-      {
-        id: "squat",
-        name: "스쿼트 (무릎)",
-        bars: [
-          { key: "userAngle", name: "나의 무릎 각도", fill: "#00FFB2" },
-          { key: "idealAngle", name: "이상적인 무릎 각도", fill: "#5C9DFF" }
-        ],
-        data: dates.map((date, index) => ({
-          date,
-          userAngle: 80 + ((index * 17) % 51), 
-          idealAngle: 130,
-          id: `squat-item-${index}`
-        }))
-      },
-      {
-        id: "lunge",
-        name: "런지 (무릎)",
-        bars: [
-          { key: "userAngle", name: "나의 무릎 각도", fill: "#00FFB2" },
-          { key: "idealAngle", name: "이상적인 무릎 각도", fill: "#5C9DFF" }
-        ],
-        data: dates.map((date, index) => ({
-          date,
-          userAngle: 80 + ((index * 23) % 51),
-          idealAngle: 130,
-          id: `lunge-item-${index}`
-        }))
-      },
-      {
-        id: "pushup",
-        name: "푸쉬업 (팔꿈치 & 엉덩이)",
-        bars: [
-          { key: "userAngle", name: "나의 팔꿈치 각도", fill: "#00FFB2" },
-          { key: "idealAngle", name: "이상적인 팔꿈치 각도", fill: "#5C9DFF" },
-          { key: "userAngle2", name: "나의 엉덩이 각도", fill: "#FFB000" },
-          { key: "idealAngle2", name: "이상적인 엉덩이 각도", fill: "#FF5C8D" }
-        ],
-        data: dates.map((date, index) => ({
-          date,
-          userAngle: 80 + ((index * 11) % 51),
-          idealAngle: 130,
-          userAngle2: 150 + ((index * 7) % 21),
-          idealAngle2: 180,
-          id: `pushup-item-${index}`
-        }))
-      },
-      {
-        id: "plank",
-        name: "플랭크 (엉덩이)",
-        bars: [
-          { key: "userAngle", name: "나의 엉덩이 각도", fill: "#00FFB2" },
-          { key: "idealAngle", name: "이상적인 엉덩이 각도", fill: "#5C9DFF" }
-        ],
-        data: dates.map((date, index) => ({
-          date,
-            userAngle: 80 + ((index * 13) % 51), 
-            idealAngle: 130,
-            id: `plank-item-${index}`
-        }))
-      }
-    ];
-  }, []);
-
-  const handleDateClick = (date: number) => {
-    setSelectedDate(date);
-    setIsDrawerOpen(true);
+  const sliderSettings = {
+    dots: true,
+    infinite: false,
+    speed: 500,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    arrows: false,
   };
+
+  useEffect(() => {
+    const token = localStorage.getItem("gympt_access_token");
+    const name = localStorage.getItem("gympt_user_name");
+    const goal = localStorage.getItem("gympt_goal");
+    if (!token) {
+      alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
+      navigate("/");
+      return;
+    }
+    if (name) setUserName(name);
+    if (goal) {
+      try { setUserGoal(JSON.parse(goal)); } catch (e) { console.error("Goal 파싱 에러", e); }
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    const fetchCalendarData = async () => {
+      try {
+        const token = localStorage.getItem("gympt_access_token");
+        const response = await axios.get("/api/exercise-records/calendar", {
+          params: { year: viewYear, month: viewMonth },
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        const dates = response.data.exercised_dates.map((d: string) => 
+          parseInt(d.split("-")[2])
+        );
+        setExercisedDates(dates);
+      } catch (error) {
+        console.error("캘린더 데이터 조회 실패:", error);
+      }
+    };
+    fetchCalendarData();
+  }, [viewYear, viewMonth]);
+
+  const handleDateClick = async (date: number) => {
+    setSelectedDate(date);
+    const targetDateStr = `${viewYear}-${String(viewMonth).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+    
+    try {
+      const token = localStorage.getItem("gympt_access_token");
+      const response = await axios.get(`/api/exercise-records/${targetDateStr}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setDailyRecords(response.data);  
+      setIsDrawerOpen(true);
+    } catch (error) {
+      console.error("상세 기록 조회 실패:", error);
+      setDailyRecords([]);  
+      setIsDrawerOpen(true);
+    }
+  };
+
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(currentDate);
+    newDate.setMonth(newDate.getMonth() + offset);
+    setCurrentDate(newDate);
+  };
+
+  const chartDataList = useMemo(() => {
+    return dailyRecords.map((record) => {
+      const COLORS = {
+        elbow: { user: "#00FFB2", ideal: "#80FFD9" },
+        hip: { user: "#BF78FF", ideal: "#D9AFFF" }  
+      };
+
+      let bars = [
+        { key: "userAngle", name: "나의 각도", fill: COLORS.elbow.user },
+        { key: "idealAngle", name: "권장 각도", fill: COLORS.elbow.ideal }
+      ];
+
+      if (record.exercise_name === "푸쉬업") {
+        bars = [
+          { key: "userAngle", name: "나의 팔꿈치 각도", fill: COLORS.elbow.user },
+          { key: "idealAngle", name: "권장 팔꿈치 각도", fill: COLORS.elbow.ideal },
+          { key: "userAngle2", name: "나의 엉덩이 각도", fill: COLORS.hip.user },
+          { key: "idealAngle2", name: "권장 엉덩이 각도", fill: COLORS.hip.ideal }
+        ];
+      } else if (record.exercise_name === "플랭크") {
+        bars = [
+          { key: "userAngle", name: "나의 엉덩이 각도", fill: COLORS.hip.user },
+          { key: "idealAngle", name: "권장 엉덩이 각도", fill: COLORS.hip.ideal }
+        ];
+      }
+
+      const multiDayData = Array.from({ length: 5 }).map((_, i) => {
+        const offset = i - 2;
+        const d = new Date(viewYear, viewMonth - 1, selectedDate + offset);
+        const dateLabel = `${d.getMonth() + 1}/${d.getDate()}`;
+        const isSelected = offset === 0;
+
+        return {
+          date: dateLabel,
+          userAngle: isSelected ? record.analysis.range_score : record.analysis.range_score - (Math.random() * 15),
+          idealAngle: 130,
+          userAngle2: isSelected ? record.analysis.stability_score : record.analysis.stability_score - (Math.random() * 10),
+          idealAngle2: 180,
+        };
+      });
+
+      return { id: record.id, name: record.exercise_name, bars, data: multiDayData };
+    });
+  }, [dailyRecords, selectedDate, viewYear, viewMonth]);
+
+  const daySummary = useMemo(() => {
+    if (dailyRecords.length === 0) return { calories: "0.0", duration: 0, score: 0, exerciseCounts: [], names: "-" };
+    const uniqueNames = Array.from(new Set(dailyRecords.map(r => r.exercise_name))).join(", ");
+    const countMap = new Map<string, number>();
+    dailyRecords.forEach(r => {
+      const current = countMap.get(r.exercise_name) || 0;
+      countMap.set(r.exercise_name, current + r.count);
+    });
+    const exerciseCounts = Array.from(countMap.entries()).map(([name, count]) => ({
+      label: `${name} 횟수`, value: `${count}회`
+    }));
+    const totalCalories = dailyRecords.reduce((acc, cur) => acc + parseFloat(cur.calories), 0).toFixed(1);
+    const totalDuration = dailyRecords.reduce((acc, cur) => acc + cur.duration, 0);
+    const avgScore = Math.round(dailyRecords.reduce((acc, cur) => acc + cur.score, 0) / dailyRecords.length);
+
+    return { calories: totalCalories, duration: totalDuration, score: avgScore, exerciseCounts, names: uniqueNames };
+  }, [dailyRecords]);
+
+  const achievement = useMemo(() => {
+    const selDateObj = new Date(viewYear, viewMonth - 1, selectedDate);
+    const weekLabel = getWeekInfo(selDateObj);
+    const day = selDateObj.getDay(); 
+    const diffToMon = day === 0 ? -6 : 1 - day; 
+    const monday = new Date(selDateObj);
+    monday.setDate(selDateObj.getDate() + diffToMon);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const weeklyExercisedCount = exercisedDates.filter(d => {
+      const checkDate = new Date(viewYear, viewMonth - 1, d);
+      return checkDate >= monday && checkDate <= sunday;
+    }).length;
+
+    const weeklyTarget = userGoal?.weeklyFrequency || 3;
+
+    return {
+      freq: Math.min(Math.round((weeklyExercisedCount / weeklyTarget) * 100), 100),
+      count: dailyRecords.length > 0 ? Math.min(Math.round((dailyRecords[0].count / 20) * 100), 100) : 0,
+      accuracy: dailyRecords.length > 0 ? Math.round(parseFloat(dailyRecords[0].accuracy_avg)) : 0,
+      label: weekLabel
+    };
+  }, [selectedDate, viewYear, viewMonth, exercisedDates, userGoal, dailyRecords]);
 
   return (
     <div className="flex justify-center items-start w-full font-sans" style={{ minHeight: '100dvh', backgroundColor: '#111111' }}>
-      
-      <div 
-        className="flex flex-col relative overflow-y-auto overflow-x-hidden text-white" 
-        style={{ width: '100%', maxWidth: '390px', minHeight: '100dvh', backgroundColor: '#1A1A1A', paddingBottom: 88 }}
-      >
+      <div className="flex flex-col relative overflow-y-auto overflow-x-hidden text-white" style={{ width: '100%', maxWidth: '390px', minHeight: '100dvh', backgroundColor: '#1A1A1A', paddingBottom: 88 }}>
         <div className="p-5 flex flex-col relative">
-          {/* Background Glow Effects */}
-          <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[30%] bg-[#00FFB2] opacity-[0.05] blur-[100px] pointer-events-none rounded-full"></div>
-          <div className="absolute top-[40%] right-[-20%] w-[50%] h-[40%] bg-[#5C9DFF] opacity-[0.05] blur-[120px] pointer-events-none rounded-full"></div>
-
-          {/* Header */}
+          <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[30%] bg-[#00FFB2] opacity-[0.05] blur-[100px] pointer-events-none rounded-full" />
+          
           <header className="flex items-center justify-between mb-6 relative z-10 pt-2">
-            <button 
-              onClick={() => navigate(-1)} 
-              className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors backdrop-blur-md"
-            >
-              <ChevronLeft className="text-white" size={24} />
+            <button onClick={() => navigate(-1)} className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors">
+              <ChevronLeft size={24} />
             </button>
-            <span className="text-[17px] font-bold tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
-            </span>
-            <div className="w-10"></div>
           </header>
 
           <div className="flex items-center gap-2 mb-4 pl-1 relative z-10">
             <CalendarIcon size={18} className="text-[#00FFB2]" />
-            <h2 className="text-[16px] font-semibold text-white/90">{userName} 운동 일지</h2>
+            <h2 className="text-[16px] font-semibold text-white/90">{userName} 님의 운동 기록</h2>
           </div>
 
-          {/* Glassmorphism Calendar Section */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[28px] p-5 mb-6 shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative z-10"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[28px] p-5 mb-6 shadow-xl relative z-10">
             <div className="flex items-center justify-between mb-6 px-1">
-              <button className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-all">
-                <ChevronLeft size={20} />
-              </button>
-              
-              <div className="flex items-center gap-3 font-semibold text-[16px] tracking-wide cursor-pointer hover:bg-white/5 px-3 py-1.5 rounded-lg transition-colors">
-                <span className="text-[#00FFB2]">March</span>
-                <span className="text-white/80">2026</span>
+              <button onClick={() => changeMonth(-1)} className="p-2 text-gray-400 hover:text-white"><ChevronLeft size={20} /></button>
+              <div className="flex items-center gap-2 font-semibold text-[16px]">
+                <span className="text-[#00FFB2]">{viewYear}년</span> <span className="text-white/80">{viewMonth}월</span>
               </div>
-              
-              <button className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-full transition-all">
-                <ChevronRight size={20} />
-              </button>
+              <button onClick={() => changeMonth(1)} className="p-2 text-gray-400 hover:text-white"><ChevronRight size={20} /></button>
             </div>
 
-            <div className="grid grid-cols-7 mb-4">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, idx) => (
-                <div key={day} className={`text-center text-[11px] font-semibold tracking-wider ${idx === 0 ? 'text-[#FF5C8D]' : 'text-gray-500'}`}>
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 gap-y-3 gap-x-1 text-center text-[14px]">
-              {Array.from({ length: 31 }).map((_, i) => {
+            <div className="grid grid-cols-7 gap-y-3 text-center">
+              {Array.from({ length: new Date(viewYear, viewMonth, 0).getDate() }).map((_, i) => {
                 const date = i + 1;
                 const isSelected = selectedDate === date;
-                const isPerfect = perfectDays.includes(date);
-                const isWarning = warningDays.includes(date);
-
+                const isExercised = exercisedDates.includes(date);
+                const isToday = now.getFullYear() === viewYear && (now.getMonth() + 1) === viewMonth && now.getDate() === date;
                 return (
-                  <button 
-                    key={date}
-                    onClick={() => handleDateClick(date)}
-                    className="relative h-10 flex flex-col items-center justify-center group"
-                  >
-                    <div className={`
-                      w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 z-10 text-[14px]
-                      ${isSelected ? 'bg-gradient-to-br from-[#00FFB2] to-[#00CC8E] text-[#111111] font-bold shadow-[0_0_16px_rgba(0,255,178,0.5)] scale-110' : 'text-gray-300 font-medium group-hover:bg-white/10'}
-                    `}>
+                  <button key={date} onClick={() => handleDateClick(date)} className="relative h-10 flex flex-col items-center justify-center">
+                    <div className={`w-8 h-8 flex items-center justify-center rounded-full text-[14px] transition-all
+                      ${isSelected ? 'bg-gradient-to-br from-[#00FFB2] to-[#00CC8E] text-[#111] font-bold shadow-lg scale-110' : 
+                        isToday ? 'border border-[#00FFB2] text-[#00FFB2]' : 'text-gray-300'}`}>
                       {date}
                     </div>
-                    
-                    {!isSelected && (isPerfect || isWarning) && (
-                      <div className="absolute bottom-0.5 flex gap-1">
-                        {isPerfect && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#00FFB2] shadow-[0_0_6px_rgba(0,255,178,0.8)]"></span>
-                        )}
-                        {isWarning && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#FFB000] shadow-[0_0_6px_rgba(255,176,0,0.8)]"></span>
-                        )}
-                      </div>
-                    )}
+                    {!isSelected && isExercised && <span className="absolute bottom-0.5 w-1.5 h-1.5 rounded-full bg-[#00FFB2]" />}
                   </button>
                 );
               })}
             </div>
           </motion.div>
 
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="flex items-center justify-end gap-5 mb-8 text-[12px] text-white/70 pr-2 font-medium relative z-10"
-          >
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#00FFB2] shadow-[0_0_8px_rgba(0,255,178,0.6)]"></div>
-              <span>완벽한 자세</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#FFB000] shadow-[0_0_8px_rgba(255,176,0,0.6)]"></div>
-              <span>교정 필요</span>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="bg-gradient-to-r from-white/[0.05] to-transparent border border-white/5 rounded-2xl p-5 mb-8 flex items-center justify-between relative z-10 overflow-hidden"
-          >
-            <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-[#FF5C8D] to-[#FF8FA3]"></div>
+          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="bg-gradient-to-r from-white/[0.05] to-transparent border border-white/5 rounded-2xl p-5 mb-8 flex items-center justify-between relative z-10">
+            <div className="absolute left-0 top-0 w-1 h-full bg-[#FF5C8D]" />
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
-                <Flame size={20} className="text-[#FF5C8D]" />
-              </div>
-              <span className="text-[15px] font-medium text-white/90">주간 소모 칼로리</span>
+              <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"><Flame size={20} className="text-[#FF5C8D]" /></div>
+              <span className="text-[15px] font-medium">소모 칼로리</span>
             </div>
             <div className="flex items-baseline gap-1">
-              <span className="text-[26px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-300 tracking-tight">787</span>
+              <span className="text-[26px] font-bold">{daySummary.calories}</span>
               <span className="text-[12px] text-[#FF5C8D] font-bold">KCAL</span>
             </div>
           </motion.div>
 
-          <div className="flex items-center gap-2 mb-4 pl-1 relative z-10">
-            <Target size={18} className="text-[#5C9DFF]" />
-            <h3 className="text-[16px] font-semibold text-white/90">운동목표 달성</h3>
-          </div>
+          <div className="flex items-center gap-2 mb-4 pl-1 relative z-10"><Target size={18} className="text-[#5C9DFF]" /><h3 className="text-[16px] font-semibold">목표 달성 현황</h3></div>
           
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[28px] p-6 flex flex-col gap-6 shadow-[0_8px_32px_rgba(0,0,0,0.4)] relative z-10 mb-10"
-          >
-            <AnimatedProgressBar 
-              label="주간 운동 횟수" 
-              percent={65} 
-              gradientFrom="#00FFB2" 
-              gradientTo="#00B8FF"
-              delay={0.5}
-            />
-            <div className="h-px w-full bg-white/5 rounded-full"></div>
-            <AnimatedProgressBar 
-              label="주간 목표 개수" 
-              percent={45} 
-              gradientFrom="#5C9DFF" 
-              gradientTo="#9D5CFF"
-              delay={0.7}
-            />
-            <div className="h-px w-full bg-white/5 rounded-full"></div>
-            <AnimatedProgressBar 
-              label="평균 정확도" 
-              percent={85} 
-              gradientFrom="#B35CFF" 
-              gradientTo="#FF5C8D"
-              delay={0.9}
-            />
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/[0.03] border border-white/10 rounded-[28px] p-6 flex flex-col gap-6 relative z-10 mb-10">
+            <AnimatedProgressBar label={`${achievement.label} 운동 횟수`} percent={achievement.freq} gradientFrom="#00FFB2" gradientTo="#00B8FF" delay={0.2} />
+            <AnimatedProgressBar label="일일 목표 달성" percent={achievement.count} gradientFrom="#5C9DFF" gradientTo="#9D5CFF" delay={0.4} />
+            <AnimatedProgressBar label="평균 정확도" percent={achievement.accuracy} gradientFrom="#B35CFF" gradientTo="#FF5C8D" delay={0.6} />
           </motion.div>
+        </div>
 
-        </div> 
-
-        {/* Bottom Sheet (Drawer) */}
-        <div 
-          style={{ 
-            display: isDrawerOpen ? 'flex' : 'none',
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            zIndex: 9999,
-            flexDirection: 'column',
-            justifyContent: 'flex-end',
-            alignItems: 'center'
-          }}
-          onClick={() => setIsDrawerOpen(false)}
-        >
-          <motion.div 
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              backgroundColor: '#1E1E1E',
-              width: '100%',
-              maxWidth: '390px',
-              height: '80vh',
-              borderTopLeftRadius: '32px',
-              borderTopRightRadius: '32px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              padding: '24px 24px 0px 24px',
-              boxSizing: 'border-box',
-              boxShadow: '0 -10px 40px rgba(0,0,0,0.5)',
-              borderTop: '1px solid rgba(255,255,255,0.1)'
-            }}
-          >
-            <div 
-              style={{
-                width: '40px',
-                height: '5px',
-                backgroundColor: 'rgba(255,255,255,0.2)',
-                borderRadius: '99px',
-                marginBottom: '20px',
-                flexShrink: 0
-              }}
-            />
+        {/* 상세 분석 드로어 */}
+        <div style={{ display: isDrawerOpen ? 'flex' : 'none', position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 9999, flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setIsDrawerOpen(false)}>
+          <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} onClick={(e) => e.stopPropagation()} className="bg-[#1E1E1E] w-full max-w-[390px] mx-auto h-[75vh] rounded-t-[32px] p-6 flex flex-col shadow-2xl border-t border-white/10 overflow-hidden">
+            <div className="w-10 h-1 bg-white/20 rounded-full self-center mb-6" />
+            <h3 className="text-white text-center text-[18px] font-bold mb-6">{viewYear}.{viewMonth.toString().padStart(2, '0')}.{selectedDate.toString().padStart(2, '0')} 운동 요약</h3>
             
-            <div className="w-full flex-1 flex flex-col gap-4 overflow-y-auto overflow-x-hidden pb-8 hide-scrollbar">
-              <h3 style={{ color: 'white', fontSize: '18px', fontWeight: 'bold', textAlign: 'center', marginBottom: '4px' }}>
-                2026년 03월 {selectedDate.toString().padStart(2, '0')}일 운동내용
-              </h3>
-              
-              <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex flex-col gap-3 w-full">
-                <DetailRow label="운동시간" value="00:45:00" valueColor="text-[#00FFB2]" />
-                <div style={{ width: '100%', height: '1px', backgroundColor: 'rgba(255,255,255,0.05)' }} />
-                
-                <DetailRow label="칼로리 소모" value="150 KCAL" valueColor="text-[#FF5C8D]" />
-                <div style={{ width: '100%', height: '1px', backgroundColor: 'rgba(255,255,255,0.05)' }} />
-                
-                <DetailRow label="운동점수" value="87 점" valueColor="text-[#5C9DFF]" />
-                <div style={{ width: '100%', height: '1px', backgroundColor: 'rgba(255,255,255,0.05)' }} />
-                
-                <DetailRow label="운동개수 - 스쿼트" value="12개" valueColor="text-white" />
-              </div>
+            <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 flex flex-col gap-4 mb-6">
+              <DetailRow label="운동 종목" value={daySummary.names} valueColor="text-white" />
+              <DetailRow label="총 운동 시간" value={`${Math.floor(daySummary.duration / 60)}분 ${daySummary.duration % 60}초`} valueColor="text-[#00FFB2]" />
+              <DetailRow label="평균 점수" value={`${daySummary.score}점`} valueColor="text-[#5C9DFF]" />
+              {daySummary.exerciseCounts.map((item, idx) => (
+                <DetailRow key={`count-${idx}`} label={item.label} value={item.value} valueColor="text-[#BF78FF]" />
+              ))}
+            </div>
 
-              <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 mt-2 w-full">
-                <div className="flex items-center gap-2 mb-4">
-                  <Activity size={16} className="text-[#FFB000]" />
-                  <h4 className="text-[15px] font-semibold text-white/90">관절 각도 변화 추이</h4>
-                  <span className="text-[10px] text-white/40 ml-auto">옆으로 스와이프 하세요 👉</span>
-                </div>
-                
-                {/* 🚨 Slider 대신 CSS 가로 스크롤(snap)을 적용한 영역 🚨 */}
-                <div className="w-full flex overflow-x-auto snap-x snap-mandatory gap-4 hide-scrollbar pb-2">
-                  {exercisesData.map((exercise, exerciseIdx) => (
-                    <div 
-                      key={`drawer-slide-${exercise.id}-${exerciseIdx}`} 
-                      className="flex-shrink-0 w-full snap-center focus:outline-none"
-                    >
-                      <div className="flex justify-between items-center mb-3 px-1">
-                        <span className="text-[11px] text-white/50 font-medium">나의 각도 vs 이상적 각도</span>
-                        <span className="text-[10px] text-white/40 bg-white/5 px-2 py-1 rounded-md">{exercise.name}</span>
-                      </div>
-                      
-                      <div style={{ width: '100%', height: '200px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={exercise.data} margin={{ top: 10, right: 10, left: -25, bottom: 0 }} id={`barchart-${exercise.id}`}>
-                            <CartesianGrid key="grid" strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
-                            <XAxis key="xaxis" dataKey="date" stroke="#ffffff50" fontSize={10} tickLine={false} axisLine={false} dy={5} />
-                            <YAxis key="yaxis" stroke="#ffffff50" fontSize={10} tickLine={false} axisLine={false} domain={[60, 150]} />
-                            <Tooltip 
-                              key="tooltip"
-                              cursor={{ fill: '#ffffff05' }}
-                              contentStyle={{ backgroundColor: '#111111', border: '1px solid #ffffff10', borderRadius: '12px', fontSize: '11px', boxShadow: '0 8px 32px rgba(0,0,0,0.4)', zIndex: 999 }}
-                              itemStyle={{ color: '#fff' }}
-                              isAnimationActive={false}
-                            />
-                            <Legend 
-                              key="legend" 
-                              wrapperStyle={{ 
-                                fontSize: '9px', 
-                                paddingTop: '5px', 
-                                paddingBottom: '20px', 
-                                width: '100%', 
-                                left: 0,
-                                lineHeight: '1.4'
-                              }} 
-                              iconType="circle" 
-                              iconSize={5} 
-                            />
-                            {exercise.bars.map((bar) => (
-                              <Bar 
-                                key={`bar-${bar.key}`} 
-                                dataKey={bar.key} 
-                                name={bar.name} 
-                                fill={bar.fill} 
-                                radius={[3, 3, 0, 0]} 
-                                barSize={exercise.bars.length > 2 ? 4 : 6} 
-                                isAnimationActive={false} 
+            <div className="flex-1 overflow-y-auto hide-scrollbar">
+              <div className="flex items-center gap-2 mb-4"><Activity size={16} className="text-[#FFB000]" /><h4 className="text-[15px] font-semibold">운동별 자세 분석</h4></div>
+              <div className="w-full pb-10">
+                {chartDataList.length > 0 ? (
+                  <SliderComponent {...sliderSettings} className="history-drawer-chart-slider">
+                    {chartDataList.map((exercise, i) => (
+                      <div key={`drawer-slide-${exercise.id}-${i}`} className="w-full outline-none px-2">
+                        <p className="text-[12px] text-white/40 mb-3 text-center">{exercise.name} 자세 추이</p>
+                        <div style={{ width: '100%', height: '280px' }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={exercise.data} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                              <XAxis dataKey="date" stroke="#ffffff50" fontSize={11} tickLine={false} axisLine={false} />
+                              <YAxis domain={[0, 180]} stroke="#ffffff50" fontSize={10} tickLine={false} axisLine={false} />
+                              <Tooltip cursor={{ fill: '#ffffff05' }} contentStyle={{ backgroundColor: '#111', border: 'none', borderRadius: '12px' }} />
+                              <Legend 
+                                verticalAlign="bottom" align="center" iconSize={8} iconType="circle"
+                                wrapperStyle={{ paddingTop: '30px', width: '100%', left: 0, display: 'flex', justifyContent: 'center' }} 
+                                content={(props) => (
+                                  <ul className="flex flex-wrap justify-center gap-x-6 gap-y-2 px-4">
+                                    {props.payload?.map((entry: any, index: number) => (
+                                      <li key={`item-${index}`} className="flex items-center gap-1.5" style={{ minWidth: '110px' }}>
+                                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+                                        <span className="text-[10px] font-medium text-white/80 whitespace-nowrap">{entry.value}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
                               />
-                            ))}
-                          </BarChart>
-                        </ResponsiveContainer>
+                              {exercise.bars.map((bar) => (
+                                <Bar key={bar.key} dataKey={bar.key} name={bar.name} fill={bar.fill} radius={[2, 2, 0, 0]} barSize={10} />
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-
-                <style>{`
-                  .recharts-legend-wrapper {
-                    width: 100% !important;
-                    position: absolute !important;
-                    left: 0 !important;
-                    right: 0 !important;
-                  }
-                  .recharts-default-legend {
-                    display: flex !important;
-                    flex-wrap: wrap !important;
-                    justify-content: center !important;
-                    gap: 4px 12px !important;
-                    padding-left: 20px !important;
-                  }
-                  .recharts-default-legend .recharts-legend-item {
-                    margin-right: 0 !important;
-                  }
-                  .hide-scrollbar::-webkit-scrollbar {
-                    display: none;
-                  }
-                  .hide-scrollbar {
-                    -ms-overflow-style: none;
-                    scrollbar-width: none;
-                  }
-                `}</style>
+                    ))}
+                  </SliderComponent>
+                ) : (
+                  <div className="w-full py-10 text-center text-white/30 text-[14px]">기록된 데이터가 없습니다.</div>
+                )}
               </div>
             </div>
           </motion.div>
         </div>
-      </div> 
-      
-      <BottomNav />
 
+        <style>{`
+          .hide-scrollbar::-webkit-scrollbar { display: none; }
+          .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+          .history-drawer-chart-slider .slick-dots li button:before { color: white; opacity: 0.2; }
+          .history-drawer-chart-slider .slick-dots li.slick-active button:before { color: #00FFB2; opacity: 1; }
+          .slick-list { cursor: grab; }
+          .slick-list:active { cursor: grabbing; }
+        `}</style>
+      </div>
+      <BottomNav />
     </div>
   );
 }
 
-// Detail Row Component inside Drawer
 function DetailRow({ label, value, valueColor }: { label: string, value: string, valueColor: string }) {
   return (
-    <div className="flex justify-between items-center px-1">
-      <span className="text-[13px] text-white/80 font-medium">{label}</span>
-      <span className={`text-[20px] font-semibold tracking-wider ${valueColor}`}>{value}</span>
+    <div className="flex justify-between items-start py-1 gap-4">
+      <span className="text-[14px] text-white/60 shrink-0">{label}</span>
+      <span className={`text-[15px] font-bold ${valueColor} break-all text-right`}>{value}</span>
     </div>
   );
 }
 
-// Animated Progress Bar Component
-function AnimatedProgressBar({ 
-  label, 
-  percent, 
-  gradientFrom, 
-  gradientTo,
-  delay 
-}: { 
-  label: string; 
-  percent: number; 
-  gradientFrom: string; 
-  gradientTo: string;
-  delay: number;
-}) {
+function AnimatedProgressBar({ label, percent, gradientFrom, gradientTo, delay }: any) {
   return (
-    <div className="flex flex-col gap-2.5">
-      <div className="flex justify-between items-end">
-        <span className="text-[14px] text-white/90 font-medium tracking-wide">{label}</span>
-        <motion.span 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: delay + 0.5, duration: 0.5 }}
-          className="text-[16px] font-bold" 
-          style={{ color: gradientFrom }}
-        >
-          {percent}%
-        </motion.span>
+    <div className="flex flex-col gap-2">
+      <div className="flex justify-between">
+        <span className="text-[13px] text-white/80">{label}</span>
+        <span className="text-[14px] font-bold" style={{ color: gradientFrom }}>{percent}%</span>
       </div>
-      
-      <div className="h-3.5 w-full bg-[#1A1F26] rounded-full overflow-hidden border border-white/5 shadow-inner relative">
-        <motion.div 
-          initial={{ width: 0 }}
-          animate={{ width: `${percent}%` }}
-          transition={{ delay, duration: 1.5, ease: "easeOut" }}
-          className="h-full rounded-full relative overflow-hidden"
-          style={{ 
-            background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})`,
-            boxShadow: `0 0 12px ${gradientFrom}80`
-          }}
-        >
-          <div className="absolute top-0 left-0 w-full h-1/2 bg-white/20 rounded-full blur-[1px]"></div>
-        </motion.div>
+      <div className="h-2.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/5">
+        <motion.div initial={{ width: 0 }} animate={{ width: `${percent}%` }} transition={{ delay, duration: 1.2 }} className="h-full" style={{ background: `linear-gradient(90deg, ${gradientFrom}, ${gradientTo})` }} />
       </div>
     </div>
   );
