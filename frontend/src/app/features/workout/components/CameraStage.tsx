@@ -108,8 +108,8 @@ export function CameraStage({
         : TEXT.buttonRetry;
 
   return (
-    <section className="rounded-[20px] border border-[#242933] bg-[#15181E] p-[10px]">
-      <div className={`relative overflow-hidden rounded-[16px] bg-[#171A20] ${stageMinHeightClassName}`}>
+    <section className="rounded-[20px] border border-[#242933] bg-[#15181E] p-[10px] mob-land:rounded-none mob-land:border-0 mob-land:p-0">
+      <div className={`relative overflow-hidden rounded-[16px] bg-[#171A20] mob-land:h-[100dvh] mob-land:min-h-0 mob-land:rounded-none ${stageMinHeightClassName}`}>
         <video
           autoPlay
           className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
@@ -163,7 +163,7 @@ export function CameraStage({
           </div>
         )}
 
-        <div className="absolute bottom-4 left-4 right-4 rounded-[14px] border border-[#2A3038] bg-[#171C23EE] px-4 py-3 backdrop-blur-sm">
+        <div className="absolute bottom-4 left-4 right-4 rounded-[14px] border border-[#2A3038] bg-[#171C23]/70 px-4 py-3 backdrop-blur-md">
           <div className="mb-1 flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[#3FEED0]" />
             <p className="text-[12px] font-bold text-[#3FEED0]">{noticeTitle}</p>
