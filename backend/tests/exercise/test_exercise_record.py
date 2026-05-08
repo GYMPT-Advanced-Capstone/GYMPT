@@ -136,7 +136,11 @@ def test_exercise_record_service_create_with_analysis_generates_ai_feedback():
         analysis={
             "exercise_type": "pushup",
             "reps": [
-                {"rep_index": 1, "metrics": {}, "representative_feedback_code": "hip_sag"},
+                {
+                    "rep_index": 1,
+                    "metrics": {},
+                    "representative_feedback_code": "hip_sag",
+                },
                 {"rep_index": 2, "metrics": {}, "representative_feedback_code": "good"},
             ],
         },
@@ -163,7 +167,9 @@ def test_exercise_record_service_create_with_analysis_no_feedback_when_none():
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
         analysis={
             "exercise_type": "pushup",
-            "reps": [{"rep_index": 1, "metrics": {}, "representative_feedback_code": "good"}],
+            "reps": [
+                {"rep_index": 1, "metrics": {}, "representative_feedback_code": "good"}
+            ],
         },
     )
 
