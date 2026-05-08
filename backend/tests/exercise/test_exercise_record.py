@@ -2,6 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 import sys
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
@@ -123,6 +124,59 @@ def test_exercise_record_service_create_returns_response():
     )
 
 
+def test_exercise_record_service_create_with_analysis_generates_ai_feedback():
+    repo = FakeExerciseRecordRepo()
+    service = ExerciseRecordService(repo)
+    request = ExerciseRecordCreateRequest(
+        exercise_id=10,
+        count=5,
+        duration=60,
+        calories=Decimal("4.20"),
+        completed_at=datetime(2026, 3, 26, 10, 30, 0),
+        analysis={
+            "exercise_type": "pushup",
+            "reps": [
+                {"rep_index": 1, "metrics": {}, "representative_feedback_code": "hip_sag"},
+                {"rep_index": 2, "metrics": {}, "representative_feedback_code": "good"},
+            ],
+        },
+    )
+
+    with patch(
+        "app.exercise_record.exercise_record_service.generate_workout_feedback",
+        return_value="엉덩이가 처지고 있습니다. 복근에 힘을 주세요.",
+    ):
+        result = service.create(7, request)
+
+    assert repo.ai_feedback_updated == "엉덩이가 처지고 있습니다. 복근에 힘을 주세요."
+    assert result.ai_feedback == "엉덩이가 처지고 있습니다. 복근에 힘을 주세요."
+
+
+def test_exercise_record_service_create_with_analysis_no_feedback_when_none():
+    repo = FakeExerciseRecordRepo()
+    service = ExerciseRecordService(repo)
+    request = ExerciseRecordCreateRequest(
+        exercise_id=10,
+        count=5,
+        duration=60,
+        calories=Decimal("4.20"),
+        completed_at=datetime(2026, 3, 26, 10, 30, 0),
+        analysis={
+            "exercise_type": "pushup",
+            "reps": [{"rep_index": 1, "metrics": {}, "representative_feedback_code": "good"}],
+        },
+    )
+
+    with patch(
+        "app.exercise_record.exercise_record_service.generate_workout_feedback",
+        return_value=None,
+    ):
+        result = service.create(7, request)
+
+    assert repo.ai_feedback_updated is None
+    assert result.ai_feedback is None
+
+
 def test_exercise_record_request_rejects_empty_reps():
     with pytest.raises(ValueError):
         ExerciseRecordCreateRequest(
@@ -170,6 +224,16 @@ def test_exercise_record_service_get_by_date_returns_response_list():
 
     assert [item.exercise_name for item in result] == ["Push Up", "Squat"]
     assert [item.id for item in result] == [1, 2]
+
+
+def test_exercise_record_service_update_returns_updated_record():
+    repo = FakeExerciseRecordRepo()
+    repo.record_by_id = make_record(count=20, duration=60)
+    service = ExerciseRecordService(repo)
+
+    result = service.update(7, 1, ExerciseRecordUpdateRequest(count=30))
+
+    assert result.count == 30
 
 
 def test_exercise_record_service_update_rejects_empty_payload():
