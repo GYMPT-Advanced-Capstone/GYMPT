@@ -5,24 +5,29 @@ import { useGoal } from '../../context/GoalContext';
 
 const weeklyOptions = [
   {
+    count: 7,
+    label: '7회',
+    message: '매일 운동하는 진정한 챔피언이군요!\n회복일도 꼭 챙기면서 부상 없이 달려봐요!',
+  },
+  {
     count: 6,
     label: '6회',
-    message: '운동 마니아시군요! 최상의 결과를 위해 열심히 달려봐요!',
+    message: '운동 마니아시군요! 하루는 꼭 쉬어가며\n최상의 컨디션을 유지해봐요!',
   },
   {
     count: 5,
     label: '5회',
-    message: '정말 열정적이에요! 몸의 회복도 함께 챙겨주세요!',
+    message: '정말 열정적이에요!\n몸의 회복도 함께 챙겨주세요!',
   },
   {
     count: 4,
     label: '4회',
-    message: '일주일에 4번이나 운동한다니, 대단해요!\n지치지 않고 계속할 수 있는 플랜을 추천할게요!',
+    message: '일주일에 4번이나 운동한다니, 대단해요!\n지치지 않고 계속할 수 있는\n플랜을 추천할게요!',
   },
   {
     count: 3,
     label: '3회',
-    message: '완벽한 균형이에요! 운동과 휴식이 딱 맞아요!',
+    message: '완벽한 균형이에요!\n운동과 휴식이 딱 맞아요!',
   },
   {
     count: 2,
@@ -32,7 +37,7 @@ const weeklyOptions = [
   {
     count: 1,
     label: '1회',
-    message: '첫 걸음이 가장 중요해요! 꾸준히 하는 것이 최고예요!',
+    message: '첫 걸음이 가장 중요해요!\n꾸준히 하는 것이 최고예요!',
   },
 ];
 
@@ -64,7 +69,6 @@ export function GoalWeeklyPage() {
           언제든지 변경할 수 있어요.
         </p>
 
-        {/* Option List */}
         <div className="flex flex-col gap-3">
           {weeklyOptions.map((option) => {
             const isSelected = selected === option.count;
@@ -93,7 +97,6 @@ export function GoalWeeklyPage() {
                   {option.label}
                 </div>
 
-                {/* Motivational message when selected */}
                 {isSelected && (
                   <div
                     className="flex items-start gap-3 mt-3"
@@ -129,7 +132,6 @@ export function GoalWeeklyPage() {
         </div>
       </div>
 
-      {/* Next Button */}
       <div className="px-6 pb-10 pt-6">
         <button
           onClick={handleNext}
