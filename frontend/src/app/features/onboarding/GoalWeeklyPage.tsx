@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { GoalLayout } from './components/GoalLayout';
 import { useGoal } from '../../context/GoalContext';
+import trainerImg from '../../../assets/exercises/trainer.png';
 
 const weeklyOptions = [
   {
@@ -112,7 +113,11 @@ export function GoalWeeklyPage() {
                         fontSize: 18,
                       }}
                     >
-                      🤖
+                      <img
+                        src={trainerImg}
+                        alt="trainer"
+                        style={{ width: '80%', height: '80%', objectFit: 'cover' }}
+                      />
                     </div>
                     <p
                       style={{
