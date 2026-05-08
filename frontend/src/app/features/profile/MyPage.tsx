@@ -495,7 +495,7 @@ export function MyPage() {
         </Section>
 
         <p style={{ color: '#444444', fontSize: 11, textAlign: 'center', marginTop: 24 }}>
-          AI 피트니스 코치 v1.0.0
+          GYMPT v1.0.0
         </p>
       </div>
 
