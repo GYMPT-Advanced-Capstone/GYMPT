@@ -154,5 +154,5 @@ def test_pose_websocket_pushup_missing_landmarks_returns_visibility_error():
             }
         )
         message = websocket.receive_json()
-        assert message["type"] == "error"
-        assert "측면" in message["feedbackMessage"]
+        assert message["type"] == "feedback"
+        assert message["status"] == "not_in_position"

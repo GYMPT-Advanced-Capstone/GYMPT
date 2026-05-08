@@ -26,6 +26,9 @@ pytest-cov
 pytest-asyncio
 httpx
 
+# AI
+openai
+
 # Code Quality
 ruff
 mypy

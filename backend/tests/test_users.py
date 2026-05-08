@@ -57,8 +57,6 @@ def test_get_main_summary_success(client, mock_redis_client, access_token, fake_
         count=10,
         duration=60,
         calories=50,
-        score=90,
-        accuracy_avg=85,
         completed_at=datetime.combine(today, datetime.min.time()),
     )
 
@@ -107,8 +105,6 @@ def test_get_main_summary_duration_goal(
         count=0,
         duration=60,
         calories=10,
-        score=90,
-        accuracy_avg=85,
         completed_at=datetime.combine(today, datetime.min.time()),
     )
 

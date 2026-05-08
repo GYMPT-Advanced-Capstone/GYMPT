@@ -10,9 +10,8 @@ interface WorkoutResultState {
   durationLabel?: string;
   durationSeconds?: number;
   calories?: string;
-  score?: number;
   retryPath?: string;
-  accuracyAvg?: string;
+  aiFeedback?: string | null;
 }
 
 function toDurationLabel(state: WorkoutResultState) {
@@ -37,9 +36,8 @@ export function PostWorkout() {
   const completedCount = result.completedCount ?? 0;
   const durationLabel = toDurationLabel(result);
   const calories = result.calories ?? "0.00";
-  const score = result.score ?? 0;
-  const accuracyAvg = result.accuracyAvg ?? "0.00";
   const retryPath = result.retryPath ?? "/main";
+  const aiFeedback = result.aiFeedback ?? null;
 
   return (
     <div
@@ -95,14 +93,17 @@ export function PostWorkout() {
             <div className="h-px w-full bg-gray-800/80" />
 
             <DetailRow label="칼로리 소모" value={`${calories} KCAL`} color="text-[#FF5A5A]" />
-            <div className="h-px w-full bg-gray-800/80" />
-
-            <DetailRow label="운동점수" value={`${score} 점`} color="text-[#4DA6FF]" />
-            <div className="h-px w-full bg-gray-800/80" />
-
-            <DetailRow label="평균 정확도" value={`${accuracyAvg}%`} color="text-[#3FFDD4]" />
           </div>
         </div>
+
+        {aiFeedback && (
+          <div className="mb-4 flex shrink-0 flex-col gap-3 rounded-[24px] border border-[#3FFDD4]/20 bg-gradient-to-br from-[#12221D] to-[#0A1411] p-6 shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-bold text-[#3FFDD4]">AI 자세 피드백</span>
+            </div>
+            <p className="text-[15px] leading-relaxed text-gray-300">{aiFeedback}</p>
+          </div>
+        )}
 
         <div className="mt-auto flex gap-3 pt-4 shrink-0">
           <button

@@ -146,5 +146,5 @@ def test_pushup_pose_service_returns_error_on_missing_tracked_landmarks():
         },
     )
 
-    assert response["type"] == "error"
-    assert "측면" in response["feedbackMessage"]
+    assert response["type"] == "feedback"
+    assert response["status"] == "not_in_position"

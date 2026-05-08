@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     MAIL_SERVER: str
     MAIL_PORT: int
     VERIFICATION_CODE_EXPIRE_MINUTES: int = 10
+    OPENAI_API_KEY: str = ""
 
     @property
     def database_url(self) -> str:

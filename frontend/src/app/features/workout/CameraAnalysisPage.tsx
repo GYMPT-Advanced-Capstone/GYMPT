@@ -189,15 +189,13 @@ export function CameraAnalysisPage() {
         count: currentAnalysis.fullRepCount,
         duration: durationSeconds,
         calories: estimatedCalories,
-        score: 1,
-        accuracy_avg: "1.00",
         completed_at: new Date().toISOString(),
         analysis: {
-          calibration_id: calibration?.id ?? null,
           exercise_type: "pushup",
           reps: pushupRepSummaries.map((rep) => ({
             rep_index: rep.repIndex,
             metrics: rep.metrics,
+            representative_feedback_code: rep.representativeFeedbackCode ?? null,
           })),
         },
       });
@@ -207,9 +205,7 @@ export function CameraAnalysisPage() {
           ...fallbackState,
           completedCount: response.count,
           calories: response.calories,
-          score: response.score,
-          accuracyAvg: response.accuracy_avg,
-          analysis: response.analysis,
+          aiFeedback: response.ai_feedback ?? null,
         },
       });
     } catch (error) {

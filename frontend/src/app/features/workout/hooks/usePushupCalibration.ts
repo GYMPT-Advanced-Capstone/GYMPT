@@ -7,6 +7,8 @@ import { buildPushupObservation } from "../utils/pushup";
 const HOLD_DURATION_MS = 2000;
 const TRANSITION_DELAY_MS = 1000;
 const COMPLETE_REDIRECT_DELAY_MS = 1200;
+const UNSTABLE_FRAME_TOLERANCE = 8;
+const BOTTOM_SHOULDER_DROP_THRESHOLD = 0.05;
 
 export type PushupCalibrationStep =
   | "idle"
@@ -20,16 +22,19 @@ export type PushupCalibrationStep =
 
 function isStablePose(
   phase: "top" | "bottom",
-  metrics: { elbowAngle: number; bodyLineAngle: number },
+  metrics: { elbowAngle: number; shoulderY: number; bodyLineAngle: number },
+  topShoulderY: number | null = null,
 ) {
-  const bodyLineStable = metrics.bodyLineAngle >= 145;
+  const bodyLineStable = metrics.bodyLineAngle >= 130;
   if (!bodyLineStable) {
     return false;
   }
   if (phase === "top") {
-    return metrics.elbowAngle >= 145;
+    return metrics.elbowAngle >= 130;
   }
-  return metrics.elbowAngle >= 60 && metrics.elbowAngle <= 115;
+  // 바텀: 탑 자세 대비 어깨가 충분히 내려왔는지 확인
+  if (topShoulderY === null) return false;
+  return metrics.shoulderY >= topShoulderY + BOTTOM_SHOULDER_DROP_THRESHOLD;
 }
 
 interface UsePushupCalibrationParams {
@@ -63,6 +68,8 @@ export function usePushupCalibration({
   const [isSavingCalibration, setIsSavingCalibration] = useState(false);
   const [isCalibrationComplete, setIsCalibrationComplete] = useState(false);
   const captureStartedAtRef = useRef<number | null>(null);
+  const unstableFrameCountRef = useRef(0);
+  const topShoulderYRef = useRef<number | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
   const completeTimeoutRef = useRef<number | null>(null);
   const lastSpokenStepRef = useRef<PushupCalibrationStep | null>(null);
@@ -102,6 +109,8 @@ export function usePushupCalibration({
   const resetCalibration = useCallback(() => {
     pushupSamplesRef.current = { top: [], bottom: [] };
     captureStartedAtRef.current = null;
+    unstableFrameCountRef.current = 0;
+    topShoulderYRef.current = null;
     setPhase("top");
     setStep("idle");
     setCapturedSide(null);
@@ -122,6 +131,8 @@ export function usePushupCalibration({
   const startCalibration = useCallback(() => {
     pushupSamplesRef.current = { top: [], bottom: [] };
     captureStartedAtRef.current = null;
+    unstableFrameCountRef.current = 0;
+    topShoulderYRef.current = null;
     setPhase("top");
     setStep("top_waiting");
     setCapturedSide(null);
@@ -160,7 +171,9 @@ export function usePushupCalibration({
     if (step === "top_waiting") {
       message = "탑 자세를 유지해주세요.";
     } else if (step === "transition_to_bottom") {
-      message = "이제 바텀 자세를 측정합니다. 바텀 자세를 유지해주세요.";
+      message = "탑 자세 측정 완료. 이제 바텀 자세를 취해주세요.";
+    } else if (step === "bottom_waiting") {
+      message = "가슴을 바닥에 가깝게 내린 바텀 자세를 유지해주세요.";
     } else if (step === "complete") {
       message = "초기 자세 설정이 완료되었습니다. 운동을 시작합니다.";
     }
@@ -185,32 +198,46 @@ export function usePushupCalibration({
 
     const observation = buildPushupObservation(landmarks);
     if (!observation) {
-      captureStartedAtRef.current = null;
-      if (step === "top_counting") {
-        pushupSamplesRef.current.top = [];
-        setStep("top_waiting");
-      } else if (step === "bottom_counting") {
-        pushupSamplesRef.current.bottom = [];
-        setStep("bottom_waiting");
+      unstableFrameCountRef.current += 1;
+      if (unstableFrameCountRef.current > UNSTABLE_FRAME_TOLERANCE) {
+        unstableFrameCountRef.current = 0;
+        captureStartedAtRef.current = null;
+        if (step === "top_counting") {
+          pushupSamplesRef.current.top = [];
+          setStep("top_waiting");
+        } else if (step === "bottom_counting") {
+          pushupSamplesRef.current.bottom = [];
+          lastSpokenStepRef.current = null;
+          setStep("bottom_waiting");
+        }
       }
       return;
     }
 
     const activePhase = step === "top_waiting" || step === "top_counting" ? "top" : "bottom";
-    const stable = isStablePose(activePhase, observation.metrics);
+    const stable = isStablePose(activePhase, observation.metrics, topShoulderYRef.current);
     setCapturedSide(observation.trackedLandmarks.side);
 
     if (!stable) {
+      unstableFrameCountRef.current += 1;
+      if (unstableFrameCountRef.current <= UNSTABLE_FRAME_TOLERANCE) {
+        return;
+      }
+      unstableFrameCountRef.current = 0;
       captureStartedAtRef.current = null;
       pushupSamplesRef.current[activePhase] = [];
       if (activePhase === "top" && step === "top_counting") {
         setStep("top_waiting");
       }
       if (activePhase === "bottom" && step === "bottom_counting") {
+        // bottom_waiting으로 돌아올 때 TTS 재발화를 위해 lastSpokenStep 초기화
+        lastSpokenStepRef.current = null;
         setStep("bottom_waiting");
       }
       return;
     }
+
+    unstableFrameCountRef.current = 0;
 
     pushupSamplesRef.current[activePhase].push({
       phase: activePhase,
@@ -230,6 +257,12 @@ export function usePushupCalibration({
     captureStartedAtRef.current = null;
 
     if (activePhase === "top") {
+      // 탑 샘플의 평균 shoulderY를 저장 → 바텀 감지 기준으로 사용
+      const topSamples = pushupSamplesRef.current.top;
+      if (topSamples.length > 0) {
+        const avgShoulderY = topSamples.reduce((sum, s) => sum + (s.metrics.shoulderY ?? 0), 0) / topSamples.length;
+        topShoulderYRef.current = avgShoulderY;
+      }
       setPhase("bottom");
       setStep("transition_to_bottom");
       if (transitionTimeoutRef.current !== null) {
