@@ -5,6 +5,7 @@ import { BottomNav } from '../../components/BottomNav';
 import { Trophy, TrendingUp, Zap } from 'lucide-react';
 import { userApi, localExerciseGoalStorage, type UserProfile } from '../../api/userApi';
 import { workoutApi } from '../../api/workoutApi';
+import trainerImg from '../../../assets/exercises/trainer.png';
 
 import squatImg from '../../../assets/exercises/squat.png';
 import pushupImg from '../../../assets/exercises/pushup.png';
@@ -144,10 +145,14 @@ export function MainPage() {
                 height: 46,
                 backgroundColor: 'rgba(63,253,212,0.12)',
                 border: '1.5px solid rgba(63,253,212,0.4)',
-                fontSize: 22,
+                overflow: 'hidden',
               }}
             >
-              🦾
+              <img
+                src={trainerImg}
+                alt="trainer"
+                style={{ width: '80%', height: '80%', objectFit: 'cover' }}
+              />
             </div>
             <div>
               <p style={{ color: '#888888', fontSize: 12, marginBottom: 2 }}>AI 트레이너</p>
