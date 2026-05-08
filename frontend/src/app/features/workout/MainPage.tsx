@@ -348,29 +348,7 @@ export function MainPage() {
             ))}
           </div>
         </div>
-
-        <div className="px-5 mb-4">
-          <div
-            className="rounded-2xl px-5 py-4"
-            style={{
-              background: 'linear-gradient(135deg, #1E2E2A 0%, #1A2420 100%)',
-              border: '1px solid rgba(63,253,212,0.2)',
-            }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <span style={{ fontSize: 18 }}>🤖</span>
-              <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
-                AI PT쌤 한마디
-              </span>
-            </div>
-            <p style={{ color: '#CCCCCC', fontSize: 13, lineHeight: 1.6 }}>
-              오늘 스쿼트 자세가 어제보다 <span style={{ color: '#3FFDD4', fontWeight: 700 }}>15% 개선</span>됐어요!
-              무릎 각도를 조금 더 신경 써보면 완벽한 자세가 될 것 같아요. 파이팅! 💪
-            </p>
-          </div>
-        </div>
       </div>
-
       <BottomNav />
     </div>
   );
