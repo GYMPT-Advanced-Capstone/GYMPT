@@ -1,4 +1,13 @@
-from sqlalchemy import DECIMAL, BigInteger, Column, DateTime, ForeignKey, Integer, JSON, Text
+from sqlalchemy import (
+    DECIMAL,
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 

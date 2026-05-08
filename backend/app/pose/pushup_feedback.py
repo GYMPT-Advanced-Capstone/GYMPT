@@ -162,7 +162,10 @@ class PushupFeedbackProcessor:
             return False
         vertical_span = abs(shoulder[1] - ankle[1])
         horizontal_span = abs(shoulder[0] - ankle[0])
-        return vertical_span < PUSHUP_MAX_VERTICAL_SPAN and horizontal_span > PUSHUP_MIN_HORIZONTAL_SPAN
+        return (
+            vertical_span < PUSHUP_MAX_VERTICAL_SPAN
+            and horizontal_span > PUSHUP_MIN_HORIZONTAL_SPAN
+        )
 
     def _resolve_observation(
         self,

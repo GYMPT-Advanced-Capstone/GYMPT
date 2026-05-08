@@ -59,7 +59,9 @@ def generate_workout_feedback(
     rep_summary = _summarize_rep_feedbacks(rep_feedback_codes)
     duration_min = duration_seconds // 60
     duration_sec = duration_seconds % 60
-    duration_label = f"{duration_min}분 {duration_sec}초" if duration_min else f"{duration_sec}초"
+    duration_label = (
+        f"{duration_min}분 {duration_sec}초" if duration_min else f"{duration_sec}초"
+    )
 
     prompt = f"""사용자가 {exercise_name} {total_reps}회를 {duration_label} 동안 수행했습니다.
 
