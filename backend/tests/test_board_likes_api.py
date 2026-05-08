@@ -10,9 +10,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-# ---------------------------------
-# import 시점 env 안전장치
-# ---------------------------------
 os.environ.setdefault("MYSQL_HOST", "localhost")
 os.environ.setdefault("MYSQL_PORT", "3306")
 os.environ.setdefault("MYSQL_USER", "test_user")
@@ -22,7 +19,7 @@ os.environ.setdefault("SECRET_KEY", "test_secret_key_for_testing_only")
 os.environ.setdefault("ALGORITHM", "HS256")
 
 from app.board.dependencies import get_current_user
-from app.board.models import Board, Like
+from app.board.models import Board, BoardImage, Like
 from app.core.database import Base, get_db
 from app.main import app
 from app.users.models import User
@@ -114,16 +111,24 @@ def create_board(
     user: User,
     title: str,
     content: str,
-    imgpath: str | None = None,
+    image_paths: list[str] | None = None,
     likes: int = 0,
 ) -> Board:
     board = Board(
         title=title,
         content=content,
-        imgpath=imgpath,
         likes=likes,
         writer_id=user.id,
     )
+
+    for index, imgpath in enumerate(image_paths or [], start=1):
+        board.images.append(
+            BoardImage(
+                imgpath=imgpath,
+                sort_order=index,
+            )
+        )
+
     db.add(board)
     db.commit()
     db.refresh(board)

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS `user` (
   `nickname` VARCHAR(100) NOT NULL,
   `birth_date` DATE NULL,
   `weekly_target` INT NULL,
+  `height` INT NULL,
+  `weight` INT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_user_email` (`email`),

@@ -148,6 +148,14 @@ export function MyPage() {
 
       if (profile) {
         setUserProfile(profile);
+        if (profile.height != null && profile.weight != null) {
+          const synced = { height: profile.height, weight: profile.weight };
+          bodyStorage.save(synced);
+          setBodyData(synced);
+        } else if (profile.weight != null) {
+          bodyStorage.updateWeight(profile.weight);
+          setBodyData(bodyStorage.load());
+        }
       } else {
         const userId = tokenStorage.getUserId();
         const userName = tokenStorage.getUserName();
@@ -159,6 +167,8 @@ export function MyPage() {
             nickname: userName,
             birth_date: null,
             weekly_target: 3,
+            height: null,
+            weight: null,
             created_at: new Date().toISOString(),
           });
         } else {
@@ -227,8 +237,12 @@ export function MyPage() {
         setUserProfile(updated);
 
       } else if (editTarget === 'weight') {
+        const currentHeight = userProfile?.height ?? bodyData?.height ?? null;
         bodyStorage.updateWeight(tmpCount);
         setBodyData(bodyStorage.load());
+        if (currentHeight != null) {
+          await userApi.updateBody(currentHeight, tmpCount);
+        }
 
       } else if (typeof editTarget === 'object' && editTarget.type === 'exercise') {
         const g = editTarget.goal;

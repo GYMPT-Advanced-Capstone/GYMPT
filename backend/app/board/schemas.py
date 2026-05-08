@@ -2,6 +2,26 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class BoardImageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    image_id: int = Field(
+        ...,
+        description="게시글 이미지 ID",
+        json_schema_extra={"example": 1},
+    )
+    imgpath: str = Field(
+        ...,
+        description="게시글 이미지 경로",
+        json_schema_extra={"example": "/static/board/image_20260426103000123456.jpg"},
+    )
+    sort_order: int = Field(
+        ...,
+        description="이미지 정렬 순서",
+        json_schema_extra={"example": 1},
+    )
+
+
 class BoardResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -20,10 +40,9 @@ class BoardResponse(BaseModel):
         description="게시글 내용",
         json_schema_extra={"example": "스쿼트 100개 완료했습니다."},
     )
-    imgpath: str | None = Field(
-        None,
-        description="게시글 이미지 경로",
-        json_schema_extra={"example": "/static/board/workout_image_20260327103000.jpg"},
+    images: list[BoardImageResponse] = Field(
+        default_factory=list,
+        description="게시글 이미지 목록",
     )
     writer: str = Field(
         ...,

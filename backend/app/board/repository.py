@@ -1,7 +1,9 @@
-from sqlalchemy import case, select, update, func
-from sqlalchemy.orm import Session
+from __future__ import annotations
 
-from app.board.models import Board, Comment, Like
+from sqlalchemy import case, select, update, func
+from sqlalchemy.orm import Session, selectinload
+
+from app.board.models import Board, BoardImage, Comment, Like
 from app.users.models import User
 
 
@@ -17,49 +19,53 @@ def get_board_by_id(db: Session, board_no: int) -> Board | None:
     return db.query(Board).filter(Board.board_no == board_no).first()
 
 
+def get_board_by_id_with_images(db: Session, board_no: int) -> Board | None:
+    stmt = (
+        select(Board)
+        .options(selectinload(Board.images))
+        .where(Board.board_no == board_no)
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def create_board(
     db: Session,
     title: str,
     content: str,
-    imgpath: str | None,
     writer_id: int,
+    image_paths: list[str],
 ) -> Board:
-    new_board = Board(
+    board = Board(
         title=title,
         content=content,
-        imgpath=imgpath,
         writer_id=writer_id,
     )
 
+    for index, imgpath in enumerate(image_paths, start=1):
+        board.images.append(
+            BoardImage(
+                imgpath=imgpath,
+                sort_order=index,
+            )
+        )
+
     try:
-        db.add(new_board)
+        db.add(board)
         db.commit()
     except Exception as exc:
         db.rollback()
         raise BoardCommitError from exc
 
     try:
-        db.refresh(new_board)
+        db.refresh(board)
+        db.refresh(board, attribute_names=["images"])
     except Exception as exc:
         raise BoardRefreshError from exc
 
-    return new_board
+    return board
 
 
-def update_board(
-    db: Session,
-    board: Board,
-    title: str | None,
-    content: str | None,
-    imgpath: str | None,
-) -> Board:
-    if title is not None:
-        board.title = title
-    if content is not None:
-        board.content = content
-
-    board.imgpath = imgpath
-
+def update_board_with_images(db: Session, board: Board) -> Board:
     try:
         db.commit()
     except Exception as exc:
@@ -68,6 +74,7 @@ def update_board(
 
     try:
         db.refresh(board)
+        db.refresh(board, attribute_names=["images"])
     except Exception as exc:
         raise BoardRefreshError from exc
 
@@ -105,6 +112,7 @@ def get_board_list(
                 "comments_count"
             ),
         )
+        .options(selectinload(Board.images))
         .join(User, Board.writer_id == User.id)
         .outerjoin(liked_subquery, liked_subquery.c.board_no == Board.board_no)
         .outerjoin(
@@ -124,6 +132,7 @@ def get_board_list(
 def get_board_detail(db: Session, board_no: int) -> tuple[Board, str] | None:
     stmt = (
         select(Board, User.nickname)
+        .options(selectinload(Board.images))
         .join(User, Board.writer_id == User.id)
         .where(Board.board_no == board_no)
     )
