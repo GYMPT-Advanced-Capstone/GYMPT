@@ -148,3 +148,25 @@ def test_pushup_pose_service_returns_error_on_missing_tracked_landmarks():
 
     assert response["type"] == "feedback"
     assert response["status"] == "not_in_position"
+
+
+def test_pushup_pose_service_returns_insufficient_visibility_when_horizontal_but_partial_landmarks():
+    service = PoseFeedbackService()
+    state = service.create_session()
+
+    # 어깨-발목이 수평 자세이지만 팔꿈치 등 일부 랜드마크 누락
+    response = service.handle_message(
+        state,
+        {
+            "type": "pose_landmarks",
+            "exerciseType": "pushup",
+            "timestampMs": 1000,
+            "trackedLandmarks": {
+                "shoulder": {"x": 0.7, "y": 0.4},
+                "ankle": {"x": 0.1, "y": 0.45},
+            },
+        },
+    )
+
+    assert response["type"] == "error"
+    assert response["status"] == "insufficient_visibility"
