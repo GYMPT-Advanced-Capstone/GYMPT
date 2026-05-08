@@ -4,12 +4,17 @@ import { Minus, Plus } from "lucide-react";
 import { GoalLayout } from "./components/GoalLayout";
 import { useGoal } from "../../context/GoalContext";
 
+import squatImg from "../../../assets/exercises/squat.png";
+import pushupImg from "../../../assets/exercises/pushup.png";
+import lungeImg from "../../../assets/exercises/lunge.png";
+import plankImg from "../../../assets/exercises/plank.png";
+
 type ExerciseId = "squat" | "pushup" | "lunge" | "plank";
 
 interface ExerciseDef {
   id: ExerciseId;
   name: string;
-  emoji: string;
+  img: string;
   unit: string;
   min: number;
   max: number;
@@ -21,7 +26,7 @@ const exercises: ExerciseDef[] = [
   {
     id: "squat",
     name: "스쿼트",
-    emoji: "🦵",
+    img: squatImg,
     unit: "개",
     min: 5,
     max: 100,
@@ -31,7 +36,7 @@ const exercises: ExerciseDef[] = [
   {
     id: "pushup",
     name: "푸시업",
-    emoji: "💪",
+    img: pushupImg,
     unit: "개",
     min: 3,
     max: 80,
@@ -41,7 +46,7 @@ const exercises: ExerciseDef[] = [
   {
     id: "lunge",
     name: "런지",
-    emoji: "🏃",
+    img: lungeImg,
     unit: "개",
     min: 5,
     max: 60,
@@ -51,7 +56,7 @@ const exercises: ExerciseDef[] = [
   {
     id: "plank",
     name: "플랭크",
-    emoji: "🧘",
+    img: plankImg,
     unit: "초",
     min: 10,
     max: 300,
@@ -97,7 +102,6 @@ export function GoalExerciseAllPage() {
       totalSteps={4}
       onBack={() => navigate("/goal/weekly")}
     >
-      {/* Title */}
       <div className="px-6 pt-8 pb-4">
         <h1
           style={{
@@ -116,7 +120,6 @@ export function GoalExerciseAllPage() {
         </p>
       </div>
 
-      {/* Exercise Cards */}
       <div className="px-6 flex flex-col gap-4 flex-1" style={{ marginTop: 20 }}>
         {exercises.map((ex) => {
           const count = counts[ex.id];
@@ -134,7 +137,6 @@ export function GoalExerciseAllPage() {
               }}
             >
               <div className="flex items-center justify-between">
-                {/* Left: emoji + name */}
                 <div className="flex items-center gap-3">
                   <div
                     className="flex items-center justify-center rounded-xl flex-shrink-0"
@@ -143,10 +145,14 @@ export function GoalExerciseAllPage() {
                       height: 42,
                       backgroundColor: "rgba(114,225,177,0.12)",
                       border: "1px solid rgba(114,225,177,0.25)",
-                      fontSize: 20,
+                      overflow: "hidden",
                     }}
                   >
-                    {ex.emoji}
+                    <img
+                      src={ex.img}
+                      alt={ex.name}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
                   </div>
                   <div className="flex flex-col">
                     <span
@@ -170,12 +176,9 @@ export function GoalExerciseAllPage() {
                   </div>
                 </div>
 
-                {/* Right: stepper */}
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() =>
-                      handleChange(ex.id, -ex.step, ex.min, ex.max)
-                    }
+                    onClick={() => handleChange(ex.id, -ex.step, ex.min, ex.max)}
                     disabled={atMin}
                     style={{
                       width: 32,
@@ -215,9 +218,7 @@ export function GoalExerciseAllPage() {
                   </div>
 
                   <button
-                    onClick={() =>
-                      handleChange(ex.id, ex.step, ex.min, ex.max)
-                    }
+                    onClick={() => handleChange(ex.id, ex.step, ex.min, ex.max)}
                     disabled={atMax}
                     style={{
                       width: 32,
@@ -242,7 +243,6 @@ export function GoalExerciseAllPage() {
         })}
       </div>
 
-      {/* Next Button */}
       <div className="px-6 pb-16 pt-5">
         <button
           onClick={handleNext}
