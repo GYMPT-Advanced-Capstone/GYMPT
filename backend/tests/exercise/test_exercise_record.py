@@ -199,7 +199,9 @@ def test_exercise_record_service_create_with_squat_analysis_generates_ai_feedbac
         duration_seconds=45,
         rep_feedback_codes=["depth_low", "knee_track", "good"],
     )
-    assert repo.ai_feedback_updated == "스쿼트 깊이와 무릎 방향을 조금 더 신경써 주세요."
+    assert (
+        repo.ai_feedback_updated == "스쿼트 깊이와 무릎 방향을 조금 더 신경써 주세요."
+    )
     assert result.ai_feedback == "스쿼트 깊이와 무릎 방향을 조금 더 신경써 주세요."
 
 

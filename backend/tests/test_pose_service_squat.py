@@ -84,7 +84,10 @@ def test_squat_pose_service_returns_korean_visibility_feedback():
     )
 
     assert response["status"] == "insufficient_visibility"
-    assert response["feedbackMessage"] == "몸의 측면 관절이 보이도록 카메라와 몸을 맞춰주세요."
+    assert (
+        response["feedbackMessage"]
+        == "몸의 측면 관절이 보이도록 카메라와 몸을 맞춰주세요."
+    )
 
 
 def test_squat_torso_lean_feedback_is_relaxed_for_natural_hip_hinge():
@@ -211,7 +214,9 @@ def test_squat_representative_feedback_ignores_transient_depth_low_after_good_de
         current_rep_warning_counts={"depth_low": 3},
     )
 
-    representative_code, representative_message = processor._resolve_representative_feedback(state)
+    representative_code, representative_message = (
+        processor._resolve_representative_feedback(state)
+    )
 
     assert representative_code == "good"
     assert representative_message == "좋은 자세예요."

@@ -9,9 +9,7 @@ from app.pose.squat_feedback import SquatFeedbackProcessor
 
 DEFAULT_GOAL_COUNT = 10
 DEFAULT_POSE_ISSUE = "무릎이 발끝과 같은 방향을 바라보도록 자세를 맞춰주세요."
-SESSION_STARTED_MESSAGE = (
-    "운동 분석을 시작할 준비가 되었습니다."
-)
+SESSION_STARTED_MESSAGE = "운동 분석을 시작할 준비가 되었습니다."
 UNSUPPORTED_MESSAGE_TYPE = "지원하지 않는 메시지 타입입니다."
 NO_LANDMARKS_MESSAGE = "몸이 화면 안에 잘 보이도록 위치를 조정해 주세요."
 INSUFFICIENT_LANDMARKS_MESSAGE = (

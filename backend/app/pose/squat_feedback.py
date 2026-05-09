@@ -97,7 +97,9 @@ class SquatFeedbackProcessor:
         if zone == "top" and state.movement_zone != "top" and state.rep_active:
             rep_duration_ms = 0.0
             if state.current_rep_started_at_ms > 0:
-                rep_duration_ms = max(0.0, timestamp_ms - state.current_rep_started_at_ms)
+                rep_duration_ms = max(
+                    0.0, timestamp_ms - state.current_rep_started_at_ms
+                )
 
             if rep_duration_ms >= SQUAT_MIN_REP_DURATION_MS:
                 rep_completed = True
@@ -411,8 +413,7 @@ class SquatFeedbackProcessor:
                 max(
                     0.0,
                     min(
-                        (torso_stability_rate * 0.3)
-                        + (knee_stability_rate * 0.7),
+                        (torso_stability_rate * 0.3) + (knee_stability_rate * 0.7),
                         1.0,
                     ),
                 ),
