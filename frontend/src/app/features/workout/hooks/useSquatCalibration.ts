@@ -240,6 +240,8 @@ export function useSquatCalibration({
         onSuccess();
       }, COMPLETE_REDIRECT_DELAY_MS);
     }).catch((error) => {
+      captureStartedAtRef.current = null;
+      samplesRef.current.bottom = [];
       setStep("bottom_waiting");
       setCalibrationError(error instanceof Error ? error.message : "스쿼트 기준 범위 저장에 실패했습니다.");
     }).finally(() => {

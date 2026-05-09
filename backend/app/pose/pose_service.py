@@ -24,7 +24,7 @@ class PoseSessionState:
     full_rep_count: int = 0
     last_timestamp_ms: float = 0.0
     last_pose_issue: str = DEFAULT_POSE_ISSUE
-    exercise_type: str = "squat"
+    exercise_type: str = "legacy"
     movement_zone: str = "top"
     rep_active: bool = False
     current_rep_started_at_ms: float = 0.0
@@ -105,12 +105,11 @@ class PoseFeedbackService:
         if message_type != "pose_landmarks":
             return self.build_error_message(UNSUPPORTED_MESSAGE_TYPE, state=state)
 
-        exercise_type = self._to_exercise_type(payload.get("exerciseType"))
-        if exercise_type is None:
-            return self._handle_pose_landmarks(state, payload)
+        requested_exercise_type = self._to_exercise_type(payload.get("exerciseType"))
+        if requested_exercise_type in {"pushup", "squat"}:
+            state.exercise_type = requested_exercise_type
 
-        state.exercise_type = exercise_type
-
+        exercise_type = requested_exercise_type or state.exercise_type
         if exercise_type == "pushup":
             return self._handle_pushup_landmarks(state, payload)
         if exercise_type == "squat":

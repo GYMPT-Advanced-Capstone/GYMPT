@@ -34,7 +34,7 @@ export function PostWorkout() {
   const result = (location.state ?? {}) as WorkoutResultState;
 
   const exerciseId = result.exerciseId ?? "";
-  const exerciseName = result.name || WORKOUT_EXERCISES[exerciseId]?.name || "운동";
+  const exerciseName = WORKOUT_EXERCISES[exerciseId]?.name || result.name || "운동";
   const targetCount = result.targetCount ?? 0;
   const completedCount = result.completedCount ?? 0;
   const durationLabel = toDurationLabel(result);

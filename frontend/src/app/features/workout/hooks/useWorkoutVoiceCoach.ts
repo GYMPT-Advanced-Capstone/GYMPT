@@ -124,7 +124,9 @@ export function useWorkoutVoiceCoach({
     if (isLandmarkLost || shouldSpeakVisibilityPrompt) {
       if (!lostStateRef.current) {
         lostStateRef.current = true;
+        lastSpokenPosturePromptRef.current = null;
         cancelSpeech();
+        scheduleNoticeUpdate(visibilityPrompt ?? LANDMARK_LOST_MESSAGE);
         speak(visibilityPrompt ?? LANDMARK_LOST_MESSAGE);
       }
       return;
@@ -155,6 +157,9 @@ export function useWorkoutVoiceCoach({
 
   useEffect(() => {
     if (!enabled || isLandmarkLost || visibilityPrompt || !posturePrompt) {
+      if (!posturePrompt || isLandmarkLost || visibilityPrompt) {
+        lastSpokenPosturePromptRef.current = null;
+      }
       return;
     }
 

@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from app.pose.pose_service import PoseFeedbackService
-from app.pose.squat_feedback import SquatFeedbackProcessor
+from app.pose.squat_feedback import SQUAT_VIEW_MESSAGE, SquatFeedbackProcessor
 
 
 def test_squat_pose_service_counts_rep_and_builds_summary():
@@ -88,6 +88,31 @@ def test_squat_pose_service_returns_korean_visibility_feedback():
         response["feedbackMessage"]
         == "몸의 측면 관절이 보이도록 카메라와 몸을 맞춰주세요."
     )
+
+
+def test_squat_pose_service_reuses_session_exercise_type_when_payload_omits_it():
+    service = PoseFeedbackService()
+    state = service.create_session(goal_count=10)
+
+    service.handle_message(
+        state,
+        {
+            "type": "pose_landmarks",
+            "exerciseType": "squat",
+            "timestampMs": 1000,
+            "landmarks": [],
+        },
+    )
+    response = service.handle_message(
+        state,
+        {
+            "type": "pose_landmarks",
+            "timestampMs": 1100,
+            "landmarks": [],
+        },
+    )
+
+    assert response["feedbackMessage"] == SQUAT_VIEW_MESSAGE
 
 
 def test_squat_torso_lean_feedback_is_relaxed_for_natural_hip_hinge():
