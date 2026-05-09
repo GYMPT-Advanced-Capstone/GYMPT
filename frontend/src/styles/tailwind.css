@@ -1,6 +1,6 @@
 @import 'tailwindcss' source(none);
-@source '../**/*.{js,ts,jsx,tsx}';
-
 @import 'tw-animate-css';
+
+@source '../**/*.{js,ts,jsx,tsx}';
 
 @custom-variant mob-land (@media (orientation: landscape) and (max-height: 500px));

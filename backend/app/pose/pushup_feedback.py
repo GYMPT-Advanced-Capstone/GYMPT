@@ -42,6 +42,7 @@ class PushupFeedbackProcessor:
         state.last_timestamp_ms = timestamp_ms
 
         if not self._is_pushup_orientation(tracked_landmarks):
+            state.reset_rep_tracking()
             return {
                 "type": "feedback",
                 "exerciseType": "pushup",

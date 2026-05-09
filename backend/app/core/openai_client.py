@@ -32,11 +32,14 @@ def _summarize_rep_feedbacks(rep_feedback_codes: list[str | None]) -> str:
     counter: Counter[str] = Counter(
         code for code in rep_feedback_codes if code and code != "good"
     )
-    good_count = sum(1 for code in rep_feedback_codes if not code or code == "good")
+    good_count = sum(1 for code in rep_feedback_codes if code == "good")
+    unclassified_count = sum(1 for code in rep_feedback_codes if not code)
 
     lines = [f"총 {total}회 수행"]
     if good_count:
         lines.append(f"- 정자세: {good_count}회")
+    if unclassified_count:
+        lines.append(f"- 미분류: {unclassified_count}회")
     for code, count in counter.most_common():
         label = _FEEDBACK_CODE_KO.get(code, code)
         lines.append(f"- {label}: {count}회")
@@ -78,7 +81,7 @@ def generate_workout_feedback(
 - 300자 이내, 헤더나 목록 없이 자연스러운 문장으로 작성"""
 
     try:
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        client = OpenAI(api_key=settings.OPENAI_API_KEY, timeout=30.0, max_retries=1)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[

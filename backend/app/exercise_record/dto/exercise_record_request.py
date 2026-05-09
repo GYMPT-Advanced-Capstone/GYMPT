@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -22,7 +22,7 @@ class ExerciseRepSummaryRequest(BaseModel):
             }
         },
     )
-    representative_feedback_code: str | None = Field(
+    representative_feedback_code: Literal["hip_sag", "hip_high", "depth_low", "body_line_bad", "good"] | None = Field(
         default=None,
         description="해당 반복의 대표 자세 피드백 코드 (hip_sag, hip_high, depth_low, body_line_bad, good)",
         json_schema_extra={"example": "hip_sag"},
