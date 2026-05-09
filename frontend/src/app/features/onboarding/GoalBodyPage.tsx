@@ -40,7 +40,7 @@ export function GoalBodyPage() {
         <p style={{ color: '#888888', fontSize: 14, lineHeight: 1.6, marginBottom: 28 }}>
           더 정확한 운동 플랜 제공을 위해 사용돼요.
           <br />
-          절대 외부에 공개되지 않아요.
+          입력한 정보는 공개되지 않아요.
         </p>
 
         <div
