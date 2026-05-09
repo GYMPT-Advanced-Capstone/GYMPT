@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
+from collections.abc import Sequence
 from openai import OpenAI
 
 from app.core.config import get_settings
@@ -24,7 +25,7 @@ _EXERCISE_NAME_KO: dict[str, str] = {
 }
 
 
-def _summarize_rep_feedbacks(rep_feedback_codes: list[str | None]) -> str:
+def _summarize_rep_feedbacks(rep_feedback_codes: Sequence[str | None]) -> str:
     total = len(rep_feedback_codes)
     if total == 0:
         return "반복 데이터 없음"
@@ -51,7 +52,7 @@ def generate_workout_feedback(
     exercise_type: str,
     total_reps: int,
     duration_seconds: int,
-    rep_feedback_codes: list[str | None],
+    rep_feedback_codes: Sequence[str | None],
 ) -> str | None:
     settings = get_settings()
     if not settings.OPENAI_API_KEY:
