@@ -15,6 +15,8 @@ import { useWorkoutVoiceCoach } from "./hooks/useWorkoutVoiceCoach";
 import type { NormalizedLandmark } from "./types/pose";
 import { buildPushupObservation } from "./utils/pushup";
 
+const SQUAT_KCAL_PER_REP = 0.32;
+
 const TEXT = {
   finishWorkout: "운동 종료",
   feedbackTitle: "AI 실시간 피드백",
@@ -43,10 +45,7 @@ export function CameraAnalysisPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const startedAtRef = useRef<number | null>(null);
   const [calibration, setCalibration] = useState<ExerciseCalibrationResponse | null>(null);
-  const [calibrationStatus, setCalibrationStatus] = useState<"idle" | "loading" | "ready" | "error">(
-    isPushup ? "loading" : "ready",
-  );
-  const [finishError, setFinishError] = useState<string | null>(null);
+  const [calibrationStatus, setCalibrationStatus] = useState<"idle" | "loading" | "ready" | "error">("loading");
   const [isSavingResult, setIsSavingResult] = useState(false);
 
   const {
@@ -58,11 +57,6 @@ export function CameraAnalysisPage() {
   } = useCameraPreview(videoRef);
 
   useEffect(() => {
-    if (!isPushup) {
-      setCalibrationStatus("ready");
-      return;
-    }
-
     let cancelled = false;
     setCalibrationStatus("loading");
     workoutApi.getLatestCalibration(exercise.backendExerciseId)
@@ -84,7 +78,7 @@ export function CameraAnalysisPage() {
     return () => {
       cancelled = true;
     };
-  }, [exercise.backendExerciseId, isPushup, navigate, resolvedExerciseId]);
+  }, [exercise.backendExerciseId, navigate, resolvedExerciseId]);
 
   useEffect(() => {
     if (isStreaming && startedAtRef.current === null) {
@@ -96,7 +90,9 @@ export function CameraAnalysisPage() {
   }, [isStreaming]);
 
   const { analysis: squatAnalysis, onPoseLandmarks: onSquatPoseLandmarks } = useSquatAnalysis({
-    enabled: isStreaming && !isPushup,
+    enabled: isStreaming && !isPushup && calibrationStatus === "ready",
+    goalCount: targetCount,
+    calibrationMetrics: (calibration?.metrics as Record<string, unknown> | null) ?? null,
   });
   const {
     analysis: pushupAnalysis,
@@ -130,16 +126,29 @@ export function CameraAnalysisPage() {
   });
 
   const currentAnalysis = isPushup ? pushupAnalysis : squatAnalysis;
-  const pushupRepSummaries = isPushup ? pushupAnalysis.repSummaries : [];
+  const repSummaries = isPushup ? pushupAnalysis.repSummaries : squatAnalysis.repSummaries;
   const estimatedCalories = isPushup
     ? (currentAnalysis.fullRepCount * PUSHUP_KCAL_PER_REP).toFixed(2)
-    : "0.00";
+    : (currentAnalysis.fullRepCount * SQUAT_KCAL_PER_REP).toFixed(2);
   const { noticeMessageOverride } = useWorkoutVoiceCoach({
-    enabled: isStreaming && isPushup,
+    enabled: isStreaming && calibrationStatus === "ready",
     hasPoseLandmarks,
     poseStatus,
     goalCount: targetCount,
-    repEvent: isPushup ? pushupAnalysis.lastRepEvent : null,
+    visibilityPrompt:
+      !isPushup
+      && currentAnalysis.fullRepCount === 0
+      && currentAnalysis.status === "insufficient_visibility"
+        ? currentAnalysis.feedbackMessage
+        : null,
+    posturePrompt:
+      !isPushup
+      && currentAnalysis.fullRepCount === 0
+      && currentAnalysis.status === "tracking"
+      && currentAnalysis.feedbackMessage
+        ? currentAnalysis.feedbackMessage
+        : null,
+    repEvent: currentAnalysis.lastRepEvent,
   });
   let noticeMessage: string = TEXT.searching;
   if (!isStreaming) {
@@ -150,8 +159,6 @@ export function CameraAnalysisPage() {
     noticeMessage = TEXT.modelLoading;
   } else if (poseStatus === "error") {
     noticeMessage = poseErrorMessage ?? TEXT.modelError;
-  } else if (finishError) {
-    noticeMessage = finishError;
   } else if (hasPoseLandmarks) {
     noticeMessage = isPushup ? TEXT.detecting : (currentAnalysis.feedbackMessage || TEXT.detecting);
   }
@@ -174,11 +181,10 @@ export function CameraAnalysisPage() {
       durationSeconds,
       durationLabel: formatDuration(durationSeconds),
       calories: estimatedCalories,
-      score: 0,
       retryPath: `/workout/camera/${resolvedExerciseId}`,
     };
 
-    if (!isPushup || pushupRepSummaries.length === 0) {
+    if (repSummaries.length === 0) {
       navigate("/post-workout", { state: fallbackState });
       return;
     }
@@ -192,8 +198,8 @@ export function CameraAnalysisPage() {
         calories: estimatedCalories,
         completed_at: new Date().toISOString(),
         analysis: {
-          exercise_type: "pushup",
-          reps: pushupRepSummaries.map((rep) => ({
+          exercise_type: resolvedExerciseId,
+          reps: repSummaries.map((rep) => ({
             rep_index: rep.repIndex,
             metrics: rep.metrics,
             representative_feedback_code: rep.representativeFeedbackCode ?? null,
@@ -209,8 +215,7 @@ export function CameraAnalysisPage() {
           aiFeedback: response.ai_feedback ?? null,
         },
       });
-    } catch (error) {
-      setFinishError(error instanceof Error ? error.message : "운동 기록 저장에 실패했습니다.");
+    } catch {
       navigate("/post-workout", { state: fallbackState });
     } finally {
       setIsSavingResult(false);
@@ -245,7 +250,7 @@ export function CameraAnalysisPage() {
             noticeMessage={noticeMessage}
             noticeTitle={TEXT.feedbackTitle}
             onRequestCamera={requestCamera}
-            stageMinHeightClassName={isPushup ? "min-h-[420px] md:min-h-[540px]" : "min-h-[700px]"}
+            stageMinHeightClassName={isPushup ? "min-h-[420px] md:min-h-[540px]" : "min-h-[calc(100dvh-112px)] md:min-h-[900px]"}
             videoRef={videoRef}
           />
 
@@ -274,7 +279,7 @@ export function CameraAnalysisPage() {
         </main>
 
         <button
-          className="mt-5 rounded-[16px] bg-[#3FEED0] py-4 text-[19px] font-extrabold text-[#081B16] disabled:cursor-not-allowed disabled:bg-[#2A4A43] disabled:text-[#9CC7BE]"
+          className={`${isPushup ? "mt-5" : "mt-2"} rounded-[16px] bg-[#3FEED0] py-4 text-[19px] font-extrabold text-[#081B16] disabled:cursor-not-allowed disabled:bg-[#2A4A43] disabled:text-[#9CC7BE]`}
           disabled={isSavingResult || calibrationStatus === "loading"}
           onClick={() => {
             void handleEndWorkout();

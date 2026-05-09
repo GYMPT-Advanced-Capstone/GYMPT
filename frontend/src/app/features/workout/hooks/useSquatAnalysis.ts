@@ -5,6 +5,8 @@ import type { SquatAnalysisSnapshot, SquatAnalysisStatus } from "../types/squat"
 
 interface UseSquatAnalysisParams {
   enabled: boolean;
+  goalCount: number;
+  calibrationMetrics: Record<string, unknown> | null;
 }
 
 interface UseSquatAnalysisResult {
@@ -20,6 +22,11 @@ interface BackendFeedbackPayload {
   message?: string;
   fullRepCount?: number;
   count?: number;
+  repCompleted?: boolean;
+  repSummary?: Record<string, number>;
+  warningCode?: string;
+  representativeFeedbackCode?: string;
+  representativeFeedbackMessage?: string;
 }
 
 const LANDMARK_SEND_INTERVAL_MS = 100;
@@ -40,6 +47,9 @@ const INITIAL_ANALYSIS: SquatAnalysisSnapshot = {
   status: "idle",
   feedbackMessage: "",
   fullRepCount: 0,
+  repSummaries: [],
+  warningCode: null,
+  lastRepEvent: null,
 };
 
 function createInitialAnalysis(): SquatAnalysisSnapshot {
@@ -110,6 +120,19 @@ function toNumber(value: unknown): number | null {
   return null;
 }
 
+function toNumberRecord(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const entries = Object.entries(value).flatMap(([key, rawValue]) => {
+    const numericValue = toNumber(rawValue);
+    return numericValue === null ? [] : [[key, numericValue] as const];
+  });
+
+  return Object.fromEntries(entries);
+}
+
 function isSquatAnalysisStatus(value: unknown): value is SquatAnalysisStatus {
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(STATUS_MAP, value);
 }
@@ -142,6 +165,7 @@ function parseBackendFeedback(raw: unknown): BackendFeedbackPayload | null {
   }
 
   const payload = isRecord(parsed.data) ? parsed.data : parsed;
+  const repSummary = toNumberRecord(payload.repSummary);
 
   return {
     timestampMs: toNumber(payload.timestampMs) ?? undefined,
@@ -151,22 +175,40 @@ function parseBackendFeedback(raw: unknown): BackendFeedbackPayload | null {
     feedback: typeof payload.feedback === "string" ? payload.feedback : undefined,
     message: typeof payload.message === "string" ? payload.message : undefined,
     fullRepCount: toNumber(payload.fullRepCount) ?? toNumber(payload.count) ?? undefined,
+    repCompleted: payload.repCompleted === true,
+    repSummary,
+    warningCode: typeof payload.warningCode === "string" ? payload.warningCode : undefined,
+    representativeFeedbackCode:
+      typeof payload.representativeFeedbackCode === "string"
+        ? payload.representativeFeedbackCode
+        : undefined,
+    representativeFeedbackMessage:
+      typeof payload.representativeFeedbackMessage === "string"
+        ? payload.representativeFeedbackMessage
+        : undefined,
   };
 }
 
 function buildPosePayload(
   landmarks: NormalizedLandmark[] | null,
   timestampMs: number,
+  goalCount: number,
+  calibrationMetrics: Record<string, unknown> | null,
 ): string {
   return JSON.stringify({
     type: "pose_landmarks",
+    exerciseType: "squat",
     timestampMs,
+    goalCount,
+    calibrationMetrics,
     landmarks: landmarks ?? [],
   });
 }
 
 export function useSquatAnalysis({
   enabled,
+  goalCount,
+  calibrationMetrics,
 }: UseSquatAnalysisParams): UseSquatAnalysisResult {
   const [analysis, setAnalysis] = useState<SquatAnalysisSnapshot>(createInitialAnalysis);
   const socketRef = useRef<WebSocket | null>(null);
@@ -190,16 +232,16 @@ export function useSquatAnalysis({
 
       lastSentAtMsRef.current = timestampMs;
       try {
-        socket.send(buildPosePayload(landmarks, timestampMs));
+        socket.send(buildPosePayload(landmarks, timestampMs, goalCount, calibrationMetrics));
       } catch {
         // Ignore send errors; connection state is handled by onclose/onerror.
       }
     },
-    [enabled],
+    [calibrationMetrics, enabled, goalCount],
   );
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !calibrationMetrics) {
       lastSentAtMsRef.current = 0;
       disconnectNotifiedRef.current = false;
       if (socketRef.current) {
@@ -240,19 +282,49 @@ export function useSquatAnalysis({
         const nextStatus = isSquatAnalysisStatus(feedback.status) ? feedback.status : prev.status;
         const nextTimestamp = feedback.timestampMs ?? performance.now();
 
+        let nextRepSummaries = prev.repSummaries;
+        let nextLastRepEvent = prev.lastRepEvent;
+        if (feedback.repCompleted && feedback.repSummary) {
+          nextRepSummaries = [
+            ...prev.repSummaries,
+            {
+              repIndex: prev.repSummaries.length + 1,
+              metrics: feedback.repSummary,
+              representativeFeedbackCode: feedback.representativeFeedbackCode,
+              representativeFeedbackMessage: feedback.representativeFeedbackMessage,
+            },
+          ];
+          nextLastRepEvent = {
+            count: nextCount,
+            feedbackMessage: feedback.representativeFeedbackMessage ?? nextMessage,
+            feedbackCode: feedback.representativeFeedbackCode ?? null,
+          };
+        } else if (nextCount > prev.fullRepCount) {
+          nextLastRepEvent = {
+            count: nextCount,
+            feedbackMessage: nextMessage,
+            feedbackCode: feedback.warningCode ?? prev.lastRepEvent?.feedbackCode ?? null,
+          };
+        }
+
         if (
           nextMessage === prev.feedbackMessage
           && nextCount === prev.fullRepCount
           && nextStatus === prev.status
+          && nextRepSummaries === prev.repSummaries
         ) {
           return prev;
         }
 
         return {
+          ...prev,
           timestampMs: nextTimestamp,
           status: nextStatus,
           feedbackMessage: nextMessage,
           fullRepCount: nextCount,
+          repSummaries: nextRepSummaries,
+          warningCode: feedback.warningCode ?? prev.warningCode,
+          lastRepEvent: nextLastRepEvent,
         };
       });
     };
@@ -294,7 +366,7 @@ export function useSquatAnalysis({
       }
       socket.close();
     };
-  }, [enabled]);
+  }, [calibrationMetrics, enabled]);
 
   return {
     analysis: enabled ? analysis : INITIAL_ANALYSIS,
