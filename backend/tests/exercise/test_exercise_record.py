@@ -156,6 +156,53 @@ def test_exercise_record_service_create_with_analysis_generates_ai_feedback():
     assert result.ai_feedback == "엉덩이가 처지고 있습니다. 복근에 힘을 주세요."
 
 
+def test_exercise_record_service_create_with_squat_analysis_generates_ai_feedback():
+    repo = FakeExerciseRecordRepo()
+    service = ExerciseRecordService(repo)
+    request = ExerciseRecordCreateRequest(
+        exercise_id=11,
+        count=3,
+        duration=45,
+        calories=Decimal("2.50"),
+        completed_at=datetime(2026, 3, 26, 10, 30, 0),
+        analysis={
+            "exercise_type": "squat",
+            "reps": [
+                {
+                    "rep_index": 1,
+                    "metrics": {},
+                    "representative_feedback_code": "depth_low",
+                },
+                {
+                    "rep_index": 2,
+                    "metrics": {},
+                    "representative_feedback_code": "knee_track",
+                },
+                {
+                    "rep_index": 3,
+                    "metrics": {},
+                    "representative_feedback_code": "good",
+                },
+            ],
+        },
+    )
+
+    with patch(
+        "app.exercise_record.exercise_record_service.generate_workout_feedback",
+        return_value="스쿼트 깊이와 무릎 방향을 조금 더 신경써 주세요.",
+    ) as mock_generate:
+        result = service.create(7, request)
+
+    mock_generate.assert_called_once_with(
+        exercise_type="squat",
+        total_reps=3,
+        duration_seconds=45,
+        rep_feedback_codes=["depth_low", "knee_track", "good"],
+    )
+    assert repo.ai_feedback_updated == "스쿼트 깊이와 무릎 방향을 조금 더 신경써 주세요."
+    assert result.ai_feedback == "스쿼트 깊이와 무릎 방향을 조금 더 신경써 주세요."
+
+
 def test_exercise_record_service_create_with_analysis_no_feedback_when_none():
     repo = FakeExerciseRecordRepo()
     service = ExerciseRecordService(repo)

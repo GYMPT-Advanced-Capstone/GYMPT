@@ -33,14 +33,14 @@ export function PostWorkout() {
   const location = useLocation();
   const result = (location.state ?? {}) as WorkoutResultState;
 
-  const exerciseName = result.name || "스쿼트";
+  const exerciseId = result.exerciseId ?? "";
+  const exerciseName = result.name || WORKOUT_EXERCISES[exerciseId]?.name || "운동";
   const targetCount = result.targetCount ?? 0;
   const completedCount = result.completedCount ?? 0;
   const durationLabel = toDurationLabel(result);
   const calories = result.calories ?? "0.00";
   const retryPath = result.retryPath ?? "/main";
   const aiFeedback = result.aiFeedback ?? null;
-  const exerciseId = result.exerciseId ?? "";
   const iconSrc = WORKOUT_EXERCISES[exerciseId]?.iconSrc ?? null;
 
   return (
@@ -99,7 +99,7 @@ export function PostWorkout() {
             <p className="text-[15px] leading-relaxed text-gray-300">{aiFeedback}</p>
           ) : (
             <p className="text-[14px] leading-relaxed text-gray-500">
-              푸시업 운동을 완료하면 AI가 자세 피드백을 제공합니다.
+              {exerciseName} 운동을 완료하면 AI가 자세 피드백을 제공합니다.
             </p>
           )}
         </div>
