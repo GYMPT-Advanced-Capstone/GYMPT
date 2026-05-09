@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { workoutApi, type ExerciseCalibrationSampleRequest } from "../../../api/workoutApi";
 import type { NormalizedLandmark } from "../types/pose";
 import { buildPushupObservation } from "../utils/pushup";
+import { cancelSpeech, speakKorean } from "../utils/speech";
 
 const HOLD_DURATION_MS = 2000;
 const TRANSITION_DELAY_MS = 1000;
@@ -79,31 +80,7 @@ export function usePushupCalibration({
   });
 
   const speak = useCallback((message: string) => {
-    if (
-      typeof window === "undefined"
-      || !("speechSynthesis" in window)
-      || !("SpeechSynthesisUtterance" in window)
-    ) {
-      return;
-    }
-
-    const synth = window.speechSynthesis;
-    synth.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(message);
-    const voices = synth.getVoices();
-    const voice =
-      voices.find((item) => item.lang.toLowerCase().startsWith("ko")) ?? null;
-
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang;
-    } else {
-      utterance.lang = "ko-KR";
-    }
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    synth.speak(utterance);
+    speakKorean(message, { cancel: true });
   }, []);
 
   const resetCalibration = useCallback(() => {
@@ -156,9 +133,7 @@ export function usePushupCalibration({
       if (completeTimeoutRef.current !== null) {
         window.clearTimeout(completeTimeoutRef.current);
       }
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
+      cancelSpeech();
     };
   }, []);
 

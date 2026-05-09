@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { cancelSpeech, canUseSpeechSynthesis, speakKorean } from "../utils/speech";
+
 interface UseWorkoutVoiceCoachParams {
   enabled: boolean;
   hasPoseLandmarks: boolean;
   poseStatus: string;
   goalCount: number;
+  visibilityPrompt: string | null;
+  posturePrompt: string | null;
   repEvent: {
     count: number;
     feedbackMessage: string;
@@ -20,21 +24,20 @@ const MESSAGE_DISPLAY_MS = 1000;
 const LANDMARK_LOST_MESSAGE = "화면 안으로 돌아와 주세요.";
 const SLOW_DOWN_MESSAGE = "속도를 늦춰주세요.";
 
-function canSpeak() {
-  return typeof window !== "undefined" && "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
-}
-
 export function useWorkoutVoiceCoach({
   enabled,
   hasPoseLandmarks,
   poseStatus,
   goalCount,
+  visibilityPrompt,
+  posturePrompt,
   repEvent,
 }: UseWorkoutVoiceCoachParams): UseWorkoutVoiceCoachResult {
   const [noticeMessageOverride, setNoticeMessageOverride] = useState<string | null>(null);
   const queueBusyUntilRef = useRef(0);
   const pendingCueRef = useRef<{ count: number; nextCue: string } | null>(null);
   const lastHandledRepCountRef = useRef(0);
+  const lastSpokenPosturePromptRef = useRef<string | null>(null);
   const lostStateRef = useRef(false);
   const clearTimeoutRef = useRef<number | null>(null);
   const deferredNoticeTimeoutRef = useRef<number | null>(null);
@@ -72,35 +75,17 @@ export function useWorkoutVoiceCoach({
   }, [clearNotice, showMessage]);
 
   const speak = useCallback((message: string, onEnd?: () => void) => {
-    if (!canSpeak()) {
-      onEnd?.();
-      return;
-    }
-    const synth = window.speechSynthesis;
-    const utterance = new SpeechSynthesisUtterance(message);
-    const voices = synth.getVoices();
-    const voice = voices.find((item) => item.lang.toLowerCase().startsWith("ko")) ?? null;
-    if (voice) {
-      utterance.voice = voice;
-      utterance.lang = voice.lang;
-    } else {
-      utterance.lang = "ko-KR";
-    }
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.onend = () => onEnd?.();
-    utterance.onerror = () => onEnd?.();
-    synth.speak(utterance);
+    speakKorean(message, { onEnd });
   }, []);
 
   const playRepSequence = useCallback((feedbackMessage: string, nextCue: string) => {
     const now = Date.now();
     queueBusyUntilRef.current = now + 1400;
     showMessage(feedbackMessage);
-    if (!canSpeak()) {
+    if (!canUseSpeechSynthesis()) {
       return;
     }
-    window.speechSynthesis.cancel();
+    cancelSpeech();
     speak(feedbackMessage, () => {
       showMessage(nextCue);
       speak(nextCue);
@@ -113,11 +98,10 @@ export function useWorkoutVoiceCoach({
       scheduleNoticeUpdate(null);
       pendingCueRef.current = null;
       lastHandledRepCountRef.current = 0;
+      lastSpokenPosturePromptRef.current = null;
       lostStateRef.current = false;
       queueBusyUntilRef.current = 0;
-      if (canSpeak()) {
-        window.speechSynthesis.cancel();
-      }
+      cancelSpeech();
       return;
     }
   }, [clearNotice, enabled, scheduleNoticeUpdate]);
@@ -125,26 +109,23 @@ export function useWorkoutVoiceCoach({
   useEffect(() => {
     return () => {
       clearNotice();
-      if (canSpeak()) {
-        window.speechSynthesis.cancel();
-      }
+      cancelSpeech();
     };
   }, [clearNotice]);
 
   const isLandmarkLost = enabled && poseStatus === "ready" && !hasPoseLandmarks;
+  const shouldSpeakVisibilityPrompt = enabled && visibilityPrompt !== null;
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
-    if (isLandmarkLost) {
+    if (isLandmarkLost || shouldSpeakVisibilityPrompt) {
       if (!lostStateRef.current) {
         lostStateRef.current = true;
-        if (canSpeak()) {
-          window.speechSynthesis.cancel();
-        }
-        speak(LANDMARK_LOST_MESSAGE);
+        cancelSpeech();
+        speak(visibilityPrompt ?? LANDMARK_LOST_MESSAGE);
       }
       return;
     }
@@ -160,7 +141,30 @@ export function useWorkoutVoiceCoach({
         scheduleNoticeUpdate(null);
       }
     }
-  }, [enabled, hasPoseLandmarks, isLandmarkLost, scheduleNoticeUpdate, showMessage, speak, poseStatus]);
+  }, [
+    enabled,
+    hasPoseLandmarks,
+    isLandmarkLost,
+    scheduleNoticeUpdate,
+    showMessage,
+    speak,
+    poseStatus,
+    shouldSpeakVisibilityPrompt,
+    visibilityPrompt,
+  ]);
+
+  useEffect(() => {
+    if (!enabled || isLandmarkLost || visibilityPrompt || !posturePrompt) {
+      return;
+    }
+
+    if (lastSpokenPosturePromptRef.current === posturePrompt) {
+      return;
+    }
+
+    lastSpokenPosturePromptRef.current = posturePrompt;
+    speak(posturePrompt);
+  }, [enabled, isLandmarkLost, posturePrompt, speak, visibilityPrompt]);
 
   useEffect(() => {
     if (!enabled || !repEvent || repEvent.count <= lastHandledRepCountRef.current) {
@@ -178,9 +182,7 @@ export function useWorkoutVoiceCoach({
     if (Date.now() < queueBusyUntilRef.current) {
       pendingCueRef.current = null;
       scheduleNoticeUpdate(SLOW_DOWN_MESSAGE);
-      if (canSpeak()) {
-        window.speechSynthesis.cancel();
-      }
+      cancelSpeech();
       speak(SLOW_DOWN_MESSAGE);
       queueBusyUntilRef.current = Date.now() + 1000;
       return;
@@ -192,9 +194,17 @@ export function useWorkoutVoiceCoach({
     return () => {
       window.clearTimeout(repSequenceTimeout);
     };
-  }, [enabled, goalCount, isLandmarkLost, playRepSequence, repEvent, scheduleNoticeUpdate, speak]);
+  }, [
+    enabled,
+    goalCount,
+    isLandmarkLost,
+    playRepSequence,
+    repEvent,
+    scheduleNoticeUpdate,
+    speak,
+  ]);
 
   return {
-    noticeMessageOverride: enabled && isLandmarkLost ? LANDMARK_LOST_MESSAGE : noticeMessageOverride,
+    noticeMessageOverride: isLandmarkLost ? LANDMARK_LOST_MESSAGE : noticeMessageOverride,
   };
 }
