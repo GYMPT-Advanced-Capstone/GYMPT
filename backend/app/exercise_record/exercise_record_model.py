@@ -1,4 +1,13 @@
-from sqlalchemy import DECIMAL, BigInteger, Column, DateTime, ForeignKey, Integer, JSON
+from sqlalchemy import (
+    DECIMAL,
+    BigInteger,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -17,17 +26,10 @@ class ExerciseRecord(Base):
     count = Column(Integer, nullable=False)
     duration = Column(Integer, nullable=False)
     calories = Column(DECIMAL(6, 2), nullable=False)  # type: ignore[var-annotated]
-    score = Column(Integer, nullable=False)
-    accuracy_avg = Column(DECIMAL(5, 2), nullable=False)  # type: ignore[var-annotated]
     completed_at = Column(DateTime, nullable=False, default=func.now())
+    ai_feedback = Column(Text, nullable=True)
 
     exercise = relationship("Exercise", back_populates="records")
-    analysis = relationship(
-        "ExerciseRecordAnalysis",
-        back_populates="record",
-        cascade="all, delete-orphan",
-        uselist=False,
-    )
 
 
 class UserExerciseCalibration(Base):
@@ -46,30 +48,3 @@ class UserExerciseCalibration(Base):
     )
 
     exercise = relationship("Exercise")
-
-
-class ExerciseRecordAnalysis(Base):
-    __tablename__ = "exercise_record_analysis"
-
-    id = Column(BigInteger, primary_key=True, index=True)
-    exercise_record_id = Column(
-        BigInteger,
-        ForeignKey("exercise_records.id"),
-        nullable=False,
-        unique=True,
-        index=True,
-    )
-    calibration_id = Column(
-        BigInteger,
-        ForeignKey("user_exercise_calibrations.id"),
-        nullable=True,
-        index=True,
-    )
-    range_score = Column(Integer, nullable=False)
-    extension_score = Column(Integer, nullable=False)
-    stability_score = Column(Integer, nullable=False)
-    range_summary_json = Column(JSON, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=func.now())
-
-    record = relationship("ExerciseRecord", back_populates="analysis")
-    calibration = relationship("UserExerciseCalibration")

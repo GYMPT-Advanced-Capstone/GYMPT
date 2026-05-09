@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 
 import { workoutApi, type ExerciseCalibrationResponse } from "../../api/workoutApi";
@@ -189,15 +190,13 @@ export function CameraAnalysisPage() {
         count: currentAnalysis.fullRepCount,
         duration: durationSeconds,
         calories: estimatedCalories,
-        score: 1,
-        accuracy_avg: "1.00",
         completed_at: new Date().toISOString(),
         analysis: {
-          calibration_id: calibration?.id ?? null,
           exercise_type: "pushup",
           reps: pushupRepSummaries.map((rep) => ({
             rep_index: rep.repIndex,
             metrics: rep.metrics,
+            representative_feedback_code: rep.representativeFeedbackCode ?? null,
           })),
         },
       });
@@ -207,9 +206,7 @@ export function CameraAnalysisPage() {
           ...fallbackState,
           completedCount: response.count,
           calories: response.calories,
-          score: response.score,
-          accuracyAvg: response.accuracy_avg,
-          analysis: response.analysis,
+          aiFeedback: response.ai_feedback ?? null,
         },
       });
     } catch (error) {
@@ -223,20 +220,23 @@ export function CameraAnalysisPage() {
   return (
     <div className="flex min-h-[100dvh] items-start justify-center bg-[#080A0D]">
       <div
-        className="flex w-full max-w-[960px] flex-col px-4 pb-7 pt-3"
+        className="flex w-full max-w-[960px] flex-col px-4 pb-7 pt-3 mob-land:max-w-none mob-land:px-0 mob-land:pt-0 mob-land:pb-0"
         style={{ minHeight: "100dvh", backgroundColor: "#090B0E" }}
       >
-        <WorkoutHeader
-          currentCount={currentAnalysis.fullRepCount}
-          exercise={{
-            id: exercise.id,
-            name: exercise.analysisName,
-            iconSrc: exercise.iconSrc,
-            targetCount,
-          }}
-        />
+        {/* 세로: 일반 헤더 */}
+        <div className="mob-land:hidden">
+          <WorkoutHeader
+            currentCount={currentAnalysis.fullRepCount}
+            exercise={{
+              id: exercise.id,
+              name: exercise.analysisName,
+              iconSrc: exercise.iconSrc,
+              targetCount,
+            }}
+          />
+        </div>
 
-        <main className="mt-4 flex flex-1 flex-col gap-4">
+        <main className="mt-4 flex flex-1 flex-col gap-4 mob-land:mt-0 mob-land:relative">
           <CameraStage
             canvasRef={canvasRef}
             cameraErrorMessage={cameraErrorMessage}
@@ -248,6 +248,29 @@ export function CameraAnalysisPage() {
             stageMinHeightClassName={isPushup ? "min-h-[420px] md:min-h-[540px]" : "min-h-[700px]"}
             videoRef={videoRef}
           />
+
+          {/* 가로(모바일): 카메라 위 반투명 헤더 오버레이 */}
+          <div className="hidden mob-land:flex absolute top-3 left-3 right-3 z-20 items-center justify-between rounded-2xl bg-black/60 px-3 py-2 backdrop-blur-md">
+            <div className="flex items-center gap-2">
+              <button
+                aria-label="뒤로 가기"
+                className="flex h-9 w-9 items-center justify-center text-white/90"
+                onClick={() => navigate(-1)}
+                type="button"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              {exercise.iconSrc && (
+                <img src={exercise.iconSrc} alt={exercise.analysisName} className="h-6 w-6 object-contain" />
+              )}
+              <span className="text-[15px] font-extrabold text-white">{exercise.analysisName}</span>
+            </div>
+            <div className="rounded-full border border-[#39F4D3] bg-[#102C28]/80 px-3 py-[3px]">
+              <span className="text-[12px] font-bold text-[#3FFDD4]">
+                목표 {Math.min(currentAnalysis.fullRepCount, targetCount)}/{targetCount}
+              </span>
+            </div>
+          </div>
         </main>
 
         <button

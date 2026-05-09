@@ -21,6 +21,7 @@ export interface PushupTrackedLandmarks {
 export interface PushupMetrics extends Record<string, number> {
   elbowAngle: number;
   shoulderY: number;
+  elbowY: number;
   bodyLineAngle: number;
 }
 
@@ -145,6 +146,7 @@ export function buildPushupObservation(
         trackedLandmarks.wrist,
       ).toFixed(2)),
       shoulderY: Number(trackedLandmarks.shoulder.y.toFixed(4)),
+      elbowY: Number(trackedLandmarks.elbow.y.toFixed(4)),
       bodyLineAngle: Number(calculateAngle(
         trackedLandmarks.shoulder,
         trackedLandmarks.hip,

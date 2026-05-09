@@ -118,7 +118,7 @@ function fromLocalGoal(g: LocalExerciseGoal, idx: number): DisplayGoal {
 
 export function MyPage() {
   const navigate = useNavigate();
-  const { goal: goalCtx } = useGoal();
+  const { goal: goalCtx, updateGoal } = useGoal();
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [displayGoals, setDisplayGoals] = useState<DisplayGoal[]>([]);
@@ -255,7 +255,15 @@ export function MyPage() {
           await userApi.updateExerciseGoal(g.api_goal_id, data);
         }
 
-        if (g.key) localExerciseGoalStorage.update(g.key, tmpCount);
+        if (g.key) {
+          localExerciseGoalStorage.update(g.key, tmpCount);
+          updateGoal({
+            exerciseCounts: {
+              ...goalCtx.exerciseCounts,
+              [g.key]: tmpCount,
+            },
+          });
+        }
 
         setDisplayGoals((prev) =>
           prev.map((item) =>

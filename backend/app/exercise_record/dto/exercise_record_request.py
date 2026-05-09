@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -22,6 +22,13 @@ class ExerciseRepSummaryRequest(BaseModel):
             }
         },
     )
+    representative_feedback_code: (
+        Literal["hip_sag", "hip_high", "depth_low", "body_line_bad", "good"] | None
+    ) = Field(
+        default=None,
+        description="해당 반복의 대표 자세 피드백 코드 (hip_sag, hip_high, depth_low, body_line_bad, good)",
+        json_schema_extra={"example": "hip_sag"},
+    )
 
     @field_validator("rep_index")
     @classmethod
@@ -32,11 +39,6 @@ class ExerciseRepSummaryRequest(BaseModel):
 
 
 class ExerciseRecordAnalysisCreateRequest(BaseModel):
-    calibration_id: int | None = Field(
-        default=None,
-        description="운동에 사용한 초기 가동범위 설정 ID",
-        json_schema_extra={"example": 1},
-    )
     exercise_type: str | None = Field(
         default=None,
         description="운동 타입",
@@ -53,14 +55,6 @@ class ExerciseRecordAnalysisCreateRequest(BaseModel):
                         "bottomElbowAngle": 97.0,
                         "topElbowAngle": 163.0,
                         "bodyLineAngle": 172.0,
-                    },
-                },
-                {
-                    "rep_index": 2,
-                    "metrics": {
-                        "bottomElbowAngle": 95.0,
-                        "topElbowAngle": 164.0,
-                        "bodyLineAngle": 173.0,
                     },
                 },
             ]
@@ -98,16 +92,6 @@ class ExerciseRecordCreateRequest(BaseModel):
         description="소모 칼로리",
         json_schema_extra={"example": "13.5"},
     )
-    score: int = Field(
-        ...,
-        description="운동 점수",
-        json_schema_extra={"example": 95},
-    )
-    accuracy_avg: Decimal = Field(
-        ...,
-        description="평균 정확도",
-        json_schema_extra={"example": "97.25"},
-    )
     completed_at: datetime = Field(
         ...,
         description="운동 완료 시각",
@@ -115,17 +99,17 @@ class ExerciseRecordCreateRequest(BaseModel):
     )
     analysis: ExerciseRecordAnalysisCreateRequest | None = Field(
         default=None,
-        description="자세 분석 점수 계산에 사용할 선택 분석 요약",
+        description="AI 피드백 생성에 사용할 반복별 자세 분석 데이터",
     )
 
-    @field_validator("count", "duration", "score")
+    @field_validator("count", "duration")
     @classmethod
     def must_be_positive(cls, v: int) -> int:
         if v <= 0:
             raise ValueError("0보다 커야 합니다.")
         return v
 
-    @field_validator("calories", "accuracy_avg")
+    @field_validator("calories")
     @classmethod
     def must_be_non_negative(cls, v: Decimal) -> Decimal:
         if v < 0:

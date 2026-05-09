@@ -2,6 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 import sys
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
@@ -32,9 +33,8 @@ def make_record(
     count: int = 20,
     duration: int = 60,
     calories: Decimal = Decimal("13.50"),
-    score: int = 95,
-    accuracy_avg: Decimal = Decimal("97.25"),
     completed_at: datetime = datetime(2026, 3, 26, 10, 30, 0),
+    ai_feedback: str | None = None,
 ):
     return SimpleNamespace(
         id=record_id,
@@ -44,45 +44,28 @@ def make_record(
         count=count,
         duration=duration,
         calories=calories,
-        score=score,
-        accuracy_avg=accuracy_avg,
         completed_at=completed_at,
+        ai_feedback=ai_feedback,
     )
 
 
 class FakeExerciseRecordRepo:
     def __init__(self):
         self.created_record = None
-        self.created_analysis = None
         self.record_by_id = None
         self.records_by_date = []
         self.calendar_dates = []
         self.deleted_record = None
-        self.calibration_by_id = None
+        self.ai_feedback_updated = None
 
     def create(self, record):
         record.id = 99
         record.exercise = Exercise(
             id=record.exercise_id, name="Push Up", description=None
         )
-        record.analysis = None
+        record.ai_feedback = None
         self.created_record = record
         return record
-
-    def create_with_analysis(self, record, analysis=None):
-        created_record = self.create(record)
-        if analysis is not None:
-            analysis.exercise_record_id = created_record.id
-            self.create_analysis(analysis)
-        return created_record
-
-    def create_analysis(self, analysis):
-        analysis.id = 77
-        analysis.created_at = datetime(2026, 3, 26, 10, 31, 0)
-        self.created_analysis = analysis
-        if self.created_record is not None:
-            self.created_record.analysis = analysis
-        return analysis
 
     def get_by_id(self, record_id, user_id):
         if (
@@ -96,11 +79,12 @@ class FakeExerciseRecordRepo:
     def get_exercised_dates_by_month(self, user_id, year, month):
         return self.calendar_dates
 
-    def get_calibration_by_id(self, user_id, calibration_id):
-        return self.calibration_by_id
-
     def get_by_date(self, user_id, target_date):
         return self.records_by_date
+
+    def update_ai_feedback(self, record, ai_feedback):
+        record.ai_feedback = ai_feedback
+        self.ai_feedback_updated = ai_feedback
 
     def update(self, record, count, duration):
         if count is not None:
@@ -122,8 +106,6 @@ def test_exercise_record_service_create_returns_response():
         count=20,
         duration=60,
         calories=Decimal("13.50"),
-        score=95,
-        accuracy_avg=Decimal("97.25"),
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
     )
 
@@ -138,100 +120,67 @@ def test_exercise_record_service_create_returns_response():
         count=20,
         duration=60,
         calories=Decimal("13.50"),
-        score=95,
-        accuracy_avg=Decimal("97.25"),
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
     )
 
 
-def test_exercise_record_service_create_calculates_scores_from_analysis():
+def test_exercise_record_service_create_with_analysis_generates_ai_feedback():
     repo = FakeExerciseRecordRepo()
-    repo.calibration_by_id = SimpleNamespace(
-        metrics_json={
-            "exerciseType": "pushup",
-            "bottom": {"elbowAngle": 92.0, "bodyLineAngle": 176.0},
-            "top": {"elbowAngle": 168.0, "bodyLineAngle": 177.0},
-        }
-    )
     service = ExerciseRecordService(repo)
     request = ExerciseRecordCreateRequest(
         exercise_id=10,
-        count=10,
-        duration=72,
-        calories=Decimal("8.40"),
-        score=1,
-        accuracy_avg=Decimal("1.00"),
+        count=5,
+        duration=60,
+        calories=Decimal("4.20"),
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
         analysis={
-            "calibration_id": 5,
             "exercise_type": "pushup",
             "reps": [
                 {
                     "rep_index": 1,
-                    "metrics": {
-                        "rangeCompletionRate": 0.82,
-                        "topExtensionRate": 0.94,
-                        "bodyStabilityRate": 0.88,
-                    },
-                }
+                    "metrics": {},
+                    "representative_feedback_code": "hip_sag",
+                },
+                {"rep_index": 2, "metrics": {}, "representative_feedback_code": "good"},
             ],
         },
     )
 
-    result = service.create(7, request)
+    with patch(
+        "app.exercise_record.exercise_record_service.generate_workout_feedback",
+        return_value="엉덩이가 처지고 있습니다. 복근에 힘을 주세요.",
+    ):
+        result = service.create(7, request)
 
-    assert repo.created_record.score == 87
-    assert repo.created_record.accuracy_avg == Decimal("88")
-    assert repo.created_analysis.calibration_id == 5
-    assert result.score == 87
-    assert result.accuracy_avg == Decimal("88")
-    assert result.analysis is not None
-    assert result.analysis.range_score == 82
-    assert result.analysis.extension_score == 94
-    assert result.analysis.stability_score == 88
+    assert repo.ai_feedback_updated == "엉덩이가 처지고 있습니다. 복근에 힘을 주세요."
+    assert result.ai_feedback == "엉덩이가 처지고 있습니다. 복근에 힘을 주세요."
 
 
-def test_exercise_record_service_create_calculates_scores_from_calibration_metrics():
+def test_exercise_record_service_create_with_analysis_no_feedback_when_none():
     repo = FakeExerciseRecordRepo()
-    repo.calibration_by_id = SimpleNamespace(
-        metrics_json={
-            "exerciseType": "pushup",
-            "bottom": {"elbowAngle": 92.0, "bodyLineAngle": 176.0},
-            "top": {"elbowAngle": 168.0, "bodyLineAngle": 177.0},
-        }
-    )
     service = ExerciseRecordService(repo)
     request = ExerciseRecordCreateRequest(
         exercise_id=10,
-        count=10,
-        duration=72,
-        calories=Decimal("8.40"),
-        score=1,
-        accuracy_avg=Decimal("1.00"),
+        count=5,
+        duration=60,
+        calories=Decimal("4.20"),
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
         analysis={
-            "calibration_id": 5,
             "exercise_type": "pushup",
             "reps": [
-                {
-                    "rep_index": 1,
-                    "metrics": {
-                        "bottomElbowAngle": 97.0,
-                        "topElbowAngle": 163.0,
-                        "bodyLineAngle": 172.0,
-                    },
-                }
+                {"rep_index": 1, "metrics": {}, "representative_feedback_code": "good"}
             ],
         },
     )
 
-    result = service.create(7, request)
+    with patch(
+        "app.exercise_record.exercise_record_service.generate_workout_feedback",
+        return_value=None,
+    ):
+        result = service.create(7, request)
 
-    assert result.analysis is not None
-    assert result.analysis.range_score == 80
-    assert result.analysis.extension_score == 80
-    assert result.analysis.stability_score == 88
-    assert result.score == 82
+    assert repo.ai_feedback_updated is None
+    assert result.ai_feedback is None
 
 
 def test_exercise_record_request_rejects_empty_reps():
@@ -241,11 +190,8 @@ def test_exercise_record_request_rejects_empty_reps():
             count=10,
             duration=72,
             calories=Decimal("8.40"),
-            score=1,
-            accuracy_avg=Decimal("1.00"),
             completed_at=datetime(2026, 3, 26, 10, 30, 0),
             analysis={
-                "calibration_id": 5,
                 "exercise_type": "pushup",
                 "reps": [],
             },
@@ -284,6 +230,16 @@ def test_exercise_record_service_get_by_date_returns_response_list():
 
     assert [item.exercise_name for item in result] == ["Push Up", "Squat"]
     assert [item.id for item in result] == [1, 2]
+
+
+def test_exercise_record_service_update_returns_updated_record():
+    repo = FakeExerciseRecordRepo()
+    repo.record_by_id = make_record(count=20, duration=60)
+    service = ExerciseRecordService(repo)
+
+    result = service.update(7, 1, ExerciseRecordUpdateRequest(count=30))
+
+    assert result.count == 30
 
 
 def test_exercise_record_service_update_rejects_empty_payload():
@@ -344,8 +300,6 @@ def test_create_record_route_returns_created_record(client):
         count=20,
         duration=60,
         calories=Decimal("13.50"),
-        score=95,
-        accuracy_avg=Decimal("97.25"),
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
     )
     app.dependency_overrides[get_current_user_id] = lambda: 7
@@ -360,8 +314,6 @@ def test_create_record_route_returns_created_record(client):
             "count": 20,
             "duration": 60,
             "calories": "13.50",
-            "score": 95,
-            "accuracy_avg": "97.25",
             "completed_at": "2026-03-26T10:30:00",
         },
     )
@@ -401,8 +353,6 @@ def test_get_records_by_date_route_returns_record_list(client):
             count=20,
             duration=60,
             calories=Decimal("13.50"),
-            score=95,
-            accuracy_avg=Decimal("97.25"),
             completed_at=datetime(2026, 3, 26, 10, 30, 0),
         )
     ]
@@ -429,8 +379,6 @@ def test_update_record_route_returns_updated_record(client):
         count=25,
         duration=70,
         calories=Decimal("13.50"),
-        score=95,
-        accuracy_avg=Decimal("97.25"),
         completed_at=datetime(2026, 3, 26, 10, 30, 0),
     )
     app.dependency_overrides[get_current_user_id] = lambda: 7

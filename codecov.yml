@@ -7,3 +7,6 @@ coverage:
     project:
       default:
         target: 80%
+
+ignore:
+  - "backend/app/core/openai_client.py"

@@ -5,6 +5,7 @@ from typing import Any
 
 
 PUSHUP_VIEW_MESSAGE = "측면이 잘 보이도록 몸을 옆으로 보여주세요."
+PUSHUP_NOT_IN_POSITION_MESSAGE = "푸시업 자세로 바닥에 엎드려 주세요."
 PUSHUP_SAG_MESSAGE = "엉덩이가 처지고 있습니다. 몸통을 더 단단히 유지해주세요."
 PUSHUP_PIKE_MESSAGE = "엉덩이를 너무 높이 들지 마세요. 몸을 일직선으로 맞춰주세요."
 PUSHUP_DEPTH_MESSAGE = "깊이가 부족했습니다. 바텀 자세까지 조금 더 내려가주세요."
@@ -12,9 +13,13 @@ PUSHUP_GOOD_MESSAGE = "좋습니다."
 PUSHUP_BODY_LINE_MESSAGE = "상체 각도를 더 곧게 유지해주세요."
 PUSHUP_BOTTOM_GOOD_DEPTH = 0.70
 PUSHUP_TOP_ZONE_MAX = 0.30
-PUSHUP_HIP_OFFSET_THRESHOLD = 0.045
+PUSHUP_HIP_OFFSET_THRESHOLD = 0.08
 PUSHUP_BODY_LINE_TOLERANCE_DEGREES = 18.0
 PUSHUP_MIN_REP_DURATION_MS = 200.0
+# 어깨-발목 Y 차이가 이 값보다 크면 수직(서있는) 자세로 판단
+PUSHUP_MAX_VERTICAL_SPAN = 0.35
+# 어깨-발목 X 차이가 이 값보다 작으면 수평 자세가 아닌 것으로 판단
+PUSHUP_MIN_HORIZONTAL_SPAN = 0.15
 
 
 class PushupFeedbackProcessor:
@@ -34,12 +39,28 @@ class PushupFeedbackProcessor:
             state.calibration_metrics = calibration_metrics
 
         tracked_landmarks = payload.get("trackedLandmarks")
+        state.last_timestamp_ms = timestamp_ms
+
+        if not self._is_pushup_orientation(tracked_landmarks):
+            state.reset_rep_tracking()
+            return {
+                "type": "feedback",
+                "exerciseType": "pushup",
+                "status": "not_in_position",
+                "feedbackMessage": PUSHUP_NOT_IN_POSITION_MESSAGE,
+                "fullRepCount": state.full_rep_count,
+                "goalCount": state.goal_count,
+                "timestampMs": state.last_timestamp_ms,
+                "movementZone": state.movement_zone,
+                "repCompleted": False,
+                "warningCode": None,
+            }
+
         observation = self._resolve_observation(
             tracked_landmarks,
             state.calibration_metrics,
         )
 
-        state.last_timestamp_ms = timestamp_ms
         if observation is None:
             return {
                 "type": "error",
@@ -131,6 +152,21 @@ class PushupFeedbackProcessor:
                 "representativeFeedbackMessage"
             ]
         return response
+
+    def _is_pushup_orientation(self, tracked_landmarks: Any) -> bool:
+        """어깨-발목 좌표로 몸이 수평(푸시업) 자세인지 확인한다."""
+        if not isinstance(tracked_landmarks, dict):
+            return False
+        shoulder = self._point(tracked_landmarks.get("shoulder"))
+        ankle = self._point(tracked_landmarks.get("ankle"))
+        if shoulder is None or ankle is None:
+            return False
+        vertical_span = abs(shoulder[1] - ankle[1])
+        horizontal_span = abs(shoulder[0] - ankle[0])
+        return (
+            vertical_span < PUSHUP_MAX_VERTICAL_SPAN
+            and horizontal_span > PUSHUP_MIN_HORIZONTAL_SPAN
+        )
 
     def _resolve_observation(
         self,

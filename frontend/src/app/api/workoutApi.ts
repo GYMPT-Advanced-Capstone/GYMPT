@@ -18,6 +18,7 @@ export interface ExerciseCalibrationResponse {
 export interface ExerciseRecordRepRequest {
   rep_index: number;
   metrics: Record<string, number>;
+  representative_feedback_code?: string | null;
 }
 
 export interface ExerciseRecordResponse {
@@ -27,18 +28,8 @@ export interface ExerciseRecordResponse {
   count: number;
   duration: number;
   calories: string;
-  score: number;
-  accuracy_avg: string;
   completed_at: string;
-  analysis?: {
-    id: number;
-    calibration_id: number | null;
-    range_score: number;
-    extension_score: number;
-    stability_score: number;
-    range_summary: Record<string, number>;
-    created_at: string;
-  } | null;
+  ai_feedback?: string | null;
 }
 
 export const workoutApi = {
@@ -71,11 +62,8 @@ export const workoutApi = {
     count: number;
     duration: number;
     calories: string;
-    score: number;
-    accuracy_avg: string;
     completed_at: string;
     analysis?: {
-      calibration_id?: number | null;
       exercise_type?: string;
       reps: ExerciseRecordRepRequest[];
     };

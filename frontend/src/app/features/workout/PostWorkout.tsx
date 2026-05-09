@@ -1,18 +1,19 @@
-import { Activity, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 
 import { BottomNav } from "../../components/BottomNav";
+import { WORKOUT_EXERCISES } from "./config/exercises";
 
 interface WorkoutResultState {
+  exerciseId?: string;
   name?: string;
   targetCount?: number;
   completedCount?: number;
   durationLabel?: string;
   durationSeconds?: number;
   calories?: string;
-  score?: number;
   retryPath?: string;
-  accuracyAvg?: string;
+  aiFeedback?: string | null;
 }
 
 function toDurationLabel(state: WorkoutResultState) {
@@ -37,9 +38,10 @@ export function PostWorkout() {
   const completedCount = result.completedCount ?? 0;
   const durationLabel = toDurationLabel(result);
   const calories = result.calories ?? "0.00";
-  const score = result.score ?? 0;
-  const accuracyAvg = result.accuracyAvg ?? "0.00";
   const retryPath = result.retryPath ?? "/main";
+  const aiFeedback = result.aiFeedback ?? null;
+  const exerciseId = result.exerciseId ?? "";
+  const iconSrc = WORKOUT_EXERCISES[exerciseId]?.iconSrc ?? null;
 
   return (
     <div
@@ -65,43 +67,41 @@ export function PostWorkout() {
           <h1 className="text-[17px] font-bold tracking-widest text-white">운동 결과</h1>
         </header>
 
-        <div className="mb-8 flex shrink-0 items-center gap-5 rounded-[24px] border border-[#3FFDD4]/20 bg-gradient-to-br from-[#12221D] to-[#0A1411] p-5 shadow-[0_4px_24px_rgba(63,253,212,0.05)]">
-          <div className="relative flex h-[84px] w-[84px] items-center justify-center overflow-hidden rounded-2xl border border-[#3FFDD4]/20 bg-[#1A1E24]">
+        {/* 운동 정보 카드 - 목표/완료/시간/칼로리 */}
+        <div className="mb-6 flex shrink-0 items-center gap-4 rounded-[24px] border border-[#3FFDD4]/20 bg-gradient-to-br from-[#12221D] to-[#0A1411] p-5 shadow-[0_4px_24px_rgba(63,253,212,0.05)]">
+          <div className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#3FFDD4]/20 bg-[#1A1E24]">
             <div className="absolute inset-0 bg-[#3FFDD4]/5" />
-            <Activity size={36} className="relative z-10 text-[#3FFDD4] drop-shadow-[0_0_8px_rgba(63,253,212,0.5)]" strokeWidth={1.5} />
+            {iconSrc ? (
+              <img src={iconSrc} alt={exerciseName} className="relative z-10 h-14 w-14 object-contain" />
+            ) : (
+              <span className="relative z-10 text-2xl">💪</span>
+            )}
           </div>
 
-          <div className="flex flex-1 flex-col">
-            <h2 className="mb-3 text-[22px] font-bold tracking-tight text-white">{exerciseName}</h2>
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col">
-                <span className="mb-1 text-[12px] font-medium text-gray-400">목표</span>
-                <span className="text-[16px] font-bold text-[#3FFDD4]">{targetCount}</span>
-              </div>
-              <div className="h-8 w-px bg-gray-800" />
-              <div className="flex flex-col">
-                <span className="mb-1 text-[12px] font-medium text-gray-400">완료</span>
-                <span className="text-[16px] font-bold text-[#FF5A5A]">{completedCount}</span>
-              </div>
+          <div className="flex flex-1 flex-col gap-2">
+            <h2 className="text-[18px] font-bold tracking-tight text-white">{exerciseName}</h2>
+            <div className="flex items-center gap-3">
+              <StatChip label="목표" value={String(targetCount)} color="text-[#3FFDD4]" />
+              <div className="h-6 w-px bg-gray-700" />
+              <StatChip label="완료" value={String(completedCount)} color="text-[#FF5A5A]" />
+              <div className="h-6 w-px bg-gray-700" />
+              <StatChip label="시간" value={durationLabel} color="text-[#FFD700]" />
+              <div className="h-6 w-px bg-gray-700" />
+              <StatChip label="칼로리" value={`${calories}`} color="text-[#FF8C42]" />
             </div>
           </div>
         </div>
 
-        <div className="mb-4 flex flex-1 flex-col">
-          <h3 className="mb-4 px-1 text-[17px] font-bold tracking-tight text-white">운동 내용</h3>
-
-          <div className="flex flex-col gap-5 rounded-[24px] border border-white/5 bg-[#1C2025] p-6 shadow-lg">
-            <DetailRow label="운동시간" value={durationLabel} color="text-[#FFD700]" />
-            <div className="h-px w-full bg-gray-800/80" />
-
-            <DetailRow label="칼로리 소모" value={`${calories} KCAL`} color="text-[#FF5A5A]" />
-            <div className="h-px w-full bg-gray-800/80" />
-
-            <DetailRow label="운동점수" value={`${score} 점`} color="text-[#4DA6FF]" />
-            <div className="h-px w-full bg-gray-800/80" />
-
-            <DetailRow label="평균 정확도" value={`${accuracyAvg}%`} color="text-[#3FFDD4]" />
-          </div>
+        {/* AI 피드백 - 나머지 공간 전부 */}
+        <div className="mb-4 flex flex-1 flex-col rounded-[24px] border border-[#3FFDD4]/20 bg-gradient-to-br from-[#12221D] to-[#0A1411] p-6 shadow-lg">
+          <span className="mb-3 text-[13px] font-bold text-[#3FFDD4]">AI 자세 피드백</span>
+          {aiFeedback ? (
+            <p className="text-[15px] leading-relaxed text-gray-300">{aiFeedback}</p>
+          ) : (
+            <p className="text-[14px] leading-relaxed text-gray-500">
+              푸시업 운동을 완료하면 AI가 자세 피드백을 제공합니다.
+            </p>
+          )}
         </div>
 
         <div className="mt-auto flex gap-3 pt-4 shrink-0">
@@ -127,11 +127,11 @@ export function PostWorkout() {
   );
 }
 
-function DetailRow({ label, value, color }: { label: string; value: string; color: string }) {
+function StatChip({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-medium text-gray-400">{label}</span>
-      <span className={`text-[22px] font-bold tracking-tight ${color}`}>{value}</span>
+    <div className="flex flex-col items-center gap-0.5">
+      <span className="text-[10px] font-medium text-gray-400">{label}</span>
+      <span className={`text-[13px] font-bold ${color}`}>{value}</span>
     </div>
   );
 }
