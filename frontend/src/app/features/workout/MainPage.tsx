@@ -40,6 +40,10 @@ const EXERCISE_ID_MAP: Record<string, number> = {
   plank: 4,
 };
 
+const EXERCISE_KEY_BY_ID = Object.fromEntries(
+  Object.entries(EXERCISE_ID_MAP).map(([key, id]) => [id, key]),
+) as Record<number, string>;
+
 const weeklyData = [
   { day: '월', done: true },
   { day: '화', done: true },
@@ -81,7 +85,7 @@ export function MainPage() {
         if (localExerciseGoalStorage.load().length === 0 && summary.exercise_goals.length > 0) {
           const counts: Record<string, number> = {};
           summary.exercise_goals.forEach((g) => {
-            const key = EXERCISE_KEY_MAP[g.exercise_name];
+            const key = EXERCISE_KEY_BY_ID[g.exercise_id] ?? EXERCISE_KEY_MAP[g.exercise_name];
             if (key) counts[key] = g.daily_target_count ?? g.daily_target_duration ?? 0;
           });
           if (Object.keys(counts).length > 0) {
@@ -96,8 +100,12 @@ export function MainPage() {
   const displayName = profile?.name ?? '';
   const weeklyTarget = profile?.weekly_target ?? goal.weeklyFrequency;
 
-  const getSummaryGoal = (exerciseId: string): ExerciseGoalSummaryItem | undefined =>
-    summaryGoals.find((g) => g.exercise_name === EXERCISE_NAME_MAP[exerciseId]);
+  const getSummaryGoal = (exerciseId: string): ExerciseGoalSummaryItem | undefined => {
+    const backendExerciseId = EXERCISE_ID_MAP[exerciseId];
+    return summaryGoals.find(
+      (g) => g.exercise_id === backendExerciseId || g.exercise_name === EXERCISE_NAME_MAP[exerciseId],
+    );
+  };
 
   const getTodayProgress = (exerciseId: string): number => {
     const g = getSummaryGoal(exerciseId);
@@ -108,11 +116,12 @@ export function MainPage() {
   const getExerciseTarget = (exerciseId: string): number => {
     const g = getSummaryGoal(exerciseId);
     if (g) {
+      const fallbackTarget = localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts] ?? 0;
       return exerciseId === 'plank'
-        ? (g.daily_target_duration ?? 0)
-        : (g.daily_target_count ?? 0);
+        ? (g.daily_target_duration ?? fallbackTarget)
+        : (g.daily_target_count ?? fallbackTarget);
     }
-    return localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts];
+    return localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts] ?? 0;
   };
 
   const isExerciseDone = (exerciseId: string): boolean => {
@@ -121,8 +130,15 @@ export function MainPage() {
     return target > 0 && progress >= target;
   };
 
-  const completedCount = exercises.filter((ex) => isExerciseDone(ex.id)).length;
-  const achievementRate = completedCount * 25;
+  const progressRates = exercises.map((ex) => {
+    const target = getExerciseTarget(ex.id);
+    if (target <= 0) return 0;
+    return Math.min(getTodayProgress(ex.id) / target, 1);
+  });
+  const completedCount = progressRates.filter((rate) => rate >= 1).length;
+  const achievementRate = Math.round(
+    (progressRates.reduce((sum, rate) => sum + rate, 0) / exercises.length) * 100,
+  );
   const circumference = 2 * Math.PI * 26;
 
   const handleExerciseClick = async (exerciseId: string) => {
