@@ -157,7 +157,9 @@ def test_get_main_summary_includes_today_records_without_goals(
     mock_redis_client.get.return_value = None
 
     today = date.today()
-    other_day = today - timedelta(days=1) if today.weekday() else today + timedelta(days=1)
+    other_day = (
+        today - timedelta(days=1) if today.weekday() else today + timedelta(days=1)
+    )
     fake_exercise = Exercise(id=2, name="Squat")
     fake_record = ExerciseRecord(
         id=1,
