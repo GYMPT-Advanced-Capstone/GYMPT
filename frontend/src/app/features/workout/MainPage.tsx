@@ -213,16 +213,23 @@ export function MainPage() {
             </div>
             <div style={{ position: 'relative', width: 64, height: 64 }}>
               <svg viewBox="0 0 64 64" width="64" height="64">
-                <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(63,253,212,0.15)" strokeWidth="6" />
                 <circle
                   cx="32" cy="32" r="26"
                   fill="none"
-                  stroke="#3FFDD4"
+                  stroke="rgba(63,253,212,0.15)"
                   strokeWidth="6"
-                  strokeLinecap="round"
-                  strokeDasharray={`${circumference * achievementRate / 100} ${circumference}`}
-                  transform="rotate(-90 32 32)"
                 />
+                {achievementRate > 0 && (
+                  <circle
+                    cx="32" cy="32" r="26"
+                    fill="none"
+                    stroke="#3FFDD4"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={`${circumference * achievementRate / 100} ${circumference}`}
+                    transform="rotate(-90 32 32)"
+                  />
+                )}
               </svg>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span style={{ color: '#3FFDD4', fontSize: 13, fontWeight: 700 }}>{achievementRate}%</span>
