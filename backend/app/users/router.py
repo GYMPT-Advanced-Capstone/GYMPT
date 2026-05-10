@@ -94,7 +94,10 @@ def get_main_summary(
 
     today_completed_count = len(today_counts)
 
-    exercise_ids = [int(g.exercise_id) for g in goals]
+    exercise_ids = sorted(
+        {int(g.exercise_id) for g in goals}
+        | {int(record.exercise_id) for record in week_records}
+    )
     exercises = (
         db.query(Exercise).filter(Exercise.id.in_(exercise_ids)).all()
         if exercise_ids
@@ -102,21 +105,24 @@ def get_main_summary(
     )
     exercise_map = {int(e.id): e.name for e in exercises}
 
-    exercise_goal_summaries = [
-        ExerciseGoalSummaryItem(
-            exercise_id=int(goal.exercise_id),
-            exercise_name=str(exercise_map.get(int(goal.exercise_id), "")),
-            daily_target_count=int(goal.daily_target_count)
-            if goal.daily_target_count is not None
-            else None,
-            daily_target_duration=int(goal.daily_target_duration)
-            if goal.daily_target_duration is not None
-            else None,
-            today_count=today_counts.get(int(goal.exercise_id), 0),
-            today_duration=today_durations.get(int(goal.exercise_id), 0),
+    goal_by_exercise_id = {int(goal.exercise_id): goal for goal in goals}
+    exercise_goal_summaries: list[ExerciseGoalSummaryItem] = []
+    for exercise_id in exercise_ids:
+        goal = goal_by_exercise_id.get(exercise_id)
+        exercise_goal_summaries.append(
+            ExerciseGoalSummaryItem(
+                exercise_id=exercise_id,
+                exercise_name=str(exercise_map.get(exercise_id, "")),
+                daily_target_count=int(goal.daily_target_count)
+                if goal and goal.daily_target_count is not None
+                else None,
+                daily_target_duration=int(goal.daily_target_duration)
+                if goal and goal.daily_target_duration is not None
+                else None,
+                today_count=today_counts.get(exercise_id, 0),
+                today_duration=today_durations.get(exercise_id, 0),
+            )
         )
-        for goal in goals
-    ]
 
     worked_days = {r.completed_at.date() for r in week_records}
     weekly_workout_days = [
