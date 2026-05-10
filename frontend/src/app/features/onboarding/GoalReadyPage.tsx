@@ -3,16 +3,15 @@ import { useNavigate } from 'react-router';
 import { useGoal } from '../../context/GoalContext';
 import { userApi, goalIdStorage, formatBirthDateForApi, localExerciseGoalStorage, onboardingStorage } from '../../api/userApi';
 import { tokenStorage } from '../../api/authApi';
-import { exerciseApi } from '../../api/exerciseApi';
-
-const EXERCISE_NAME_MAP: Record<string, string> = {
-  squat: '스쿼트',
-  lunge: '런지',
-  pushup: '푸시업',
-  plank: '플랭크',
-};
 
 const DURATION_EXERCISES = new Set(['plank']);
+
+const EXERCISE_ID_MAP: Record<string, number> = {
+  pushup: 1,
+  squat: 2,
+  lunge: 3,
+  plank: 4,
+};
 
 function TrainerCharacter() {
   return (
@@ -93,13 +92,8 @@ export function GoalReadyPage() {
       ]);
 
       try {
-        const exercises = await exerciseApi.getList();
-        const nameToId = Object.fromEntries(exercises.map((e) => [e.name, e.id]));
-
         for (const [key, count] of Object.entries(goal.exerciseCounts)) {
-          const koreanName = EXERCISE_NAME_MAP[key];
-          if (!koreanName) continue;
-          const exerciseId = nameToId[koreanName];
+          const exerciseId = EXERCISE_ID_MAP[key];
           if (!exerciseId) continue;
 
           const isDuration = DURATION_EXERCISES.has(key);
