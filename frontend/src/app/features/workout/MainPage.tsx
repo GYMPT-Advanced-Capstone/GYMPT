@@ -116,12 +116,12 @@ export function MainPage() {
   const getExerciseTarget = (exerciseId: string): number => {
     const g = getSummaryGoal(exerciseId);
     if (g) {
-      const fallbackTarget = localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts];
+      const fallbackTarget = localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts] ?? 0;
       return exerciseId === 'plank'
         ? (g.daily_target_duration ?? fallbackTarget)
         : (g.daily_target_count ?? fallbackTarget);
     }
-    return localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts];
+    return localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts] ?? 0;
   };
 
   const isExerciseDone = (exerciseId: string): boolean => {

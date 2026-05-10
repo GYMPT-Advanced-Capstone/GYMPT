@@ -96,7 +96,7 @@ def get_main_summary(
 
     exercise_ids = sorted(
         {int(g.exercise_id) for g in goals}
-        | {int(record.exercise_id) for record in week_records}
+        | {int(record.exercise_id) for record in today_records}
     )
     exercises = (
         db.query(Exercise).filter(Exercise.id.in_(exercise_ids)).all()

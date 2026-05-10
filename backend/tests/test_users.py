@@ -157,6 +157,7 @@ def test_get_main_summary_includes_today_records_without_goals(
     mock_redis_client.get.return_value = None
 
     today = date.today()
+    other_day = today - timedelta(days=1) if today.weekday() else today + timedelta(days=1)
     fake_exercise = Exercise(id=2, name="Squat")
     fake_record = ExerciseRecord(
         id=1,
@@ -167,11 +168,20 @@ def test_get_main_summary_includes_today_records_without_goals(
         calories=10,
         completed_at=datetime.combine(today, datetime.min.time()),
     )
+    fake_other_record = ExerciseRecord(
+        id=2,
+        user_id=1,
+        exercise_id=3,
+        count=5,
+        duration=50,
+        calories=15,
+        completed_at=datetime.combine(other_day, datetime.min.time()),
+    )
 
     mock_db.query.return_value.filter.return_value.first.side_effect = [fake_user]
     mock_db.query.return_value.filter.return_value.all.side_effect = [
         [],
-        [fake_record],
+        [fake_record, fake_other_record],
         [fake_exercise],
     ]
 
