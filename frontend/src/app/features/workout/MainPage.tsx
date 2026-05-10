@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { useGoal } from '../../context/GoalContext';
 import { BottomNav } from '../../components/BottomNav';
 import { Trophy, TrendingUp, Zap } from 'lucide-react';
-import { userApi, localExerciseGoalStorage, type UserProfile } from '../../api/userApi';
+import { userApi, localExerciseGoalStorage, type UserProfile, type ExerciseGoalSummaryItem } from '../../api/userApi';
 import { workoutApi } from '../../api/workoutApi';
 import trainerImg from '../../../assets/exercises/trainer.png';
 
@@ -17,6 +17,13 @@ const EXERCISE_KEY_MAP: Record<string, string> = {
   런지: 'lunge',
   푸시업: 'pushup',
   플랭크: 'plank',
+};
+
+const EXERCISE_NAME_MAP: Record<string, string> = {
+  squat: '스쿼트',
+  lunge: '런지',
+  pushup: '푸시업',
+  plank: '플랭크',
 };
 
 const exercises = [
@@ -56,6 +63,7 @@ export function MainPage() {
   const { exerciseCounts } = goal;
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [summaryGoals, setSummaryGoals] = useState<ExerciseGoalSummaryItem[]>([]);
   const [localCounts, setLocalCounts] = useState<Record<string, number>>(() => {
     const localGoals = localExerciseGoalStorage.load();
     if (localGoals.length === 0) return {};
@@ -67,9 +75,10 @@ export function MainPage() {
   useEffect(() => {
     userApi.getMe().then(setProfile).catch(() => {});
 
-    if (localExerciseGoalStorage.load().length === 0) {
-      userApi.getSummary().then((summary) => {
-        if (summary && summary.exercise_goals.length > 0) {
+    userApi.getSummary().then((summary) => {
+      if (summary) {
+        setSummaryGoals(summary.exercise_goals);
+        if (localExerciseGoalStorage.load().length === 0 && summary.exercise_goals.length > 0) {
           const counts: Record<string, number> = {};
           summary.exercise_goals.forEach((g) => {
             const key = EXERCISE_KEY_MAP[g.exercise_name];
@@ -80,15 +89,41 @@ export function MainPage() {
             setLocalCounts(counts);
           }
         }
-      }).catch(() => {});
-    }
+      }
+    }).catch(() => {});
   }, []);
 
   const displayName = profile?.name ?? '';
   const weeklyTarget = profile?.weekly_target ?? goal.weeklyFrequency;
 
-  const getExerciseTarget = (id: string): number =>
-    localCounts[id] ?? exerciseCounts[id as keyof typeof exerciseCounts];
+  const getSummaryGoal = (exerciseId: string): ExerciseGoalSummaryItem | undefined =>
+    summaryGoals.find((g) => g.exercise_name === EXERCISE_NAME_MAP[exerciseId]);
+
+  const getTodayProgress = (exerciseId: string): number => {
+    const g = getSummaryGoal(exerciseId);
+    if (!g) return 0;
+    return exerciseId === 'plank' ? (g.today_duration ?? 0) : (g.today_count ?? 0);
+  };
+
+  const getExerciseTarget = (exerciseId: string): number => {
+    const g = getSummaryGoal(exerciseId);
+    if (g) {
+      return exerciseId === 'plank'
+        ? (g.daily_target_duration ?? 0)
+        : (g.daily_target_count ?? 0);
+    }
+    return localCounts[exerciseId] ?? exerciseCounts[exerciseId as keyof typeof exerciseCounts];
+  };
+
+  const isExerciseDone = (exerciseId: string): boolean => {
+    const progress = getTodayProgress(exerciseId);
+    const target = getExerciseTarget(exerciseId);
+    return target > 0 && progress >= target;
+  };
+
+  const completedCount = exercises.filter((ex) => isExerciseDone(ex.id)).length;
+  const achievementRate = completedCount * 25;
+  const circumference = 2 * Math.PI * 26;
 
   const handleExerciseClick = async (exerciseId: string) => {
     if (calibratedExercises[exerciseId]) {
@@ -109,13 +144,6 @@ export function MainPage() {
     } catch {
       navigate(`/workout/calibration/${exerciseId}`);
     }
-  };
-
-  const todayProgress: Record<string, number> = {
-    squat: 8,
-    pushup: 5,
-    lunge: 6,
-    plank: 20,
   };
 
   return (
@@ -176,29 +204,35 @@ export function MainPage() {
                 오늘의 운동 달성률
               </p>
               <p style={{ color: '#FFFFFF', fontSize: 28, fontWeight: 800 }}>
-                50%
+                {achievementRate}%
                 <span style={{ color: '#888888', fontSize: 13, fontWeight: 400, marginLeft: 6 }}>완료</span>
               </p>
               <p style={{ color: '#AAAAAA', fontSize: 12, marginTop: 2 }}>
-                4개 운동 중 2개 진행 중
+                4개 운동 중 {completedCount}개 완료
               </p>
             </div>
             <div style={{ position: 'relative', width: 64, height: 64 }}>
               <svg viewBox="0 0 64 64" width="64" height="64">
-                <circle cx="32" cy="32" r="26" fill="none" stroke="rgba(63,253,212,0.15)" strokeWidth="6" />
                 <circle
                   cx="32" cy="32" r="26"
                   fill="none"
-                  stroke="#3FFDD4"
+                  stroke="rgba(63,253,212,0.15)"
                   strokeWidth="6"
-                  strokeLinecap="round"
-                  strokeDasharray={`${2 * Math.PI * 26 * 0.5} ${2 * Math.PI * 26 * 0.5}`}
-                  strokeDashoffset={2 * Math.PI * 26 * 0.25}
-                  transform="rotate(-90 32 32)"
                 />
+                {achievementRate > 0 && (
+                  <circle
+                    cx="32" cy="32" r="26"
+                    fill="none"
+                    stroke="#3FFDD4"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={`${circumference * achievementRate / 100} ${circumference}`}
+                    transform="rotate(-90 32 32)"
+                  />
+                )}
               </svg>
               <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: '#3FFDD4', fontSize: 13, fontWeight: 700 }}>50%</span>
+                <span style={{ color: '#3FFDD4', fontSize: 13, fontWeight: 700 }}>{achievementRate}%</span>
               </div>
             </div>
           </div>
@@ -214,16 +248,17 @@ export function MainPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {exercises.map((ex) => {
-              const current = todayProgress[ex.id];
+              const current = getTodayProgress(ex.id);
               const target = getExerciseTarget(ex.id);
-              const pct = Math.min((current / target) * 100, 100);
+              const done = isExerciseDone(ex.id);
+              const pct = target > 0 ? Math.min((current / target) * 100, 100) : 0;
               return (
                 <button
                   key={ex.id}
                   onClick={() => handleExerciseClick(ex.id)}
                   style={{
-                    backgroundColor: '#222228',
-                    border: '1px solid #2C2C32',
+                    backgroundColor: done ? 'rgba(63,253,212,0.06)' : '#222228',
+                    border: done ? '1px solid rgba(63,253,212,0.35)' : '1px solid #2C2C32',
                     borderRadius: 20,
                     padding: '20px 16px 16px',
                     cursor: 'pointer',
