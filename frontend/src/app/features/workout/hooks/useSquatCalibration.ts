@@ -2,16 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { workoutApi, type ExerciseCalibrationSampleRequest } from "../../../api/workoutApi";
 import type { NormalizedLandmark } from "../types/pose";
-import { buildPushupObservation } from "../utils/pushup";
+import { buildSquatObservation } from "../utils/squat";
 import { cancelSpeech, speakKorean } from "../utils/speech";
 
 const HOLD_DURATION_MS = 2000;
 const TRANSITION_DELAY_MS = 1000;
 const COMPLETE_REDIRECT_DELAY_MS = 1200;
-const UNSTABLE_FRAME_TOLERANCE = 8;
-const BOTTOM_SHOULDER_DROP_THRESHOLD = 0.05;
 
-export type PushupCalibrationStep =
+export type SquatCalibrationStep =
   | "idle"
   | "top_waiting"
   | "top_counting"
@@ -21,31 +19,14 @@ export type PushupCalibrationStep =
   | "saving"
   | "complete";
 
-function isStablePose(
-  phase: "top" | "bottom",
-  metrics: { elbowAngle: number; shoulderY: number; bodyLineAngle: number },
-  topShoulderY: number | null = null,
-) {
-  const bodyLineStable = metrics.bodyLineAngle >= 130;
-  if (!bodyLineStable) {
-    return false;
-  }
-  if (phase === "top") {
-    return metrics.elbowAngle >= 130;
-  }
-  // 바텀: 탑 자세 대비 어깨가 충분히 내려왔는지 확인
-  if (topShoulderY === null) return false;
-  return metrics.shoulderY >= topShoulderY + BOTTOM_SHOULDER_DROP_THRESHOLD;
-}
-
-interface UsePushupCalibrationParams {
+interface UseSquatCalibrationParams {
   enabled: boolean;
   exerciseId: number;
   onSuccess: () => void;
 }
 
-interface UsePushupCalibrationResult {
-  step: PushupCalibrationStep;
+interface UseSquatCalibrationResult {
+  step: SquatCalibrationStep;
   phase: "top" | "bottom";
   capturedSide: "left" | "right" | null;
   calibrationError: string | null;
@@ -57,24 +38,35 @@ interface UsePushupCalibrationResult {
   resetCalibration: () => void;
 }
 
-export function usePushupCalibration({
+function isStablePose(
+  phase: "top" | "bottom",
+  metrics: { kneeAngle: number; hipAngle: number; torsoLeanAngle: number },
+) {
+  if (metrics.torsoLeanAngle > 70) {
+    return false;
+  }
+  if (phase === "top") {
+    return metrics.kneeAngle >= 145 && metrics.hipAngle >= 135;
+  }
+  return metrics.kneeAngle >= 45 && metrics.kneeAngle <= 155 && metrics.hipAngle >= 40 && metrics.hipAngle <= 175;
+}
+
+export function useSquatCalibration({
   enabled,
   exerciseId,
   onSuccess,
-}: UsePushupCalibrationParams): UsePushupCalibrationResult {
-  const [step, setStep] = useState<PushupCalibrationStep>("idle");
+}: UseSquatCalibrationParams): UseSquatCalibrationResult {
+  const [step, setStep] = useState<SquatCalibrationStep>("idle");
   const [phase, setPhase] = useState<"top" | "bottom">("top");
   const [capturedSide, setCapturedSide] = useState<"left" | "right" | null>(null);
   const [calibrationError, setCalibrationError] = useState<string | null>(null);
   const [isSavingCalibration, setIsSavingCalibration] = useState(false);
   const [isCalibrationComplete, setIsCalibrationComplete] = useState(false);
   const captureStartedAtRef = useRef<number | null>(null);
-  const unstableFrameCountRef = useRef(0);
-  const topShoulderYRef = useRef<number | null>(null);
   const transitionTimeoutRef = useRef<number | null>(null);
   const completeTimeoutRef = useRef<number | null>(null);
-  const lastSpokenStepRef = useRef<PushupCalibrationStep | null>(null);
-  const pushupSamplesRef = useRef<Record<"top" | "bottom", ExerciseCalibrationSampleRequest[]>>({
+  const lastSpokenStepRef = useRef<SquatCalibrationStep | null>(null);
+  const samplesRef = useRef<Record<"top" | "bottom", ExerciseCalibrationSampleRequest[]>>({
     top: [],
     bottom: [],
   });
@@ -84,10 +76,8 @@ export function usePushupCalibration({
   }, []);
 
   const resetCalibration = useCallback(() => {
-    pushupSamplesRef.current = { top: [], bottom: [] };
+    samplesRef.current = { top: [], bottom: [] };
     captureStartedAtRef.current = null;
-    unstableFrameCountRef.current = 0;
-    topShoulderYRef.current = null;
     setPhase("top");
     setStep("idle");
     setCapturedSide(null);
@@ -106,10 +96,8 @@ export function usePushupCalibration({
   }, []);
 
   const startCalibration = useCallback(() => {
-    pushupSamplesRef.current = { top: [], bottom: [] };
+    samplesRef.current = { top: [], bottom: [] };
     captureStartedAtRef.current = null;
-    unstableFrameCountRef.current = 0;
-    topShoulderYRef.current = null;
     setPhase("top");
     setStep("top_waiting");
     setCapturedSide(null);
@@ -142,18 +130,17 @@ export function usePushupCalibration({
       return;
     }
 
-    let message: string | null = null;
-    if (step === "top_waiting") {
-      message = "탑 자세를 유지해주세요.";
-    } else if (step === "transition_to_bottom") {
-      message = "탑 자세 측정 완료. 이제 바텀 자세를 취해주세요.";
-    } else if (step === "bottom_waiting") {
-      message = "가슴을 바닥에 가깝게 내린 바텀 자세를 유지해주세요.";
-    } else if (step === "complete") {
-      message = "초기 자세 설정이 완료되었습니다. 운동을 시작합니다.";
-    }
-
+    const messages: Partial<Record<SquatCalibrationStep, string>> = {
+      top_waiting: "정면이 아닌 측면으로 서서 선 자세를 유지해주세요.",
+      top_counting: "좋습니다. 선 자세 측정을 시작합니다. 2초만 유지해주세요.",
+      transition_to_bottom: "좋습니다. 이제 앉은 자세를 측정합니다. 천천히 내려가 유지해주세요.",
+      bottom_waiting: "앉은 자세를 유지해주세요. 안정되면 자동으로 2초간 측정합니다.",
+      bottom_counting: "앉은 자세 측정을 시작합니다. 2초만 유지해주세요.",
+      saving: "스쿼트 기준 범위를 저장하고 있습니다.",
+      complete: "스쿼트 기준 범위 설정이 완료되었습니다. 운동을 시작합니다.",
+    };
     lastSpokenStepRef.current = step;
+    const message = messages[step];
     if (message) {
       speak(message);
     }
@@ -171,50 +158,36 @@ export function usePushupCalibration({
       return;
     }
 
-    const observation = buildPushupObservation(landmarks);
+    const observation = buildSquatObservation(landmarks);
     if (!observation) {
-      unstableFrameCountRef.current += 1;
-      if (unstableFrameCountRef.current > UNSTABLE_FRAME_TOLERANCE) {
-        unstableFrameCountRef.current = 0;
-        captureStartedAtRef.current = null;
-        if (step === "top_counting") {
-          pushupSamplesRef.current.top = [];
-          setStep("top_waiting");
-        } else if (step === "bottom_counting") {
-          pushupSamplesRef.current.bottom = [];
-          lastSpokenStepRef.current = null;
-          setStep("bottom_waiting");
-        }
-      }
-      return;
-    }
-
-    const activePhase = step === "top_waiting" || step === "top_counting" ? "top" : "bottom";
-    const stable = isStablePose(activePhase, observation.metrics, topShoulderYRef.current);
-    setCapturedSide(observation.trackedLandmarks.side);
-
-    if (!stable) {
-      unstableFrameCountRef.current += 1;
-      if (unstableFrameCountRef.current <= UNSTABLE_FRAME_TOLERANCE) {
-        return;
-      }
-      unstableFrameCountRef.current = 0;
       captureStartedAtRef.current = null;
-      pushupSamplesRef.current[activePhase] = [];
-      if (activePhase === "top" && step === "top_counting") {
+      if (step === "top_counting") {
+        samplesRef.current.top = [];
         setStep("top_waiting");
-      }
-      if (activePhase === "bottom" && step === "bottom_counting") {
-        // bottom_waiting으로 돌아올 때 TTS 재발화를 위해 lastSpokenStep 초기화
-        lastSpokenStepRef.current = null;
+      } else if (step === "bottom_counting") {
+        samplesRef.current.bottom = [];
         setStep("bottom_waiting");
       }
       return;
     }
 
-    unstableFrameCountRef.current = 0;
+    const activePhase = step === "top_waiting" || step === "top_counting" ? "top" : "bottom";
+    const stable = isStablePose(activePhase, observation.metrics);
+    setCapturedSide(observation.trackedLandmarks.side);
 
-    pushupSamplesRef.current[activePhase].push({
+    if (!stable) {
+      captureStartedAtRef.current = null;
+      samplesRef.current[activePhase] = [];
+      if (activePhase === "top" && step === "top_counting") {
+        setStep("top_waiting");
+      }
+      if (activePhase === "bottom" && step === "bottom_counting") {
+        setStep("bottom_waiting");
+      }
+      return;
+    }
+
+    samplesRef.current[activePhase].push({
       phase: activePhase,
       metrics: observation.metrics,
     });
@@ -232,28 +205,22 @@ export function usePushupCalibration({
     captureStartedAtRef.current = null;
 
     if (activePhase === "top") {
-      // 탑 샘플의 평균 shoulderY를 저장 → 바텀 감지 기준으로 사용
-      const topSamples = pushupSamplesRef.current.top;
-      if (topSamples.length > 0) {
-        const avgShoulderY = topSamples.reduce((sum, s) => sum + (s.metrics.shoulderY ?? 0), 0) / topSamples.length;
-        topShoulderYRef.current = avgShoulderY;
-      }
       setPhase("bottom");
       setStep("transition_to_bottom");
       if (transitionTimeoutRef.current !== null) {
         window.clearTimeout(transitionTimeoutRef.current);
       }
       transitionTimeoutRef.current = window.setTimeout(() => {
-        pushupSamplesRef.current.bottom = [];
+        samplesRef.current.bottom = [];
         setStep("bottom_waiting");
       }, TRANSITION_DELAY_MS);
       return;
     }
 
-    const topSamples = pushupSamplesRef.current.top;
-    const bottomSamples = pushupSamplesRef.current.bottom;
+    const topSamples = samplesRef.current.top;
+    const bottomSamples = samplesRef.current.bottom;
     if (topSamples.length === 0 || bottomSamples.length === 0) {
-      setCalibrationError("탑과 바텀 자세를 모두 측정해주세요.");
+      setCalibrationError("선 자세와 앉은 자세를 모두 측정해주세요.");
       return;
     }
 
@@ -262,7 +229,7 @@ export function usePushupCalibration({
     void workoutApi.createCalibration({
       exercise_id: exerciseId,
       version: 1,
-      exercise_type: "pushup",
+      exercise_type: "squat",
       side: observation.trackedLandmarks.side,
       hold_duration_ms: HOLD_DURATION_MS,
       samples: [...topSamples, ...bottomSamples],
@@ -273,8 +240,10 @@ export function usePushupCalibration({
         onSuccess();
       }, COMPLETE_REDIRECT_DELAY_MS);
     }).catch((error) => {
+      captureStartedAtRef.current = null;
+      samplesRef.current.bottom = [];
       setStep("bottom_waiting");
-      setCalibrationError(error instanceof Error ? error.message : "초기 범위 저장에 실패했습니다.");
+      setCalibrationError(error instanceof Error ? error.message : "스쿼트 기준 범위 저장에 실패했습니다.");
     }).finally(() => {
       setIsSavingCalibration(false);
     });
@@ -282,17 +251,17 @@ export function usePushupCalibration({
 
   let noticeMessage: string | null = null;
   if (step === "top_waiting") {
-    noticeMessage = "탑 자세를 유지해주세요. 자세가 안정되면 자동으로 2초 측정을 시작합니다.";
+    noticeMessage = "측면으로 서서 선 자세를 유지해주세요. 안정되면 자동으로 2초간 측정합니다.";
   } else if (step === "top_counting") {
-    noticeMessage = "탑 자세를 2초간 유지해주세요. 자세가 무너지면 다시 측정합니다.";
+    noticeMessage = "선 자세 측정 중입니다. 2초만 그대로 유지해주세요.";
   } else if (step === "transition_to_bottom") {
-    noticeMessage = "좋습니다. 이제 바텀 자세를 측정합니다. 바텀 자세를 유지해주세요.";
+    noticeMessage = "좋습니다. 이제 앉은 자세를 측정합니다. 천천히 내려가 유지해주세요.";
   } else if (step === "bottom_waiting") {
-    noticeMessage = "이제 바텀 자세를 유지해주세요. 자세가 안정되면 자동으로 2초 측정을 시작합니다.";
+    noticeMessage = "앉은 자세를 유지해주세요. 안정되면 자동으로 2초간 측정합니다.";
   } else if (step === "bottom_counting") {
-    noticeMessage = "바텀 자세를 2초간 유지해주세요. 자세가 무너지면 다시 측정합니다.";
+    noticeMessage = "앉은 자세 측정 중입니다. 2초만 그대로 유지해주세요.";
   } else if (step === "saving") {
-    noticeMessage = "초기 범위를 저장하고 있습니다.";
+    noticeMessage = "스쿼트 기준 범위를 저장하고 있습니다.";
   }
 
   return {

@@ -13,7 +13,10 @@ _FEEDBACK_CODE_KO: dict[str, str] = {
     "hip_sag": "엉덩이 처짐",
     "hip_high": "엉덩이 과상승",
     "depth_low": "가동범위 부족",
+    "depth_high": "과도한 깊이",
     "body_line_bad": "몸통 일직선 불량",
+    "torso_lean": "상체 숙임 과도",
+    "knee_track": "무릎 방향 불안정",
     "good": "정자세",
 }
 

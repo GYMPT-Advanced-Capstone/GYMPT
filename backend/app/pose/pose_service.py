@@ -4,19 +4,18 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.pose.pushup_feedback import PushupFeedbackProcessor
+from app.pose.squat_feedback import SquatFeedbackProcessor
 
 
 DEFAULT_GOAL_COUNT = 10
-DEFAULT_POSE_ISSUE = "무릎이 발끝과 같은 방향을 유지하도록 해주세요."
-SESSION_STARTED_MESSAGE = (
-    "자세 세션이 시작되었습니다. pose_landmarks 프레임을 전송해주세요."
-)
+DEFAULT_POSE_ISSUE = "무릎이 발끝과 같은 방향을 바라보도록 자세를 맞춰주세요."
+SESSION_STARTED_MESSAGE = "운동 분석을 시작할 준비가 되었습니다."
 UNSUPPORTED_MESSAGE_TYPE = "지원하지 않는 메시지 타입입니다."
-NO_LANDMARKS_MESSAGE = "주요 관절이 보이도록 화면 안으로 들어와 주세요."
+NO_LANDMARKS_MESSAGE = "몸이 화면 안에 잘 보이도록 위치를 조정해 주세요."
 INSUFFICIENT_LANDMARKS_MESSAGE = (
-    "안정적인 피드백을 위해 더 많은 관절 좌표가 필요합니다."
+    "자세를 더 정확히 확인할 수 있도록 전신이 보이게 해주세요."
 )
-DEFAULT_FEEDBACK_MESSAGE = "가슴을 세우고 스쿼트 깊이를 일정하게 유지해 주세요."
+DEFAULT_FEEDBACK_MESSAGE = "가슴을 세우고 지금 자세를 천천히 유지해 주세요."
 
 
 @dataclass
@@ -25,7 +24,7 @@ class PoseSessionState:
     full_rep_count: int = 0
     last_timestamp_ms: float = 0.0
     last_pose_issue: str = DEFAULT_POSE_ISSUE
-    exercise_type: str = "squat"
+    exercise_type: str = "legacy"
     movement_zone: str = "top"
     rep_active: bool = False
     current_rep_started_at_ms: float = 0.0
@@ -34,6 +33,12 @@ class PoseSessionState:
     current_rep_max_top_elbow_angle: float = 0.0
     current_rep_body_line_sum: float = 0.0
     current_rep_body_line_samples: int = 0
+    current_rep_min_knee_angle: float = 180.0
+    current_rep_min_hip_angle: float = 180.0
+    current_rep_max_top_knee_angle: float = 0.0
+    current_rep_torso_lean_sum: float = 0.0
+    current_rep_torso_lean_samples: int = 0
+    current_rep_max_knee_ankle_offset_x: float = 0.0
     current_rep_warning_counts: dict[str, int] | None = None
     calibration_metrics: dict[str, Any] | None = None
 
@@ -45,12 +50,19 @@ class PoseSessionState:
         self.current_rep_max_top_elbow_angle = 0.0
         self.current_rep_body_line_sum = 0.0
         self.current_rep_body_line_samples = 0
+        self.current_rep_min_knee_angle = 180.0
+        self.current_rep_min_hip_angle = 180.0
+        self.current_rep_max_top_knee_angle = 0.0
+        self.current_rep_torso_lean_sum = 0.0
+        self.current_rep_torso_lean_samples = 0
+        self.current_rep_max_knee_ankle_offset_x = 0.0
         self.current_rep_warning_counts = {}
 
 
 class PoseFeedbackService:
     def __init__(self) -> None:
         self.pushup_feedback_processor = PushupFeedbackProcessor()
+        self.squat_feedback_processor = SquatFeedbackProcessor()
 
     def create_session(self, goal_count: int = DEFAULT_GOAL_COUNT) -> PoseSessionState:
         normalized_goal = goal_count if goal_count > 0 else DEFAULT_GOAL_COUNT
@@ -93,11 +105,15 @@ class PoseFeedbackService:
         if message_type != "pose_landmarks":
             return self.build_error_message(UNSUPPORTED_MESSAGE_TYPE, state=state)
 
-        exercise_type = self._to_exercise_type(payload.get("exerciseType"))
-        state.exercise_type = exercise_type
+        requested_exercise_type = self._to_exercise_type(payload.get("exerciseType"))
+        if requested_exercise_type in {"pushup", "squat"}:
+            state.exercise_type = requested_exercise_type
 
+        exercise_type = requested_exercise_type or state.exercise_type
         if exercise_type == "pushup":
             return self._handle_pushup_landmarks(state, payload)
+        if exercise_type == "squat":
+            return self._handle_squat_landmarks(state, payload)
 
         return self._handle_pose_landmarks(state, payload)
 
@@ -154,6 +170,20 @@ class PoseFeedbackService:
             goal_count=goal_count,
         )
 
+    def _handle_squat_landmarks(
+        self,
+        state: PoseSessionState,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        timestamp_ms = self._to_timestamp_ms(payload.get("timestampMs"))
+        goal_count = self._to_positive_int(payload.get("goalCount"))
+        return self.squat_feedback_processor.handle_landmarks(
+            state,
+            payload,
+            timestamp_ms=timestamp_ms,
+            goal_count=goal_count,
+        )
+
     @staticmethod
     def _to_timestamp_ms(value: Any) -> float:
         if isinstance(value, (int, float)):
@@ -190,10 +220,10 @@ class PoseFeedbackService:
         return False
 
     @staticmethod
-    def _to_exercise_type(value: Any) -> str:
+    def _to_exercise_type(value: Any) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip().lower()
-        return "squat"
+        return None
 
     @staticmethod
     def _resolve_pose_issue(landmarks: Any) -> str:
