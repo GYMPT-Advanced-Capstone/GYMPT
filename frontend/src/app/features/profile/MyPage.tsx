@@ -34,6 +34,10 @@ import {
   type LocalExerciseGoal,
 } from '../../api/userApi';
 import { useGoal } from '../../context/GoalContext';
+import squatImg  from '../../../assets/exercises/squat.png';
+import pushupImg from '../../../assets/exercises/pushup.png';
+import lungeImg  from '../../../assets/exercises/lunge.png';
+import plankImg  from '../../../assets/exercises/plank.png';
 
 type DisplayGoal = {
   key: string;
@@ -71,11 +75,11 @@ const EXERCISE_KEY_BY_ID: Record<number, string> = {
   4: 'plank',
 };
 
-const EXERCISE_EMOJI: Record<string, string> = {
-  squat:  '🦵',
-  lunge:  '🏃',
-  pushup: '💪',
-  plank:  '⏱️',
+const EXERCISE_IMAGE: Record<string, { src: string; scale: number }> = {
+  squat:  { src: squatImg,  scale: 1.2 },
+  lunge:  { src: lungeImg,  scale: 2.0 },
+  pushup: { src: pushupImg, scale: 1.8 },
+  plank:  { src: plankImg,  scale: 1.5 },
 };
 
 const GOAL_CONTEXT_META: Record<string, { name: string; unit: string }> = {
@@ -670,7 +674,7 @@ function GoalRow({ label, value, onEdit, icon }: { label: string; value: string;
 }
 
 function ExerciseGoalRow({ goal: g, onEdit }: { goal: DisplayGoal; onEdit: () => void }) {
-  const emoji = EXERCISE_EMOJI[g.key] ?? '🏋️';
+  const imgEntry = EXERCISE_IMAGE[g.key];
   const todayStr =
     g.today_count > 0 ? `오늘 ${g.today_count}개 완료`
     : g.today_duration > 0 ? `오늘 ${g.today_duration}초 완료`
@@ -680,10 +684,22 @@ function ExerciseGoalRow({ goal: g, onEdit }: { goal: DisplayGoal; onEdit: () =>
     <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid #2C2C30' }}>
       <div className="flex items-center gap-3">
         <div
-          className="flex items-center justify-center rounded-lg"
-          style={{ width: 30, height: 30, backgroundColor: 'rgba(63,253,212,0.08)', border: '1px solid rgba(63,253,212,0.2)', fontSize: 16 }}
+          className="flex items-center justify-center rounded-lg overflow-hidden"
+          style={{
+            width: 30, height: 30,
+            backgroundColor: 'rgba(63,253,212,0.08)',
+            border: '1px solid rgba(63,253,212,0.2)',
+          }}
         >
-          {emoji}
+          {imgEntry ? (
+            <img
+              src={imgEntry.src}
+              alt={g.exercise_name}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', transform: `scale(${imgEntry.scale})` }}
+            />
+          ) : (
+            <Dumbbell size={14} color="#3FFDD4" />
+          )}
         </div>
         <div className="flex flex-col gap-0.5">
           <span style={{ color: '#CCCCCC', fontSize: 14 }}>{g.exercise_name} 목표</span>
@@ -747,7 +763,6 @@ function EditModal({
         className="w-full rounded-t-3xl px-6 pt-5 pb-10"
         style={{ maxWidth: 390, backgroundColor: '#242428', border: '1px solid #3A3A3E' }}
       >
-        <div className="mx-auto mb-5 rounded-full" style={{ width: 40, height: 4, backgroundColor: '#3A3A3E' }} />
         <div className="flex items-center justify-between mb-5">
           <span style={{ color: '#FFFFFF', fontSize: 17, fontWeight: 700 }}>{title}</span>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
