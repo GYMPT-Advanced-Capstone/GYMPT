@@ -147,6 +147,7 @@ export function MyPage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [resetTarget, setResetTarget] = useState<DisplayGoal | null>(null);
   const [resettingThreshold, setResettingThreshold] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [bodyData, setBodyData] = useState<BodyData | null>(() => bodyStorage.load());
 
   const loadData = useCallback(async () => {
@@ -309,6 +310,7 @@ export function MyPage() {
   };
 
   const openThresholdReset = (goal: DisplayGoal) => {
+    setResetError(null);
     setResetTarget(goal);
   };
 
@@ -316,6 +318,7 @@ export function MyPage() {
     if (!resetTarget) return;
 
     setResettingThreshold(true);
+    setResetError(null);
     try {
       let goalId = resetTarget.api_goal_id ?? goalIdStorage.get(resetTarget.exercise_id);
       if (goalId == null) {
@@ -326,7 +329,10 @@ export function MyPage() {
         goalId = latestGoal?.goal_id ?? null;
         if (goalId != null) goalIdStorage.set(resetTarget.exercise_id, goalId);
       }
-      if (goalId == null) return;
+      if (goalId == null) {
+        setResetError('운동 목표 정보를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.');
+        return;
+      }
 
       const resetGoal = await userApi.resetExerciseGoalThreshold(goalId);
       const resetExerciseKey =
@@ -334,8 +340,12 @@ export function MyPage() {
       if (resetExerciseKey) resetCalibrated(resetExerciseKey);
       setResetTarget(null);
       await loadData();
-    } catch {
-      // Keep the confirmation sheet open so the user can retry.
+    } catch (error) {
+      setResetError(
+        error instanceof Error
+          ? error.message
+          : '임계값 초기화에 실패했습니다. 다시 시도해주세요.',
+      );
     } finally {
       setResettingThreshold(false);
     }
@@ -584,13 +594,14 @@ export function MyPage() {
       {resetTarget && (
         <ConfirmSheet
           message={`${resetTarget.exercise_name} 임계값을 초기화할까요?`}
-          subMessage="다음 촬영 시 임계값을 다시 측정해야 해요"
+          subMessage={resetError ?? '다음 촬영 시 임계값을 다시 측정해야 해요'}
           confirmLabel="초기화"
           confirmColor="#FF5A5A"
           onConfirm={handleThresholdReset}
           onCancel={() => {
             if (resettingThreshold) return;
             setResetTarget(null);
+            setResetError(null);
           }}
           icon={<RotateCcw size={24} color="#FF5A5A" />}
           iconBg="rgba(255,90,90,0.12)"
