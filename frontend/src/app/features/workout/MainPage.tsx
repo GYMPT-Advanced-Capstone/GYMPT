@@ -55,7 +55,7 @@ const weeklyData = [
 ];
 
 const badges = [
-  { icon: '🔥', label: '3일 연속', active: true },
+  { icon: '🔥', label: '3회 달성', active: true },
   { icon: '⚡', label: '첫 분석', active: true },
   { icon: '🏆', label: '주간 달성', active: false },
   { icon: '💎', label: '완벽 자세', active: false },
