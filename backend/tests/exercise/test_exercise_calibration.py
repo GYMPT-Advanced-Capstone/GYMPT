@@ -7,6 +7,7 @@ from app.exercise_calibration.dto.exercise_calibration_request import (
     ExerciseCalibrationCreateRequest,
 )
 from app.exercise_calibration.service import ExerciseCalibrationService
+from app.exercise_record.exercise_record_model import UserExerciseCalibration
 
 
 class FakeExerciseCalibrationRepo:
@@ -93,3 +94,20 @@ def test_exercise_calibration_request_rejects_empty_samples():
             hold_duration_ms=3000,
             samples=[],
         )
+
+
+def test_exercise_calibration_service_treats_null_metrics_as_not_found():
+    repo = FakeExerciseCalibrationRepo()
+    repo.created_calibration = UserExerciseCalibration(
+        id=10,
+        user_id=7,
+        exercise_id=1,
+        version=1,
+        metrics_json=None,
+    )
+    service = ExerciseCalibrationService(repo)
+
+    with pytest.raises(Exception) as exc_info:
+        service.get_latest(7, 1)
+
+    assert getattr(exc_info.value, "status_code", None) == 404

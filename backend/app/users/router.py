@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.exercise.exercise_model import Exercise
+from app.exercise_record.exercise_record_model import UserExerciseCalibration
 from app.exercise_record.exercise_record_model import ExerciseRecord
 from app.users.models import User, UserExerciseGoal
 from app.users.schemas import (
@@ -111,6 +112,7 @@ def get_main_summary(
         goal = goal_by_exercise_id.get(exercise_id)
         exercise_goal_summaries.append(
             ExerciseGoalSummaryItem(
+                goal_id=int(goal.id) if goal else None,
                 exercise_id=exercise_id,
                 exercise_name=str(exercise_map.get(exercise_id, "")),
                 daily_target_count=int(goal.daily_target_count)
@@ -333,3 +335,56 @@ def update_exercise_goal(
     db.commit()
     db.refresh(goal)
     return goal
+
+
+def reset_goal_threshold_data(
+    user_id: int,
+    goal: UserExerciseGoal,
+    db: Session,
+) -> UserExerciseGoal:
+    goal.threshold = None  # type: ignore[assignment]
+    db.add(
+        UserExerciseCalibration(
+            user_id=user_id,
+            exercise_id=goal.exercise_id,
+            version=1,
+            metrics_json=None,
+        )
+    )
+    db.commit()
+    db.refresh(goal)
+    return goal
+
+
+@router.patch(
+    "/me/exercise-goals/{goal_id}/threshold/reset",
+    response_model=ExerciseGoalResponse,
+    summary="운동 목표 임계값 초기화",
+    description="등록된 운동 목표의 자세 임계값을 초기화합니다. 초기화 후 threshold는 null로 반환됩니다.",
+)
+def reset_exercise_goal_threshold(
+    goal_id: int,
+    token_data: tuple[str, str] = Depends(verify_access_token),
+    db: Session = Depends(get_db),
+):
+    email, _ = token_data
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="유저를 찾을 수 없습니다."
+        )
+    goal = (
+        db.query(UserExerciseGoal)
+        .filter(
+            UserExerciseGoal.id == goal_id,
+            UserExerciseGoal.user_id == user.id,
+        )
+        .first()
+    )
+    if not goal:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="운동 목표를 찾을 수 없습니다.",
+        )
+
+    return reset_goal_threshold_data(int(user.id), goal, db)

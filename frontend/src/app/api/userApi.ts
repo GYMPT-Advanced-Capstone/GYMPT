@@ -160,6 +160,13 @@ export const userApi = {
       { method: 'PATCH', body: JSON.stringify(data) },
       true,
     ),
+
+  resetExerciseGoalThreshold: (goalId: number) =>
+    request<ExerciseGoalResponse>(
+      `/api/v1/users/me/exercise-goals/${goalId}/threshold/reset`,
+      { method: 'PATCH' },
+      true,
+    ),
 };
 
 export function parseBirthDate(dateStr: string | null): { year: number; month: number; day: number } {

@@ -6,7 +6,10 @@ from sqlalchemy.exc import IntegrityError
 
 from app.users.models import User, UserExerciseGoal
 from app.exercise.exercise_model import Exercise
-from app.exercise_record.exercise_record_model import ExerciseRecord
+from app.exercise_record.exercise_record_model import (
+    ExerciseRecord,
+    UserExerciseCalibration,
+)
 from app.auth.utils import create_token
 from app.core.database import get_db
 
@@ -78,6 +81,7 @@ def test_get_main_summary_success(client, mock_redis_client, access_token, fake_
     assert data["today_achievement_rate"] == 100.0
     assert data["today_completed_count"] == 1
     assert len(data["exercise_goals"]) == 1
+    assert data["exercise_goals"][0]["goal_id"] == 1
     assert data["exercise_goals"][0]["exercise_name"] == "스쿼트"
     assert data["exercise_goals"][0]["today_count"] == 10
     assert data["exercise_goals"][0]["today_duration"] == 60
@@ -123,6 +127,7 @@ def test_get_main_summary_duration_goal(
     assert response.status_code == 200
     data = response.json()
     assert data["today_achievement_rate"] == 100.0
+    assert data["exercise_goals"][0]["goal_id"] == 1
     assert data["exercise_goals"][0]["daily_target_duration"] == 60
     assert data["exercise_goals"][0]["today_duration"] == 60
 
@@ -198,6 +203,7 @@ def test_get_main_summary_includes_today_records_without_goals(
     assert data["today_completed_count"] == 1
     assert data["exercise_goals"] == [
         {
+            "goal_id": None,
             "exercise_id": 2,
             "exercise_name": "Squat",
             "daily_target_count": None,
@@ -465,6 +471,70 @@ def test_update_exercise_goal_invalid_threshold(
     )
 
     assert response.status_code == 422
+
+
+def test_reset_exercise_goal_threshold_success(
+    client, mock_redis_client, access_token, fake_user
+):
+    test_client, mock_db = client
+    mock_redis_client.get.return_value = None
+    fake_goal = UserExerciseGoal(
+        id=1, user_id=1, exercise_id=1, daily_target_count=10, threshold=80.0
+    )
+    mock_db.query.return_value.filter.return_value.first.side_effect = [
+        fake_user,
+        fake_goal,
+    ]
+
+    response = test_client.patch(
+        "/api/v1/users/me/exercise-goals/1/threshold/reset",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 200
+    assert fake_goal.threshold is None
+    mock_db.add.assert_called_once()
+    added_calibration = mock_db.add.call_args.args[0]
+    assert isinstance(added_calibration, UserExerciseCalibration)
+    assert added_calibration.exercise_id == fake_goal.exercise_id
+    assert added_calibration.metrics_json is None
+    assert response.json()["exercise_id"] == 1
+    assert response.json()["threshold"] is None
+
+
+def test_reset_exercise_goal_threshold_goal_not_found(
+    client, mock_redis_client, access_token, fake_user
+):
+    test_client, mock_db = client
+    mock_redis_client.get.return_value = None
+    mock_db.query.return_value.filter.return_value.first.side_effect = [
+        fake_user,
+        None,
+    ]
+
+    response = test_client.patch(
+        "/api/v1/users/me/exercise-goals/999/threshold/reset",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "운동 목표를 찾을 수 없습니다."
+
+
+def test_reset_exercise_goal_threshold_user_not_found(
+    client, mock_redis_client, access_token
+):
+    test_client, mock_db = client
+    mock_redis_client.get.return_value = None
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    response = test_client.patch(
+        "/api/v1/users/me/exercise-goals/1/threshold/reset",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "유저를 찾을 수 없습니다."
 
 
 # PATCH /me/body

@@ -2,6 +2,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExerciseGoalSummaryItem(BaseModel):
+    goal_id: int | None = Field(
+        default=None,
+        description="운동 목표 ID",
+        json_schema_extra={"example": 1},
+    )
     exercise_id: int = Field(
         ...,
         description="운동 종목 ID",
