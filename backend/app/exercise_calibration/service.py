@@ -37,7 +37,7 @@ class ExerciseCalibrationService:
         exercise_id: int,
     ) -> ExerciseCalibrationResponse:
         calibration = self.repo.get_latest(user_id, exercise_id)
-        if calibration is None:
+        if calibration is None or self._has_no_metrics(calibration):
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="초기 가동범위 설정을 찾을 수 없습니다.",
@@ -90,3 +90,6 @@ class ExerciseCalibrationService:
 
         metrics.update(phase_metrics)
         return metrics
+
+    def _has_no_metrics(self, calibration: UserExerciseCalibration) -> bool:
+        return calibration.metrics_json is None
