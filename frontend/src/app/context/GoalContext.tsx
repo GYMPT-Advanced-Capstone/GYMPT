@@ -50,6 +50,7 @@ const GoalContext = createContext<{
   setUserName: (name: string) => void;
   calibratedExercises: Record<string, boolean>;
   markCalibrated: (exerciseId: string) => void;
+  resetCalibrated: (exerciseId: string) => void;
 }>({
   goal: defaultGoal,
   updateGoal: () => {},
@@ -57,6 +58,7 @@ const GoalContext = createContext<{
   setUserName: () => {},
   calibratedExercises: {},
   markCalibrated: () => {},
+  resetCalibrated: () => {},
 });
 
 export function GoalProvider({ children }: { children: ReactNode }) {
@@ -76,8 +78,16 @@ export function GoalProvider({ children }: { children: ReactNode }) {
     setCalibratedExercises((prev) => ({ ...prev, [exerciseId]: true }));
   };
 
+  const resetCalibrated = (exerciseId: string) => {
+    setCalibratedExercises((prev) => {
+      const { [exerciseId]: _removed, ...next } = prev;
+      void _removed;
+      return next;
+    });
+  };
+
   return (
-    <GoalContext.Provider value={{ goal, updateGoal, userName, setUserName, calibratedExercises, markCalibrated }}>
+    <GoalContext.Provider value={{ goal, updateGoal, userName, setUserName, calibratedExercises, markCalibrated, resetCalibrated }}>
       {children}
     </GoalContext.Provider>
   );

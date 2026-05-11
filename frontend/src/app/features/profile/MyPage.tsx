@@ -58,6 +58,17 @@ const EXERCISE_KEY_MAP: Record<string, string> = {
   런지: 'lunge',
   푸시업: 'pushup',
   플랭크: 'plank',
+  Squat: 'squat',
+  Lunge: 'lunge',
+  'Push Up': 'pushup',
+  Plank: 'plank',
+};
+
+const EXERCISE_KEY_BY_ID: Record<number, string> = {
+  1: 'pushup',
+  2: 'squat',
+  3: 'lunge',
+  4: 'plank',
 };
 
 const EXERCISE_EMOJI: Record<string, string> = {
@@ -88,7 +99,7 @@ function goalContextToLocalGoals(
 function fromApiItem(item: ExerciseGoalSummaryItem): DisplayGoal {
   const unit = item.daily_target_duration != null ? '초' : '개';
   const target = item.daily_target_count ?? item.daily_target_duration ?? 0;
-  const key = EXERCISE_KEY_MAP[item.exercise_name] ?? '';
+  const key = EXERCISE_KEY_BY_ID[item.exercise_id] ?? EXERCISE_KEY_MAP[item.exercise_name] ?? '';
   const apiGoalId = item.goal_id ?? goalIdStorage.get(item.exercise_id);
   if (item.goal_id != null) goalIdStorage.set(item.exercise_id, item.goal_id);
   return {
@@ -118,7 +129,7 @@ function fromLocalGoal(g: LocalExerciseGoal, idx: number): DisplayGoal {
 
 export function MyPage() {
   const navigate = useNavigate();
-  const { goal: goalCtx, updateGoal } = useGoal();
+  const { goal: goalCtx, updateGoal, resetCalibrated } = useGoal();
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [displayGoals, setDisplayGoals] = useState<DisplayGoal[]>([]);
@@ -134,7 +145,8 @@ export function MyPage() {
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [resetTarget, setResetTarget] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<DisplayGoal | null>(null);
+  const [resettingThreshold, setResettingThreshold] = useState(false);
   const [bodyData, setBodyData] = useState<BodyData | null>(() => bodyStorage.load());
 
   const loadData = useCallback(async () => {
@@ -293,6 +305,39 @@ export function MyPage() {
       setLoggingOut(false);
       setShowLogoutConfirm(false);
       navigate('/');
+    }
+  };
+
+  const openThresholdReset = (goal: DisplayGoal) => {
+    setResetTarget(goal);
+  };
+
+  const handleThresholdReset = async () => {
+    if (!resetTarget) return;
+
+    setResettingThreshold(true);
+    try {
+      let goalId = resetTarget.api_goal_id ?? goalIdStorage.get(resetTarget.exercise_id);
+      if (goalId == null) {
+        const summary = await userApi.getSummary();
+        const latestGoal = summary.exercise_goals.find(
+          (goal) => goal.exercise_id === resetTarget.exercise_id,
+        );
+        goalId = latestGoal?.goal_id ?? null;
+        if (goalId != null) goalIdStorage.set(resetTarget.exercise_id, goalId);
+      }
+      if (goalId == null) return;
+
+      const resetGoal = await userApi.resetExerciseGoalThreshold(goalId);
+      const resetExerciseKey =
+        EXERCISE_KEY_BY_ID[resetGoal.exercise_id] ?? resetTarget.key;
+      if (resetExerciseKey) resetCalibrated(resetExerciseKey);
+      setResetTarget(null);
+      await loadData();
+    } catch {
+      // Keep the confirmation sheet open so the user can retry.
+    } finally {
+      setResettingThreshold(false);
     }
   };
 
@@ -469,7 +514,7 @@ export function MyPage() {
                       <span style={{ color: '#CCCCCC', fontSize: 14 }}>{g.exercise_name}</span>
                     </div>
                     <button
-                      onClick={() => setResetTarget(g.exercise_name)}
+                      onClick={() => openThresholdReset(g)}
                       className="flex items-center gap-1.5 px-3 rounded-lg"
                       style={{
                         height: 32,
@@ -538,15 +583,19 @@ export function MyPage() {
 
       {resetTarget && (
         <ConfirmSheet
-          message={`${resetTarget} 임계값을 초기화할까요?`}
+          message={`${resetTarget.exercise_name} 임계값을 초기화할까요?`}
           subMessage="다음 촬영 시 임계값을 다시 측정해야 해요"
           confirmLabel="초기화"
           confirmColor="#FF5A5A"
-          onConfirm={() => setResetTarget(null)}
-          onCancel={() => setResetTarget(null)}
+          onConfirm={handleThresholdReset}
+          onCancel={() => {
+            if (resettingThreshold) return;
+            setResetTarget(null);
+          }}
           icon={<RotateCcw size={24} color="#FF5A5A" />}
           iconBg="rgba(255,90,90,0.12)"
           iconBorder="rgba(255,90,90,0.3)"
+          disabled={resettingThreshold}
         />
       )}
     </div>
