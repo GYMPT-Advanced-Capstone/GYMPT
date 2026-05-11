@@ -89,6 +89,21 @@ const GOAL_CONTEXT_META: Record<string, { name: string; unit: string }> = {
   plank:  { name: '플랭크', unit: '초' },
 };
 
+const EXERCISE_DISPLAY_ORDER: Record<string, number> = {
+  squat:  0,
+  pushup: 1,
+  lunge:  2,
+  plank:  3,
+};
+
+function sortGoals(goals: DisplayGoal[]): DisplayGoal[] {
+  return [...goals].sort(
+    (a, b) =>
+      (EXERCISE_DISPLAY_ORDER[a.key] ?? 99) -
+      (EXERCISE_DISPLAY_ORDER[b.key] ?? 99),
+  );
+}
+
 function goalContextToLocalGoals(
   exerciseCounts: Record<string, number>,
 ): LocalExerciseGoal[] {
@@ -101,15 +116,15 @@ function goalContextToLocalGoals(
 }
 
 function fromApiItem(item: ExerciseGoalSummaryItem): DisplayGoal {
+  const key = EXERCISE_KEY_BY_ID[item.exercise_id] ?? EXERCISE_KEY_MAP[item.exercise_name] ?? '';
   const unit = item.daily_target_duration != null ? '초' : '개';
   const target = item.daily_target_count ?? item.daily_target_duration ?? 0;
-  const key = EXERCISE_KEY_BY_ID[item.exercise_id] ?? EXERCISE_KEY_MAP[item.exercise_name] ?? '';
   const apiGoalId = item.goal_id ?? goalIdStorage.get(item.exercise_id);
   if (item.goal_id != null) goalIdStorage.set(item.exercise_id, item.goal_id);
   return {
     key,
     exercise_id: item.exercise_id,
-    exercise_name: item.exercise_name,
+    exercise_name: GOAL_CONTEXT_META[key]?.name ?? item.exercise_name,
     target,
     unit,
     today_count: item.today_count,
@@ -122,7 +137,7 @@ function fromLocalGoal(g: LocalExerciseGoal, idx: number): DisplayGoal {
   return {
     key: g.exercise_key,
     exercise_id: -(idx + 1),
-    exercise_name: g.exercise_name,
+    exercise_name: GOAL_CONTEXT_META[g.exercise_key]?.name ?? g.exercise_name,
     target: g.target,
     unit: g.unit,
     today_count: 0,
@@ -194,7 +209,7 @@ export function MyPage() {
       }
 
       if (summary && summary.exercise_goals.length > 0) {
-        const goals = summary.exercise_goals.map(fromApiItem);
+        const goals = sortGoals(summary.exercise_goals.map(fromApiItem));
         setDisplayGoals(goals);
         const syncCounts: Record<string, number> = {};
         goals.forEach((g) => { if (g.key) syncCounts[g.key] = g.target; });
@@ -202,13 +217,13 @@ export function MyPage() {
       } else {
         const localGoals = localExerciseGoalStorage.load();
         if (localGoals.length > 0) {
-          setDisplayGoals(localGoals.map(fromLocalGoal));
+          setDisplayGoals(sortGoals(localGoals.map(fromLocalGoal)));
         } else {
           const ctxGoals = goalContextToLocalGoals(goalCtx.exerciseCounts);
           const hasRealData = Object.values(goalCtx.exerciseCounts).some((v) => v > 0);
           if (hasRealData) {
             localExerciseGoalStorage.save(goalCtx.exerciseCounts);
-            setDisplayGoals(ctxGoals.map(fromLocalGoal));
+            setDisplayGoals(sortGoals(ctxGoals.map(fromLocalGoal)));
           }
         }
       }
