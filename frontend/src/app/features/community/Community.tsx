@@ -168,7 +168,11 @@ export function Community() {
   }, [navigate, handleApiError]);
 
   useEffect(() => {
-    void fetchPosts();
+    const init = async () => {
+      await fetchPosts();
+    };
+  
+    void init();
   }, [fetchPosts]);
 
   const handleLikeUpdate = async (
@@ -643,7 +647,11 @@ function CommentsBottomSheet({
   }, [postId, onApiError]);
 
   useEffect(() => {
-    void fetchComments();
+    const init = async () => {
+      await fetchComments();
+    };
+  
+    void init();
   }, [fetchComments]);
 
   const handleSubmit = async (
