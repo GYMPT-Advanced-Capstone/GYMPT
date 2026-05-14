@@ -19,10 +19,14 @@ export function EditPost() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
 
-  const [existingImages, setExistingImages] = useState<ExistingImage[]>([]);
+  const [existingImages, setExistingImages] = useState<
+    ExistingImage[]
+  >([]);
 
   const [newImages, setNewImages] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>(
+    []
+  );
 
   const [loading, setLoading] = useState(false);
 
@@ -31,9 +35,13 @@ export function EditPost() {
       const err = error as AxiosError;
 
       if (err.response?.status === 401) {
-        alert("세션이 만료되었습니다. 다시 로그인해주세요.");
+        alert(
+          "세션이 만료되었습니다. 다시 로그인해주세요."
+        );
 
-        localStorage.removeItem("gympt_access_token");
+        localStorage.removeItem(
+          "gympt_access_token"
+        );
 
         navigate("/");
 
@@ -45,50 +53,68 @@ export function EditPost() {
     [navigate]
   );
 
+  const fetchPost = useCallback(async () => {
+    try {
+      const token = localStorage.getItem(
+        "gympt_access_token"
+      );
+
+      if (!token) {
+        navigate("/");
+        return;
+      }
+
+      const res = await axios.get(
+        `${API_BASE_URL}/api/v1/board/${id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setTitle(res.data.title || "");
+      setContent(res.data.content || "");
+      setExistingImages(res.data.images || []);
+
+    } catch (error) {
+      handleApiError(error);
+      alert("게시글 불러오기 실패");
+    }
+  }, [id, navigate, handleApiError]);
+
   useEffect(() => {
     fetchPost();
+  }, [fetchPost]);
 
+  useEffect(() => {
     return () => {
       previewUrls.forEach((url) => {
         URL.revokeObjectURL(url);
       });
     };
-  }, []);
+  }, [previewUrls]);
 
-  const fetchPost = async () => {
-    try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/v1/board/${id}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem(
-              "gympt_access_token"
-            )}`,
-          },
-        }
-      );
-
-      setTitle(res.data.title);
-      setContent(res.data.content);
-      setExistingImages(res.data.images || []);
-    } catch (e) {
-      handleApiError(e);
-      alert("게시글 불러오기 실패");
-    }
-  };
-
-  const removeExistingImage = (image_id: number) => {
+  const removeExistingImage = (
+    image_id: number
+  ) => {
     setExistingImages((prev) =>
-      prev.filter((img) => img.image_id !== image_id)
+      prev.filter(
+        (img) => img.image_id !== image_id
+      )
     );
   };
 
   const handleImageChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(
+      e.target.files || []
+    );
 
-    if (files.length === 0) return;
+    if (files.length === 0) {
+      return;
+    }
 
     const totalCount =
       existingImages.length +
@@ -96,7 +122,9 @@ export function EditPost() {
       files.length;
 
     if (totalCount > 5) {
-      alert("이미지는 최대 5장까지 가능합니다.");
+      alert(
+        "이미지는 최대 5장까지 가능합니다."
+      );
       return;
     }
 
@@ -105,17 +133,25 @@ export function EditPost() {
     );
 
     if (imageFiles.length !== files.length) {
-      alert("이미지 파일만 업로드 가능합니다.");
+      alert(
+        "이미지 파일만 업로드 가능합니다."
+      );
       return;
     }
 
-    setNewImages((prev) => [...prev, ...imageFiles]);
+    setNewImages((prev) => [
+      ...prev,
+      ...imageFiles,
+    ]);
 
     const urls = imageFiles.map((file) =>
       URL.createObjectURL(file)
     );
 
-    setPreviewUrls((prev) => [...prev, ...urls]);
+    setPreviewUrls((prev) => [
+      ...prev,
+      ...urls,
+    ]);
 
     e.target.value = "";
   };
@@ -146,6 +182,15 @@ export function EditPost() {
     try {
       setLoading(true);
 
+      const token = localStorage.getItem(
+        "gympt_access_token"
+      );
+
+      if (!token) {
+        navigate("/");
+        return;
+      }
+
       const formData = new FormData();
 
       formData.append("title", title);
@@ -167,10 +212,9 @@ export function EditPost() {
         formData,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem(
-              "gympt_access_token"
-            )}`,
-            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+            "Content-Type":
+              "multipart/form-data",
           },
         }
       );
@@ -178,9 +222,11 @@ export function EditPost() {
       alert("수정 완료!");
 
       navigate("/community");
-    } catch (e) {
-      handleApiError(e);
+
+    } catch (error) {
+      handleApiError(error);
       alert("수정 실패");
+
     } finally {
       setLoading(false);
     }
@@ -218,14 +264,18 @@ export function EditPost() {
         <div className="flex-1 p-5">
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) =>
+              setTitle(e.target.value)
+            }
             placeholder="제목"
             className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none mb-4 text-white placeholder:text-white/30"
           />
 
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) =>
+              setContent(e.target.value)
+            }
             placeholder="내용"
             className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 outline-none mb-6 h-40 resize-none text-white placeholder:text-white/30"
           />
@@ -243,15 +293,23 @@ export function EditPost() {
                     className="relative shrink-0"
                   >
                     <img
-                      src={`${API_BASE_URL}${img.imgpath}`}
-                      alt=""
+                      src={
+                        img.imgpath.startsWith(
+                          "http"
+                        )
+                          ? img.imgpath
+                          : `${API_BASE_URL}${img.imgpath}`
+                      }
+                      alt="existing"
                       className="w-24 h-24 rounded-2xl object-cover border border-white/10"
                     />
 
                     <button
                       type="button"
                       onClick={() =>
-                        removeExistingImage(img.image_id)
+                        removeExistingImage(
+                          img.image_id
+                        )
                       }
                       className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center"
                     >
@@ -275,13 +333,15 @@ export function EditPost() {
               >
                 <img
                   src={url}
-                  alt=""
+                  alt="preview"
                   className="w-24 h-24 rounded-2xl object-cover border border-white/10"
                 />
 
                 <button
                   type="button"
-                  onClick={() => removeNewImage(index)}
+                  onClick={() =>
+                    removeNewImage(index)
+                  }
                   className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center"
                 >
                   <X size={14} />
@@ -289,7 +349,9 @@ export function EditPost() {
               </div>
             ))}
 
-            {existingImages.length + newImages.length < 5 && (
+            {existingImages.length +
+              newImages.length <
+              5 && (
               <>
                 <input
                   type="file"
@@ -322,7 +384,9 @@ export function EditPost() {
             disabled={loading}
             className="w-full bg-[#3FFDD4] text-black py-4 rounded-2xl font-bold text-lg active:scale-[0.98] transition-transform disabled:opacity-50"
           >
-            {loading ? "수정 중..." : "수정 완료"}
+            {loading
+              ? "수정 중..."
+              : "수정 완료"}
           </button>
         </div>
       </div>
