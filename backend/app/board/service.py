@@ -153,7 +153,7 @@ def _serialize_images(images: list[BoardImage]) -> list[BoardImageResponse]:
 
 
 def _serialize_images_summary(images: list[BoardImage]) -> list[BoardImageResponse]:
-    return _serialize_images(images[:1])
+    return _serialize_images(images)
 
 
 def _to_board_response(

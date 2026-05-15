@@ -23,6 +23,8 @@ import { CreatePost } from "./features/community/CreatePost";
 
 import { AnalysisPage } from "./features/analysis/AnalysisPage";
 
+import { EditPost } from "./features/community/EditPost";
+
 
 export const router = createBrowserRouter([
   { path: "/", Component: LoginPage },
@@ -45,4 +47,6 @@ export const router = createBrowserRouter([
   { path: "/analysis", Component: AnalysisPage },
 
   { path: "/mypage", Component: MyPage },
+
+  { path: "/edit-post/:id", Component: EditPost }
 ]);
