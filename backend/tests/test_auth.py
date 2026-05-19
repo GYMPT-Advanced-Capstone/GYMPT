@@ -740,6 +740,23 @@ def test_verify_password_reset_code_user_not_found(client, mock_redis_client):
     assert response.json()["detail"] == "존재하지 않는 사용자입니다."
 
 
+def test_verify_password_reset_code_redis_error(client, mock_redis_client):
+    test_client, mock_db = client
+    fake_user = User(
+        id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
+    )
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+    mock_redis_client.get.side_effect = redis.RedisError("connection error")
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset/verify-code",
+        json={"email": "test@test.com", "code": "123456"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "인증 서버에 일시적인 오류가 발생했습니다."
+
+
 # Password Reset
 def test_reset_password_success(client, mock_redis_client):
     test_client, mock_db = client

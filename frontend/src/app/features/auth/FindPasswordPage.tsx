@@ -118,11 +118,10 @@ export function FindPasswordPage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : '비밀번호 재설정에 실패했어요.';
       if (
-        message.toLowerCase().includes('invalid') ||
-        message.toLowerCase().includes('expired') ||
-        message.toLowerCase().includes('code')
+        message.toLowerCase().includes('verified') ||
+        message.toLowerCase().includes('expired')
       ) {
-        setResetError('인증 코드가 올바르지 않거나 만료되었어요. 처음부터 다시 시도해주세요.');
+        setResetError('인증이 만료되었어요. 처음부터 다시 시도해주세요.');
       } else {
         setResetError(message);
       }
