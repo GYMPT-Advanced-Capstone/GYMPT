@@ -72,7 +72,7 @@ class PasswordResetRequest(BaseModel):
     )
 
 
-class PasswordResetConfirmRequest(BaseModel):
+class PasswordResetVerifyRequest(BaseModel):
     email: EmailStr = Field(
         ...,
         description="이메일",
@@ -83,6 +83,14 @@ class PasswordResetConfirmRequest(BaseModel):
         pattern=r"^\d{6}$",
         description="이메일로 받은 6자리 인증 코드",
         json_schema_extra={"example": "123456"},
+    )
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    email: EmailStr = Field(
+        ...,
+        description="이메일",
+        json_schema_extra={"example": "user@example.com"},
     )
     new_password: str = Field(
         ...,

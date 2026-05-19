@@ -692,8 +692,8 @@ def test_request_password_reset_user_not_found(client):
     assert response.json()["detail"] == "등록되지 않은 이메일입니다."
 
 
-# Password Reset
-def test_reset_password_success(client, mock_redis_client):
+# Password Reset Verify Code
+def test_verify_password_reset_code_success(client, mock_redis_client):
     test_client, mock_db = client
     fake_user = User(
         id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
@@ -702,20 +702,16 @@ def test_reset_password_success(client, mock_redis_client):
     mock_redis_client.get.return_value = "123456"
 
     response = test_client.post(
-        "/api/v1/auth/password-reset",
-        json={
-            "email": "test@test.com",
-            "code": "123456",
-            "new_password": "newpassword",
-        },
+        "/api/v1/auth/password-reset/verify-code",
+        json={"email": "test@test.com", "code": "123456"},
     )
 
     assert response.status_code == 204
-    mock_redis_client.delete.assert_any_call("EMAIL_CODE:test@test.com")
-    mock_redis_client.delete.assert_any_call("RT:test@test.com")
+    mock_redis_client.delete.assert_called_with("EMAIL_CODE:test@test.com")
+    mock_redis_client.setex.assert_called()
 
 
-def test_reset_password_invalid_code(client, mock_redis_client):
+def test_verify_password_reset_code_invalid(client, mock_redis_client):
     test_client, mock_db = client
     mock_db.query.return_value.filter.return_value.first.return_value = MagicMock(
         id=1, email="test@test.com", pw="hashed_password"
@@ -723,30 +719,71 @@ def test_reset_password_invalid_code(client, mock_redis_client):
     mock_redis_client.get.return_value = "123456"
 
     response = test_client.post(
-        "/api/v1/auth/password-reset",
-        json={
-            "email": "test@test.com",
-            "code": "000000",
-            "new_password": "newpassword",
-        },
+        "/api/v1/auth/password-reset/verify-code",
+        json={"email": "test@test.com", "code": "000000"},
     )
 
     assert response.status_code == 400
     assert response.json()["detail"] == "인증 코드가 올바르지 않거나 만료되었습니다."
 
 
-def test_reset_password_user_not_found(client, mock_redis_client):
+def test_verify_password_reset_code_user_not_found(client, mock_redis_client):
     test_client, mock_db = client
     mock_db.query.return_value.filter.return_value.first.return_value = None
-    mock_redis_client.get.return_value = "123456"
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset/verify-code",
+        json={"email": "test@test.com", "code": "123456"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "존재하지 않는 사용자입니다."
+
+
+# Password Reset
+def test_reset_password_success(client, mock_redis_client):
+    test_client, mock_db = client
+    fake_user = User(
+        id=1, email="test@test.com", pw="password", name="최인규", nickname="테스터"
+    )
+    mock_db.query.return_value.filter.return_value.first.return_value = fake_user
+    mock_redis_client.get.side_effect = lambda key: (
+        "1" if key == "VERIFIED:test@test.com" else None
+    )
 
     response = test_client.post(
         "/api/v1/auth/password-reset",
-        json={
-            "email": "test@test.com",
-            "code": "123456",
-            "new_password": "newpassword",
-        },
+        json={"email": "test@test.com", "new_password": "newpassword"},
+    )
+
+    assert response.status_code == 204
+    mock_redis_client.delete.assert_any_call("VERIFIED:test@test.com")
+    mock_redis_client.delete.assert_any_call("RT:test@test.com")
+
+
+def test_reset_password_without_verify(client, mock_redis_client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = MagicMock(
+        id=1, email="test@test.com", pw="hashed_password"
+    )
+    mock_redis_client.get.return_value = None
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset",
+        json={"email": "test@test.com", "new_password": "newpassword"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "이메일 인증이 완료되지 않았습니다."
+
+
+def test_reset_password_user_not_found(client, mock_redis_client):
+    test_client, mock_db = client
+    mock_db.query.return_value.filter.return_value.first.return_value = None
+
+    response = test_client.post(
+        "/api/v1/auth/password-reset",
+        json={"email": "test@test.com", "new_password": "newpassword"},
     )
 
     assert response.status_code == 404
