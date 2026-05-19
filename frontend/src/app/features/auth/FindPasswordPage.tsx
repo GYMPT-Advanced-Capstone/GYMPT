@@ -43,16 +43,18 @@ export function FindPasswordPage() {
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [loadingSend, setLoadingSend] = useState(false);
+  const [loadingVerify, setLoadingVerify] = useState(false);
   const [loadingReset, setLoadingReset] = useState(false);
 
   const [sendError, setSendError] = useState('');
+  const [verifyError, setVerifyError] = useState('');
   const [resetError, setResetError] = useState('');
 
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const pwValid = newPw.length >= 8;
   const pwMatch = newPw === confirmPw && confirmPw.length > 0;
 
-  const verifyReady = codeSent && code.trim().length === 6;
+  const verifyReady = codeSent && code.trim().length === 6 && !loadingVerify;
   const resetReady = pwValid && pwMatch && !loadingReset;
 
   const handleSendCode = async () => {
@@ -80,10 +82,29 @@ export function FindPasswordPage() {
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!verifyReady) return;
+    setVerifyError('');
     setResetError('');
-    setStep('reset');
+    setLoadingVerify(true);
+
+    try {
+      await authApi.verifyPasswordResetCode(email.trim(), code.trim());
+      setStep('reset');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '인증 코드 확인에 실패했어요.';
+      if (
+        message.toLowerCase().includes('invalid') ||
+        message.toLowerCase().includes('expired') ||
+        message.toLowerCase().includes('code')
+      ) {
+        setVerifyError('인증 코드가 올바르지 않거나 만료되었어요.');
+      } else {
+        setVerifyError(message);
+      }
+    } finally {
+      setLoadingVerify(false);
+    }
   };
 
   const handleReset = async () => {
@@ -92,16 +113,15 @@ export function FindPasswordPage() {
     setLoadingReset(true);
 
     try {
-      await authApi.resetPassword(email.trim(), code.trim(), newPw);
+      await authApi.resetPassword(email.trim(), newPw);
       setStep('done');
     } catch (err) {
       const message = err instanceof Error ? err.message : '비밀번호 재설정에 실패했어요.';
       if (
-        message.toLowerCase().includes('invalid') ||
-        message.toLowerCase().includes('expired') ||
-        message.toLowerCase().includes('code')
+        message.toLowerCase().includes('verified') ||
+        message.toLowerCase().includes('expired')
       ) {
-        setResetError('인증 코드가 올바르지 않거나 만료되었어요. 처음부터 다시 시도해주세요.');
+        setResetError('인증이 만료되었어요. 처음부터 다시 시도해주세요.');
       } else {
         setResetError(message);
       }
@@ -275,6 +295,7 @@ export function FindPasswordPage() {
                         setCodeSent(false);
                         setCode('');
                         setSendError('');
+                        setVerifyError('');
                       }}
                       style={{
                         flex: 1,
@@ -324,61 +345,74 @@ export function FindPasswordPage() {
               </div>
 
               {codeSent && (
-                <div className="flex items-center gap-2" style={{ marginBottom: 32, width: '100%' }}>
-                  <div
-                    className="flex items-center gap-3 px-4"
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      backgroundColor: '#2C2C30',
-                      borderRadius: 12,
-                      height: 54,
-                      border: `1px solid ${code.trim() ? 'rgba(63,253,212,0.4)' : '#3A3A3E'}`,
-                      transition: 'border-color 0.2s',
-                    }}
-                  >
-                    <input
-                      type="text"
-                      placeholder="인증번호 6자리를 입력해주세요"
-                      value={code}
-                      maxLength={6}
-                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                <div style={{ marginBottom: 32 }}>
+                  <div className="flex items-center gap-2" style={{ width: '100%' }}>
+                    <div
+                      className="flex items-center gap-3 px-4"
                       style={{
                         flex: 1,
                         minWidth: 0,
-                        background: 'transparent',
-                        border: 'none',
-                        outline: 'none',
-                        color: '#FFFFFF',
-                        fontSize: 15,
-                        letterSpacing: code ? 4 : 0,
+                        backgroundColor: '#2C2C30',
+                        borderRadius: 12,
+                        height: 54,
+                        border: `1px solid ${code.trim() ? 'rgba(63,253,212,0.4)' : '#3A3A3E'}`,
+                        transition: 'border-color 0.2s',
                       }}
-                      className="placeholder-[#555555]"
-                    />
-                    {code.length === 6 && (
-                      <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>✓</span>
-                    )}
+                    >
+                      <input
+                        type="text"
+                        placeholder="인증번호 6자리를 입력해주세요"
+                        value={code}
+                        maxLength={6}
+                        onChange={(e) => {
+                          setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                          setVerifyError('');
+                        }}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          background: 'transparent',
+                          border: 'none',
+                          outline: 'none',
+                          color: '#FFFFFF',
+                          fontSize: 15,
+                          letterSpacing: code ? 4 : 0,
+                        }}
+                        className="placeholder-[#555555]"
+                      />
+                      {code.length === 6 && (
+                        <span style={{ color: '#3FFDD4', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>✓</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={handleVerify}
+                      disabled={!verifyReady}
+                      style={{
+                        flexShrink: 0,
+                        width: 80,
+                        height: 54,
+                        borderRadius: 12,
+                        border: `1.5px solid ${verifyReady ? '#3FFDD4' : '#3A3A3E'}`,
+                        backgroundColor: 'transparent',
+                        color: verifyReady ? '#3FFDD4' : '#555555',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: verifyReady ? 'pointer' : 'not-allowed',
+                        whiteSpace: 'nowrap',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 4,
+                        transition: 'color 0.2s, border-color 0.2s',
+                      }}
+                    >
+                      {loadingVerify ? <Spinner /> : null}
+                      인증 확인
+                    </button>
                   </div>
-                  <button
-                    onClick={handleVerify}
-                    disabled={!verifyReady}
-                    style={{
-                      flexShrink: 0,
-                      width: 80,
-                      height: 54,
-                      borderRadius: 12,
-                      border: `1.5px solid ${verifyReady ? '#3FFDD4' : '#3A3A3E'}`,
-                      backgroundColor: 'transparent',
-                      color: verifyReady ? '#3FFDD4' : '#555555',
-                      fontSize: 13,
-                      fontWeight: 700,
-                      cursor: verifyReady ? 'pointer' : 'not-allowed',
-                      whiteSpace: 'nowrap',
-                      transition: 'color 0.2s, border-color 0.2s',
-                    }}
-                  >
-                    인증 확인
-                  </button>
+                  {verifyError && (
+                    <p style={{ color: '#FF6B6B', fontSize: 12, marginTop: 6 }}>{verifyError}</p>
+                  )}
                 </div>
               )}
             </>
