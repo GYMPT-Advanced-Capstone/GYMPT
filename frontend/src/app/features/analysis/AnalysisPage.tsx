@@ -85,8 +85,15 @@ export function AnalysisPage() {
   // 💡 [핵심] 선택한 날짜 기준 앞뒤 2일(총 5일)의 실제 데이터를 저장할 공간
   const [fiveDaysRecords, setFiveDaysRecords] = useState<{ [dateStr: string]: ExerciseRecord[] }>({});
   
-  const [userGoal, setUserGoal] = useState<UserGoal | null>(null);
-  const [userName, setUserName] = useState("사용자");
+  const userGoal = useMemo<UserGoal | null>(() => {
+    try {
+      const saved = localStorage.getItem("gympt_goal");
+      return saved ? (JSON.parse(saved) as UserGoal) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const userName = localStorage.getItem("gympt_user_name") ?? "사용자";
   const [weeklyCalories, setWeeklyCalories] = useState("0.0");
 
   const viewYear = currentDate.getFullYear();
@@ -97,18 +104,6 @@ export function AnalysisPage() {
     if (!token) {
       alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
       navigate("/");
-      return;
-    }
-    const savedName = localStorage.getItem("gympt_user_name");
-    const savedGoal = localStorage.getItem("gympt_goal");
-    if (savedName) setUserName(savedName);
-    if (savedGoal) {
-      try {
-        const parsedGoal = JSON.parse(savedGoal) as UserGoal;
-        setUserGoal(parsedGoal);
-      } catch (error) {
-        console.error("goal parsing error:", error);
-      }
     }
   }, [navigate]);
 
