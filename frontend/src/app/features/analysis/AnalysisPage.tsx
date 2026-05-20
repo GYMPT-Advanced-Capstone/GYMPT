@@ -407,7 +407,7 @@ export function AnalysisPage() {
         dailyRecords.length > 0
           ? Math.round(
               dailyRecords.reduce((acc, record) => {
-                const metrics = record.analysis?.reps?.[0]?.metrics;
+                const metrics = record.best_rep_metrics;
                 if (!metrics) {
                   return acc + (record.score || Number(record.accuracy_avg) || 80);
                 }
