@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -46,6 +47,11 @@ class ExerciseRecordResponse(BaseModel):
         default=None,
         description="AI가 생성한 운동 자세 최종 피드백",
         json_schema_extra={"example": "전반적으로 안정적인 자세를 유지했습니다."},
+    )
+    best_rep_metrics: dict[str, Any] | None = Field(
+        default=None,
+        description="이상값에 가장 가까운 렙의 관절 측정값",
+        json_schema_extra={"example": {"bottomKneeAngle": 86.2, "bottomHipAngle": 79.1}},
     )
 
 

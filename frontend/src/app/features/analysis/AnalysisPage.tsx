@@ -31,25 +31,15 @@ interface ExerciseRecord {
   score: number;
   accuracy_avg: string;
   completed_at: string;
-  analysis?: {
-    range_score?: number;
-    extension_score?: number;
-    stability_score?: number;
-    exercise_type?: string;
-    reps?: {
-      rep_index?: number;
-      metrics?: {
-        bodyLineAngle?: number;
-        bottomElbowAngle?: number;
-        topElbowAngle?: number;
-      };
-    }[];
-    range_summary?: {
-      bodyStabilityRate?: number;
-      rangeCompletionRate?: number;
-      topExtensionRate?: number;
-    };
-  };
+  best_rep_metrics?: {
+    bottomKneeAngle?: number;
+    bottomHipAngle?: number;
+    bottomElbowAngle?: number;
+    bodyLineAngle?: number;
+    topKneeAngle?: number;
+    topElbowAngle?: number;
+    [key: string]: number | undefined;
+  } | null;
 }
 
 interface UserGoal {
@@ -312,38 +302,17 @@ export function AnalysisPage() {
         let userAngle2 = 0;
 
         if (matchingRecord) {
-          const reps = matchingRecord.analysis?.reps;
-          
-          // 1. 실제 회차별 실시간 데이터(reps)가 있으면 하나씩 더해 평균 각도 구하기
-          if (Array.isArray(reps) && reps.length > 0) {
-            let sum1 = 0, count1 = 0;
-            let sum2 = 0, count2 = 0;
+          const bm = matchingRecord.best_rep_metrics;
 
-            reps.forEach((rep) => {
-              const m = rep.metrics;
-              if (!m) return;
-
-              if (koName === "푸쉬업") {
-                if (m.bottomElbowAngle) { sum1 += m.bottomElbowAngle; count1++; }
-                if (m.bodyLineAngle) { sum2 += m.bodyLineAngle; count2++; }
-              } else if (koName === "스쿼트" || koName === "런지") {
-                const angle = m.bottomElbowAngle ?? m.topElbowAngle;
-                if (angle) { sum1 += angle; count1++; }
-              } else if (koName === "플랭크") {
-                if (m.bodyLineAngle) { sum1 += m.bodyLineAngle; count1++; }
-              }
-            });
-
-            userAngle = count1 > 0 ? Math.round(sum1 / count1) : 0;
-            userAngle2 = count2 > 0 ? Math.round(sum2 / count2) : 0;
-          }
-
-          // 2. 만약 reps 내부 세부 metric 필드가 비어있다면, 당일의 전반적인 score나 accuracy_avg를 대용값으로 실시간 반영
-          if (userAngle === 0) {
-            userAngle = matchingRecord.score || Number(matchingRecord.accuracy_avg) || 0;
-          }
-          if (koName === "푸쉬업" && userAngle2 === 0) {
-            userAngle2 = 165; // 푸쉬업 엉덩이 수평 기본 백업 값
+          if (bm) {
+            if (koName === "푸쉬업") {
+              userAngle = Math.round(bm.bottomElbowAngle ?? 0);
+              userAngle2 = Math.round(bm.bodyLineAngle ?? 0);
+            } else if (koName === "스쿼트" || koName === "런지") {
+              userAngle = Math.round(bm.bottomKneeAngle ?? 0);
+            } else if (koName === "플랭크") {
+              userAngle = Math.round(bm.bodyLineAngle ?? 0);
+            }
           }
         }
 

@@ -28,6 +28,7 @@ class ExerciseRecord(Base):
     calories = Column(DECIMAL(6, 2), nullable=False)  # type: ignore[var-annotated]
     completed_at = Column(DateTime, nullable=False, default=func.now())
     ai_feedback = Column(Text, nullable=True)
+    best_rep_metrics = Column(JSON, nullable=True)
 
     exercise = relationship("Exercise", back_populates="records")
 
