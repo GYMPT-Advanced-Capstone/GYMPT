@@ -111,6 +111,13 @@ class ExerciseRecordCreateRequest(BaseModel):
         default=None,
         description="AI 피드백 생성에 사용할 반복별 자세 분석 데이터",
     )
+    best_rep_metrics: dict[str, Any] | None = Field(
+        default=None,
+        description="이상값에 가장 가까운 렙의 관절 측정값",
+        json_schema_extra={
+            "example": {"bottomKneeAngle": 86.2, "bottomHipAngle": 79.1}
+        },
+    )
 
     @field_validator("count", "duration")
     @classmethod
