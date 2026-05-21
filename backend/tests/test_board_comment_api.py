@@ -208,7 +208,7 @@ def test_create_comment_success(client: TestClient) -> None:
     assert data["content"] == "첫 댓글입니다."
     assert data["writer"] == "댓글작성자"
     assert "comment_no" in data
-    assert "create_at" in data
+    assert "created_at" in data
 
 
 def test_create_comment_board_not_found(client: TestClient) -> None:

@@ -243,7 +243,7 @@ def create_comment(
     return CommentResponse(
         comment_no=comment.comment_no,
         content=comment.content,
-        create_at=comment.create_at,
+        created_at=comment.created_at,
         writer=str(current_user.nickname),
         board_no=comment.board_no,
     )
@@ -275,7 +275,7 @@ def update_comment(
     return CommentResponse(
         comment_no=comment.comment_no,
         content=comment.content,
-        create_at=comment.create_at,
+        created_at=comment.created_at,
         writer=str(current_user.nickname),
         board_no=comment.board_no,
     )
