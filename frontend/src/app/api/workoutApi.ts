@@ -30,6 +30,7 @@ export interface ExerciseRecordResponse {
   calories: string;
   completed_at: string;
   ai_feedback?: string | null;
+  best_rep_metrics?: Record<string, number> | null;
 }
 
 export const workoutApi = {
@@ -67,6 +68,7 @@ export const workoutApi = {
       exercise_type?: string;
       reps: ExerciseRecordRepRequest[];
     };
+    best_rep_metrics?: Record<string, number> | null;
   }) =>
     request<ExerciseRecordResponse>(
       "/api/exercise-records",

@@ -35,6 +35,7 @@ def make_record(
     calories: Decimal = Decimal("13.50"),
     completed_at: datetime = datetime(2026, 3, 26, 10, 30, 0),
     ai_feedback: str | None = None,
+    best_rep_metrics: dict | None = None,
 ):
     return SimpleNamespace(
         id=record_id,
@@ -46,6 +47,7 @@ def make_record(
         calories=calories,
         completed_at=completed_at,
         ai_feedback=ai_feedback,
+        best_rep_metrics=best_rep_metrics,
     )
 
 
@@ -64,6 +66,8 @@ class FakeExerciseRecordRepo:
             id=record.exercise_id, name="Push Up", description=None
         )
         record.ai_feedback = None
+        if not hasattr(record, "best_rep_metrics"):
+            record.best_rep_metrics = None
         self.created_record = record
         return record
 

@@ -17,6 +17,37 @@ import { buildPushupObservation } from "./utils/pushup";
 
 const SQUAT_KCAL_PER_REP = 0.32;
 
+const IDEAL_METRICS: Record<string, Record<string, number>> = {
+  squat: { bottomKneeAngle: 85 },
+  pushup: { bottomElbowAngle: 55, bodyLineAngle: 180 },
+};
+
+function pickBestRepMetrics(
+  exerciseType: string,
+  repSummaries: { metrics: Record<string, number> }[],
+): Record<string, number> | null {
+  if (repSummaries.length === 0) return null;
+  const ideal = IDEAL_METRICS[exerciseType];
+  if (!ideal) return repSummaries[0].metrics;
+
+  let bestMetrics = repSummaries[0].metrics;
+  let bestScore = Infinity;
+
+  for (const rep of repSummaries) {
+    let score = 0;
+    for (const [key, idealVal] of Object.entries(ideal)) {
+      const actual = rep.metrics[key] ?? idealVal;
+      score += Math.abs(actual - idealVal);
+    }
+    if (score < bestScore) {
+      bestScore = score;
+      bestMetrics = rep.metrics;
+    }
+  }
+
+  return bestMetrics;
+}
+
 const TEXT = {
   finishWorkout: "운동 종료",
   feedbackTitle: "AI 실시간 피드백",
@@ -191,6 +222,8 @@ export function CameraAnalysisPage() {
 
     try {
       setIsSavingResult(true);
+      const bestRepMetrics = pickBestRepMetrics(resolvedExerciseId, repSummaries);
+
       const response = await workoutApi.createExerciseRecord({
         exercise_id: exercise.backendExerciseId,
         count: currentAnalysis.fullRepCount,
@@ -205,6 +238,7 @@ export function CameraAnalysisPage() {
             representative_feedback_code: rep.representativeFeedbackCode ?? null,
           })),
         },
+        best_rep_metrics: bestRepMetrics,
       });
 
       navigate("/post-workout", {

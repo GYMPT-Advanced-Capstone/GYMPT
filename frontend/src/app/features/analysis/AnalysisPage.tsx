@@ -31,25 +31,15 @@ interface ExerciseRecord {
   score: number;
   accuracy_avg: string;
   completed_at: string;
-  analysis?: {
-    range_score?: number;
-    extension_score?: number;
-    stability_score?: number;
-    exercise_type?: string;
-    reps?: {
-      rep_index?: number;
-      metrics?: {
-        bodyLineAngle?: number;
-        bottomElbowAngle?: number;
-        topElbowAngle?: number;
-      };
-    }[];
-    range_summary?: {
-      bodyStabilityRate?: number;
-      rangeCompletionRate?: number;
-      topExtensionRate?: number;
-    };
-  };
+  best_rep_metrics?: {
+    bottomKneeAngle?: number;
+    bottomHipAngle?: number;
+    bottomElbowAngle?: number;
+    bodyLineAngle?: number;
+    topKneeAngle?: number;
+    topElbowAngle?: number;
+    [key: string]: number | undefined;
+  } | null;
 }
 
 interface UserGoal {
@@ -95,8 +85,15 @@ export function AnalysisPage() {
   // 💡 [핵심] 선택한 날짜 기준 앞뒤 2일(총 5일)의 실제 데이터를 저장할 공간
   const [fiveDaysRecords, setFiveDaysRecords] = useState<{ [dateStr: string]: ExerciseRecord[] }>({});
   
-  const [userGoal, setUserGoal] = useState<UserGoal | null>(null);
-  const [userName, setUserName] = useState("사용자");
+  const userGoal = useMemo<UserGoal | null>(() => {
+    try {
+      const saved = localStorage.getItem("gympt_goal");
+      return saved ? (JSON.parse(saved) as UserGoal) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+  const userName = localStorage.getItem("gympt_user_name") ?? "사용자";
   const [weeklyCalories, setWeeklyCalories] = useState("0.0");
 
   const viewYear = currentDate.getFullYear();
@@ -107,18 +104,6 @@ export function AnalysisPage() {
     if (!token) {
       alert("로그인이 만료되었습니다. 다시 로그인해주세요.");
       navigate("/");
-      return;
-    }
-    const savedName = localStorage.getItem("gympt_user_name");
-    const savedGoal = localStorage.getItem("gympt_goal");
-    if (savedName) setUserName(savedName);
-    if (savedGoal) {
-      try {
-        const parsedGoal = JSON.parse(savedGoal) as UserGoal;
-        setUserGoal(parsedGoal);
-      } catch (error) {
-        console.error("goal parsing error:", error);
-      }
     }
   }, [navigate]);
 
@@ -312,38 +297,17 @@ export function AnalysisPage() {
         let userAngle2 = 0;
 
         if (matchingRecord) {
-          const reps = matchingRecord.analysis?.reps;
-          
-          // 1. 실제 회차별 실시간 데이터(reps)가 있으면 하나씩 더해 평균 각도 구하기
-          if (Array.isArray(reps) && reps.length > 0) {
-            let sum1 = 0, count1 = 0;
-            let sum2 = 0, count2 = 0;
+          const bm = matchingRecord.best_rep_metrics;
 
-            reps.forEach((rep) => {
-              const m = rep.metrics;
-              if (!m) return;
-
-              if (koName === "푸쉬업") {
-                if (m.bottomElbowAngle) { sum1 += m.bottomElbowAngle; count1++; }
-                if (m.bodyLineAngle) { sum2 += m.bodyLineAngle; count2++; }
-              } else if (koName === "스쿼트" || koName === "런지") {
-                const angle = m.bottomElbowAngle ?? m.topElbowAngle;
-                if (angle) { sum1 += angle; count1++; }
-              } else if (koName === "플랭크") {
-                if (m.bodyLineAngle) { sum1 += m.bodyLineAngle; count1++; }
-              }
-            });
-
-            userAngle = count1 > 0 ? Math.round(sum1 / count1) : 0;
-            userAngle2 = count2 > 0 ? Math.round(sum2 / count2) : 0;
-          }
-
-          // 2. 만약 reps 내부 세부 metric 필드가 비어있다면, 당일의 전반적인 score나 accuracy_avg를 대용값으로 실시간 반영
-          if (userAngle === 0) {
-            userAngle = matchingRecord.score || Number(matchingRecord.accuracy_avg) || 0;
-          }
-          if (koName === "푸쉬업" && userAngle2 === 0) {
-            userAngle2 = 165; // 푸쉬업 엉덩이 수평 기본 백업 값
+          if (bm) {
+            if (koName === "푸쉬업") {
+              userAngle = Math.round(bm.bottomElbowAngle ?? 0);
+              userAngle2 = Math.round(bm.bodyLineAngle ?? 0);
+            } else if (koName === "스쿼트" || koName === "런지") {
+              userAngle = Math.round(bm.bottomKneeAngle ?? 0);
+            } else if (koName === "플랭크") {
+              userAngle = Math.round(bm.bodyLineAngle ?? 0);
+            }
           }
         }
 
@@ -443,7 +407,7 @@ export function AnalysisPage() {
         dailyRecords.length > 0
           ? Math.round(
               dailyRecords.reduce((acc, record) => {
-                const metrics = record.analysis?.reps?.[0]?.metrics;
+                const metrics = record.best_rep_metrics;
                 if (!metrics) {
                   return acc + (record.score || Number(record.accuracy_avg) || 80);
                 }

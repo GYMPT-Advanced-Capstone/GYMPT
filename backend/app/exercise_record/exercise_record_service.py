@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from decimal import Decimal
-from typing import cast
+from typing import Any, cast
 
 from fastapi import HTTPException, status
 
@@ -31,6 +31,7 @@ class ExerciseRecordService:
             duration=data.duration,
             calories=data.calories,
             completed_at=data.completed_at,
+            best_rep_metrics=data.best_rep_metrics,
         )
         created_record = self.repo.create(record)
 
@@ -98,4 +99,5 @@ class ExerciseRecordService:
             calories=cast(Decimal, record.calories),
             completed_at=cast(datetime, record.completed_at),
             ai_feedback=cast(str | None, record.ai_feedback),
+            best_rep_metrics=cast(dict[str, Any] | None, record.best_rep_metrics),
         )
