@@ -17,6 +17,7 @@ from app.auth.dto.auth_request import (
     LogoutRequest,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
+    PasswordResetVerifyRequest,
     SignupRequest,
     TokenRefreshRequest,
 )
@@ -282,12 +283,14 @@ def request_password_reset(data: PasswordResetRequest, db: Session = Depends(get
 
 
 @router.post(
-    "/password-reset",
+    "/password-reset/verify-code",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="비밀번호 재설정",
-    description="인증 코드 확인 후 비밀번호를 재설정합니다.",
+    summary="비밀번호 재설정 인증 코드 확인",
+    description="비밀번호 재설정을 위한 인증 코드를 확인합니다.",
 )
-def reset_password(data: PasswordResetConfirmRequest, db: Session = Depends(get_db)):
+def verify_password_reset_code(
+    data: PasswordResetVerifyRequest, db: Session = Depends(get_db)
+):
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(
@@ -300,7 +303,35 @@ def reset_password(data: PasswordResetConfirmRequest, db: Session = Depends(get_
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="인증 코드가 올바르지 않거나 만료되었습니다.",
         )
+    store_email_verified(data.email)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/password-reset",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="비밀번호 재설정",
+    description="이메일 인증 완료 후 비밀번호를 재설정합니다.",
+)
+def reset_password(data: PasswordResetConfirmRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="존재하지 않는 사용자입니다.",
+        )
+    if not is_email_verified(data.email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="이메일 인증이 완료되지 않았습니다.",
+        )
     user.pw = get_password_hash(data.new_password)  # type: ignore[assignment]
     db.commit()
+    try:
+        delete_email_verified(data.email)
+    except Exception:
+        logger.warning(
+            f"Redis cleanup failed for {mask_email(data.email)} after password reset"
+        )
     invalidate_user_session(data.email)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
