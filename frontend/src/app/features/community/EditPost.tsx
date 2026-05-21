@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import axios, { AxiosError } from "axios";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
 
-const API_BASE_URL = "http://localhost:8001";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 interface ExistingImage {
   image_id: number;

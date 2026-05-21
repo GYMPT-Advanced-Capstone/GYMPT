@@ -15,7 +15,7 @@ import { useEffect, useState, useCallback } from "react";
 import axios, { AxiosError } from "axios";
 import { BottomNav } from "../../components/BottomNav";
 
-const API_BASE_URL = "http://localhost:8001";
+const API_BASE_URL = "http://localhost:8000";
 
 interface PostImage {
   imgpath: string;
@@ -38,7 +38,7 @@ interface Post {
 interface Comment {
   comment_no: number;
   content: string;
-  create_at: string;
+  created_at: string;
   writer: string;
   board_no: number;
 }
@@ -639,6 +639,7 @@ function CommentsBottomSheet({
           },
         }
       );
+      console.log("게시글 상세 응답:", res.data);
 
       setComments(res.data.comments || []);
     } catch (error) {

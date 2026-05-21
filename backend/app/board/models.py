@@ -116,7 +116,7 @@ class Comment(Base):
         autoincrement=True,
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    create_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,

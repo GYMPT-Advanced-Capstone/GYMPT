@@ -151,7 +151,7 @@ def get_comments_by_board_no(db: Session, board_no: int) -> list[tuple[Comment, 
         select(Comment, User.nickname)
         .join(User, Comment.writer_id == User.id)
         .where(Comment.board_no == board_no)
-        .order_by(Comment.create_at.asc(), Comment.comment_no.asc())
+        .order_by(Comment.created_at.asc(), Comment.comment_no.asc())
     )
 
     result = db.execute(stmt).all()

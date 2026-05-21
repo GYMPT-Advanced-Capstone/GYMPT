@@ -363,7 +363,7 @@ def get_board_detail_service(
         CommentResponse(
             comment_no=comment.comment_no,
             content=comment.content,
-            create_at=comment.create_at,
+            created_at=comment.created_at,
             writer=comment_writer,
             board_no=comment.board_no,
         )

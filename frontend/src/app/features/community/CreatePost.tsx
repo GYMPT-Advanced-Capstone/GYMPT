@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import axios, { AxiosError } from "axios";
 import { BottomNav } from "../../components/BottomNav";
 
-const API_BASE_URL = "http://localhost:8001";
+const API_BASE_URL = "http://localhost:8000";
 
 export function CreatePost() {
   const navigate = useNavigate();

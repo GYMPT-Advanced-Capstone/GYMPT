@@ -128,7 +128,7 @@ class CommentResponse(BaseModel):
         description="댓글 내용",
         json_schema_extra={"example": "좋은 글 감사합니다!"},
     )
-    create_at: datetime = Field(
+    created_at: datetime = Field(
         ...,
         description="댓글 작성 시각",
         json_schema_extra={"example": "2026-03-27T14:30:00"},
