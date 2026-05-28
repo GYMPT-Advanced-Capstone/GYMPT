@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { useNavigate, useParams } from "react-router";
 
 import { workoutApi, type ExerciseCalibrationResponse } from "../../api/workoutApi";
+import type { ExerciseRecordRepRequest } from "../../api/workoutApi";
 import { useGoal } from "../../context/GoalContext";
 import { CameraStage } from "./components/CameraStage";
 import { WorkoutHeader } from "./components/WorkoutHeader";
@@ -10,12 +11,14 @@ import { PUSHUP_KCAL_PER_REP, WORKOUT_EXERCISES } from "./config/exercises";
 import { useCameraPreview } from "./hooks/useCameraPreview";
 import { usePoseLandmarker } from "./hooks/usePoseLandmarker";
 import { usePushupAnalysis } from "./hooks/usePushupAnalysis";
+import { useLungeAnalysis } from "./hooks/useLungeAnalysis";
 import { useSquatAnalysis } from "./hooks/useSquatAnalysis";
 import { useWorkoutVoiceCoach } from "./hooks/useWorkoutVoiceCoach";
 import type { NormalizedLandmark } from "./types/pose";
 import { buildPushupObservation } from "./utils/pushup";
 
 const SQUAT_KCAL_PER_REP = 0.32;
+const LUNGE_KCAL_PER_REP = 0.35;
 
 const IDEAL_METRICS: Record<string, Record<string, number>> = {
   squat: { bottomKneeAngle: 85 },
@@ -48,6 +51,28 @@ function pickBestRepMetrics(
   return bestMetrics;
 }
 
+function buildRepAnalysis(
+  exerciseType: string,
+  repSummaries: {
+    repIndex: number;
+    metrics: Record<string, number>;
+    representativeFeedbackCode?: string;
+  }[],
+): { exercise_type: string; reps: ExerciseRecordRepRequest[] } | undefined {
+  if (repSummaries.length === 0) {
+    return undefined;
+  }
+
+  return {
+    exercise_type: exerciseType,
+    reps: repSummaries.map((rep) => ({
+      rep_index: rep.repIndex,
+      metrics: rep.metrics,
+      representative_feedback_code: rep.representativeFeedbackCode ?? null,
+    })),
+  };
+}
+
 const TEXT = {
   finishWorkout: "운동 종료",
   feedbackTitle: "AI 실시간 피드백",
@@ -71,6 +96,8 @@ export function CameraAnalysisPage() {
   const resolvedExerciseId = exerciseId ?? "squat";
   const exercise = WORKOUT_EXERCISES[resolvedExerciseId] ?? WORKOUT_EXERCISES.squat;
   const isPushup = resolvedExerciseId === "pushup";
+  const isLunge = resolvedExerciseId === "lunge";
+  const isSquat = !isPushup && !isLunge;
   const targetCount = goal.exerciseCounts[resolvedExerciseId as keyof typeof goal.exerciseCounts] ?? exercise.targetCount;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -121,7 +148,12 @@ export function CameraAnalysisPage() {
   }, [isStreaming]);
 
   const { analysis: squatAnalysis, onPoseLandmarks: onSquatPoseLandmarks } = useSquatAnalysis({
-    enabled: isStreaming && !isPushup && calibrationStatus === "ready",
+    enabled: isStreaming && isSquat && calibrationStatus === "ready",
+    goalCount: targetCount,
+    calibrationMetrics: (calibration?.metrics as Record<string, unknown> | null) ?? null,
+  });
+  const { analysis: lungeAnalysis, onPoseLandmarks: onLungePoseLandmarks } = useLungeAnalysis({
+    enabled: isStreaming && isLunge && calibrationStatus === "ready",
     goalCount: targetCount,
     calibrationMetrics: (calibration?.metrics as Record<string, unknown> | null) ?? null,
   });
@@ -141,9 +173,13 @@ export function CameraAnalysisPage() {
         onTrackedLandmarks(observation?.trackedLandmarks ?? null, timestampMs);
         return;
       }
+      if (isLunge) {
+        onLungePoseLandmarks(landmarks, timestampMs);
+        return;
+      }
       onSquatPoseLandmarks(landmarks, timestampMs);
     };
-  }, [isPushup, onSquatPoseLandmarks, onTrackedLandmarks]);
+  }, [isLunge, isPushup, onLungePoseLandmarks, onSquatPoseLandmarks, onTrackedLandmarks]);
 
   const {
     poseStatus,
@@ -156,10 +192,12 @@ export function CameraAnalysisPage() {
     onPoseLandmarks,
   });
 
-  const currentAnalysis = isPushup ? pushupAnalysis : squatAnalysis;
-  const repSummaries = isPushup ? pushupAnalysis.repSummaries : squatAnalysis.repSummaries;
+  const currentAnalysis = isPushup ? pushupAnalysis : (isLunge ? lungeAnalysis : squatAnalysis);
+  const repSummaries = currentAnalysis.repSummaries;
   const estimatedCalories = isPushup
     ? (currentAnalysis.fullRepCount * PUSHUP_KCAL_PER_REP).toFixed(2)
+    : isLunge
+      ? (currentAnalysis.fullRepCount * LUNGE_KCAL_PER_REP).toFixed(2)
     : (currentAnalysis.fullRepCount * SQUAT_KCAL_PER_REP).toFixed(2);
   const { noticeMessageOverride } = useWorkoutVoiceCoach({
     enabled: isStreaming && calibrationStatus === "ready",
@@ -215,7 +253,7 @@ export function CameraAnalysisPage() {
       retryPath: `/workout/camera/${resolvedExerciseId}`,
     };
 
-    if (repSummaries.length === 0) {
+    if (currentAnalysis.fullRepCount <= 0) {
       navigate("/post-workout", { state: fallbackState });
       return;
     }
@@ -223,6 +261,7 @@ export function CameraAnalysisPage() {
     try {
       setIsSavingResult(true);
       const bestRepMetrics = pickBestRepMetrics(resolvedExerciseId, repSummaries);
+      const analysis = buildRepAnalysis(resolvedExerciseId, repSummaries);
 
       const response = await workoutApi.createExerciseRecord({
         exercise_id: exercise.backendExerciseId,
@@ -230,14 +269,7 @@ export function CameraAnalysisPage() {
         duration: durationSeconds,
         calories: estimatedCalories,
         completed_at: new Date().toISOString(),
-        analysis: {
-          exercise_type: resolvedExerciseId,
-          reps: repSummaries.map((rep) => ({
-            rep_index: rep.repIndex,
-            metrics: rep.metrics,
-            representative_feedback_code: rep.representativeFeedbackCode ?? null,
-          })),
-        },
+        analysis,
         best_rep_metrics: bestRepMetrics,
       });
 
