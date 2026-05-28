@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from math import acos, atan2, degrees, sqrt
 from typing import Any

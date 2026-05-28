@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth.router import router as auth_router
 from app.board.router import router as board_router
@@ -38,10 +39,10 @@ SCHEMA_BACKFILL_COLUMNS = {
 
 def _ensure_runtime_schema(engine: Engine) -> None:
     json_type = "JSON" if engine.dialect.name == "mysql" else "TEXT"
-    inspector = inspect(engine)
 
     with engine.begin() as connection:
         for table_name, columns in SCHEMA_BACKFILL_COLUMNS.items():
+            inspector = inspect(connection)
             existing_columns = {
                 column["name"] for column in inspector.get_columns(table_name)
             }
@@ -50,9 +51,17 @@ def _ensure_runtime_schema(engine: Engine) -> None:
                     continue
 
                 ddl = ddl_template.format(json_type=json_type)
-                connection.exec_driver_sql(
-                    f"ALTER TABLE {table_name} ADD COLUMN {ddl}"
-                )
+                try:
+                    connection.exec_driver_sql(
+                        f"ALTER TABLE {table_name} ADD COLUMN {ddl}"
+                    )
+                except SQLAlchemyError:
+                    refreshed_columns = {
+                        column["name"]
+                        for column in inspect(connection).get_columns(table_name)
+                    }
+                    if column_name not in refreshed_columns:
+                        raise
 
 
 @asynccontextmanager
