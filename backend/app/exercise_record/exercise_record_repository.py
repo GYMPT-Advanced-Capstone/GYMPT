@@ -75,6 +75,7 @@ class ExerciseRecordRepository:
     def update_ai_feedback(self, record: ExerciseRecord, ai_feedback: str) -> None:
         setattr(record, "ai_feedback", ai_feedback)
         self.db.commit()
+        self.db.refresh(record)
 
     def update(
         self,

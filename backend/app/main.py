@@ -3,8 +3,10 @@ from importlib import import_module
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware  # ← 추가
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect
+from sqlalchemy.engine import Engine
 
 from app.auth.router import router as auth_router
 from app.board.router import router as board_router
@@ -22,6 +24,36 @@ BOARD_IMAGE_DIR = STATIC_DIR / "board"
 
 BOARD_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 
+SCHEMA_BACKFILL_COLUMNS = {
+    "user_exercise_goal": (
+        ("daily_target_duration", "daily_target_duration INT NULL"),
+        ("threshold", "threshold FLOAT NULL"),
+    ),
+    "exercise_records": (
+        ("ai_feedback", "ai_feedback TEXT NULL"),
+        ("best_rep_metrics", "best_rep_metrics {json_type} NULL"),
+    ),
+}
+
+
+def _ensure_runtime_schema(engine: Engine) -> None:
+    json_type = "JSON" if engine.dialect.name == "mysql" else "TEXT"
+    inspector = inspect(engine)
+
+    with engine.begin() as connection:
+        for table_name, columns in SCHEMA_BACKFILL_COLUMNS.items():
+            existing_columns = {
+                column["name"] for column in inspector.get_columns(table_name)
+            }
+            for column_name, ddl_template in columns:
+                if column_name in existing_columns:
+                    continue
+
+                ddl = ddl_template.format(json_type=json_type)
+                connection.exec_driver_sql(
+                    f"ALTER TABLE {table_name} ADD COLUMN {ddl}"
+                )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,7 +61,9 @@ async def lifespan(app: FastAPI):
     import_module("app.board.models")
     import_module("app.exercise.exercise_model")
     import_module("app.exercise_record.exercise_record_model")
-    Base.metadata.create_all(bind=get_engine())
+    engine = get_engine()
+    Base.metadata.create_all(bind=engine)
+    _ensure_runtime_schema(engine)
     yield
 
 
