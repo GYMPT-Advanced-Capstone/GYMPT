@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+﻿import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 
@@ -8,6 +8,7 @@ import { WORKOUT_EXERCISES } from "./config/exercises";
 import { useCameraPreview } from "./hooks/useCameraPreview";
 import { usePoseLandmarker } from "./hooks/usePoseLandmarker";
 import { usePushupCalibration } from "./hooks/usePushupCalibration";
+import { useLungeCalibration } from "./hooks/useLungeCalibration";
 import { useSquatCalibration } from "./hooks/useSquatCalibration";
 
 function CalibrationCompleteStage({ isPushup }: { isPushup: boolean }) {
@@ -45,6 +46,8 @@ export function RangeCalibrationPage() {
   const resolvedExerciseId = exerciseId ?? "squat";
   const exercise = WORKOUT_EXERCISES[resolvedExerciseId] ?? WORKOUT_EXERCISES.squat;
   const isPushup = resolvedExerciseId === "pushup";
+  const isLunge = resolvedExerciseId === "lunge";
+  const isSquat = !isPushup && !isLunge;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -88,7 +91,7 @@ export function RangeCalibrationPage() {
     startCalibration: startSquatCalibration,
     resetCalibration: resetSquatCalibration,
   } = useSquatCalibration({
-    enabled: isStreaming && !isPushup,
+    enabled: isStreaming && isSquat,
     exerciseId: exercise.backendExerciseId,
     onSuccess: () => {
       markCalibrated(resolvedExerciseId);
@@ -96,13 +99,33 @@ export function RangeCalibrationPage() {
     },
   });
 
-  const activeStep = isPushup ? pushupStep : squatStep;
-  const activePhase = isPushup ? pushupPhase : squatPhase;
-  const activeCapturedSide = isPushup ? pushupCapturedSide : squatCapturedSide;
-  const calibrationError = isPushup ? pushupCalibrationError : squatCalibrationError;
-  const isSavingCalibration = isPushup ? isSavingPushupCalibration : isSavingSquatCalibration;
-  const calibrationComplete = isPushup ? isPushupCalibrationComplete : isSquatCalibrationComplete;
-  const activeNoticeMessage = isPushup ? pushupNoticeMessage : squatNoticeMessage;
+  const {
+    step: lungeStep,
+    phase: lungePhase,
+    capturedSide: lungeCapturedSide,
+    calibrationError: lungeCalibrationError,
+    isSavingCalibration: isSavingLungeCalibration,
+    isCalibrationComplete: isLungeCalibrationComplete,
+    noticeMessage: lungeNoticeMessage,
+    onPoseLandmarks: onLungePoseLandmarks,
+    startCalibration: startLungeCalibration,
+    resetCalibration: resetLungeCalibration,
+  } = useLungeCalibration({
+    enabled: isStreaming && isLunge,
+    exerciseId: exercise.backendExerciseId,
+    onSuccess: () => {
+      markCalibrated(resolvedExerciseId);
+      stopCamera();
+    },
+  });
+
+  const activeStep = isPushup ? pushupStep : (isLunge ? lungeStep : squatStep);
+  const activePhase = isPushup ? pushupPhase : (isLunge ? lungePhase : squatPhase);
+  const activeCapturedSide = isPushup ? pushupCapturedSide : (isLunge ? lungeCapturedSide : squatCapturedSide);
+  const calibrationError = isPushup ? pushupCalibrationError : (isLunge ? lungeCalibrationError : squatCalibrationError);
+  const isSavingCalibration = isPushup ? isSavingPushupCalibration : (isLunge ? isSavingLungeCalibration : isSavingSquatCalibration);
+  const calibrationComplete = isPushup ? isPushupCalibrationComplete : (isLunge ? isLungeCalibrationComplete : isSquatCalibrationComplete);
+  const activeNoticeMessage = isPushup ? pushupNoticeMessage : (isLunge ? lungeNoticeMessage : squatNoticeMessage);
 
   const {
     poseStatus,
@@ -112,7 +135,7 @@ export function RangeCalibrationPage() {
     enabled: isStreaming && !calibrationComplete,
     videoRef,
     canvasRef,
-    onPoseLandmarks: isPushup ? onPushupPoseLandmarks : onSquatPoseLandmarks,
+    onPoseLandmarks: isPushup ? onPushupPoseLandmarks : (isLunge ? onLungePoseLandmarks : onSquatPoseLandmarks),
   });
 
   const isPoseError = poseStatus === "error";
@@ -150,6 +173,9 @@ export function RangeCalibrationPage() {
       if (isPushup) {
         resetPushupCalibration();
         startPushupCalibration();
+      } else if (isLunge) {
+        resetLungeCalibration();
+        startLungeCalibration();
       } else {
         resetSquatCalibration();
         startSquatCalibration();
@@ -160,6 +186,8 @@ export function RangeCalibrationPage() {
     if (activeStep === "idle") {
       if (isPushup) {
         startPushupCalibration();
+      } else if (isLunge) {
+        startLungeCalibration();
       } else {
         startSquatCalibration();
       }
@@ -181,16 +209,16 @@ export function RangeCalibrationPage() {
       return "다시 시도";
     }
     if (!isStreaming || activeStep === "idle") {
-      return isPushup ? "자세 설정 시작" : "스쿼트 기준 측정 시작";
+      return isPushup ? "자세 설정 시작" : `${exercise.name} 기준 측정 시작`;
     }
     if (activeStep === "transition_to_bottom") {
       return "다음 단계 안내 중...";
     }
     if (activeStep === "top_waiting" || activeStep === "top_counting") {
-      return isPushup ? "탑 자세 자동 측정 중..." : "선 자세 자동 측정 중...";
+      return isPushup ? "탑 자세 자동 측정 중..." : "시작 자세 자동 측정 중...";
     }
     if (activeStep === "bottom_waiting" || activeStep === "bottom_counting") {
-      return isPushup ? "바텀 자세 자동 측정 중..." : "앉은 자세 자동 측정 중...";
+      return isPushup ? "바텀 자세 자동 측정 중..." : "내려간 자세 자동 측정 중...";
     }
     return "측정 중...";
   })();
@@ -252,7 +280,7 @@ export function RangeCalibrationPage() {
               onRequestCamera={requestCamera}
               hideStageButton
               idleIntroLine1="카메라 권한을 허용하면"
-              idleIntroLine2={isPushup ? "푸쉬업 초기 범위 측정이 시작됩니다" : "스쿼트 기준 범위 측정이 시작됩니다"}
+              idleIntroLine2={isPushup ? "푸쉬업 초기 범위 측정이 시작됩니다" : `${exercise.name} 기준 범위 측정이 시작됩니다`}
               stageMinHeightClassName={isPushup ? "min-h-[420px] md:min-h-[540px]" : "min-h-[calc(100dvh-112px)] md:min-h-[900px]"}
               videoRef={videoRef}
             />

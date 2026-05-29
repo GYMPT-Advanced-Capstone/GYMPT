@@ -1,5 +1,6 @@
 import pushupImg from "../../../../assets/exercises/pushup.png";
 import squatImg from "../../../../assets/exercises/squat.png";
+import lungeImg from "../../../../assets/exercises/lunge.png";
 
 export interface WorkoutExerciseConfig {
   id: string;
@@ -41,6 +42,19 @@ export const WORKOUT_EXERCISES: Record<string, WorkoutExerciseConfig> = {
     calibrationIntro: "본인의 관절 최대 가동 범위를 설정하는 단계입니다.",
     calibrationActiveTop: "기준 자세를 유지해주세요.",
     calibrationActiveBottom: "고통을 느끼지 않을 범위까지 최대한 내려가주세요.",
+  },
+  lunge: {
+    id: "lunge",
+    backendExerciseId: 3,
+    name: "런지",
+    analysisName: "런지 AI 분석",
+    iconSrc: lungeImg,
+    targetCount: 10,
+    idleFeedback: "카메라를 시작하면 실시간 런지 피드백을 제공합니다.",
+    calibrationTitle: "런지 범위 설정",
+    calibrationIntro: "본인의 관절 최대 가동 범위를 설정하는 단계입니다.",
+    calibrationActiveTop: "측면으로 서서 시작 자세를 유지해주세요.",
+    calibrationActiveBottom: "앞무릎을 굽혀 통증 없는 범위까지 내려가 주세요.",
   },
 };
 
