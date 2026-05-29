@@ -107,7 +107,7 @@ export function LoginPage() {
           />
           <div className="absolute bottom-2 left-6">
             <h1 style={{ color: '#FFFFFF', fontSize: 28, fontWeight: 700, lineHeight: 1.2 }}>
-              AI 피트니스 코칭
+              GYMPT
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 6 }}>
               당신만을 위한 맞춤형 AI 트레이너를 만나보세요
