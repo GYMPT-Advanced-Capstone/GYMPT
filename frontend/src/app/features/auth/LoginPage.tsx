@@ -106,7 +106,7 @@ export function LoginPage() {
             }}
           />
           <div className="absolute bottom-2 left-6">
-            <h1 style={{ color: '#FFFFFF', fontSize: 28, fontWeight: 700, lineHeight: 1.2 }}>
+            <h1 style={{ color: '#3FFDD4', fontSize: 32, fontWeight: 700, lineHeight: 1.2 }}>
               GYMPT
             </h1>
             <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 6 }}>
