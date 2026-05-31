@@ -64,8 +64,8 @@ class PlankFeedbackProcessor:
                 "timestampMs": state.last_timestamp_ms,
             }
 
-        # 세션 시작 초기화
-        if state.current_rep_started_at_ms == 0.0:
+        # 세션 시작 초기화 (rep_active 기준 - 타임스탬프 0.0 오판 방지)
+        if not state.rep_active:
             state.current_rep_started_at_ms = timestamp_ms
             state.rep_active = True
             state.plank_last_feedback_at_ms = timestamp_ms
