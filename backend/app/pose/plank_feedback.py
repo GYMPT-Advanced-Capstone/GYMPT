@@ -113,7 +113,9 @@ class PlankFeedbackProcessor:
     def _build_session_metrics(self, state: Any) -> dict[str, Any]:
         avg_body_line = 0.0
         if state.current_rep_body_line_samples > 0:
-            avg_body_line = state.current_rep_body_line_sum / state.current_rep_body_line_samples
+            avg_body_line = (
+                state.current_rep_body_line_sum / state.current_rep_body_line_samples
+            )
 
         avg_elbow = 0.0
         if state.plank_elbow_angle_samples > 0:
@@ -151,7 +153,13 @@ class PlankFeedbackProcessor:
         ankle = self._point(tracked_landmarks.get("ankle"))
         nose = self._point(tracked_landmarks.get("nose"))
 
-        if shoulder is None or elbow is None or wrist is None or hip is None or ankle is None:
+        if (
+            shoulder is None
+            or elbow is None
+            or wrist is None
+            or hip is None
+            or ankle is None
+        ):
             return None
 
         elbow_angle = self._angle(shoulder, elbow, wrist)
@@ -169,7 +177,9 @@ class PlankFeedbackProcessor:
         }
 
     @staticmethod
-    def _resolve_warning(observation: dict[str, float]) -> tuple[str | None, str | None]:
+    def _resolve_warning(
+        observation: dict[str, float],
+    ) -> tuple[str | None, str | None]:
         if observation["hipLineOffset"] >= PLANK_HIP_OFFSET_THRESHOLD:
             return "hip_sag", PLANK_HIP_SAG_MESSAGE
         if observation["hipLineOffset"] <= -PLANK_HIP_OFFSET_THRESHOLD:

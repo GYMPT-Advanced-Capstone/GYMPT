@@ -83,7 +83,6 @@ export function RangeCalibrationPage() {
 
   const {
     step: squatStep,
-    phase: squatPhase,
     capturedSide: squatCapturedSide,
     calibrationError: squatCalibrationError,
     isSavingCalibration: isSavingSquatCalibration,
