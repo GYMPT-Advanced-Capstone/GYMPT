@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.pose.lunge_feedback import LungeFeedbackProcessor
+from app.pose.plank_feedback import PlankFeedbackProcessor
 from app.pose.pushup_feedback import PushupFeedbackProcessor
 from app.pose.squat_feedback import SquatFeedbackProcessor
 
@@ -42,6 +43,12 @@ class PoseSessionState:
     current_rep_max_knee_ankle_offset_x: float = 0.0
     current_rep_warning_counts: dict[str, int] | None = None
     calibration_metrics: dict[str, Any] | None = None
+    # plank 전용
+    plank_last_feedback_at_ms: float = 0.0
+    plank_elbow_angle_sum: float = 0.0
+    plank_elbow_angle_samples: int = 0
+    plank_current_warning_code: str | None = None
+    plank_warning_history: list[str | None] = field(default_factory=list)
 
     def reset_rep_tracking(self) -> None:
         self.rep_active = False
@@ -65,6 +72,7 @@ class PoseFeedbackService:
         self.pushup_feedback_processor = PushupFeedbackProcessor()
         self.squat_feedback_processor = SquatFeedbackProcessor()
         self.lunge_feedback_processor = LungeFeedbackProcessor()
+        self.plank_feedback_processor = PlankFeedbackProcessor()
 
     def create_session(self, goal_count: int = DEFAULT_GOAL_COUNT) -> PoseSessionState:
         normalized_goal = goal_count if goal_count > 0 else DEFAULT_GOAL_COUNT
@@ -118,6 +126,8 @@ class PoseFeedbackService:
             return self._handle_squat_landmarks(state, payload)
         if exercise_type == "lunge":
             return self._handle_lunge_landmarks(state, payload)
+        if exercise_type == "plank":
+            return self._handle_plank_landmarks(state, payload)
 
         return self._handle_pose_landmarks(state, payload)
 
@@ -196,6 +206,20 @@ class PoseFeedbackService:
         timestamp_ms = self._to_timestamp_ms(payload.get("timestampMs"))
         goal_count = self._to_positive_int(payload.get("goalCount"))
         return self.lunge_feedback_processor.handle_landmarks(
+            state,
+            payload,
+            timestamp_ms=timestamp_ms,
+            goal_count=goal_count,
+        )
+
+    def _handle_plank_landmarks(
+        self,
+        state: PoseSessionState,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        timestamp_ms = self._to_timestamp_ms(payload.get("timestampMs"))
+        goal_count = self._to_positive_int(payload.get("goalCount"))
+        return self.plank_feedback_processor.handle_landmarks(
             state,
             payload,
             timestamp_ms=timestamp_ms,

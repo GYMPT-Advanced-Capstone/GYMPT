@@ -11,4 +11,5 @@ export interface ExerciseInfo {
   emoji?: string;
   iconSrc?: string;
   targetCount: number;
+  isTimeBased?: boolean;
 }

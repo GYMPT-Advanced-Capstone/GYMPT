@@ -1,6 +1,7 @@
 import pushupImg from "../../../../assets/exercises/pushup.png";
 import squatImg from "../../../../assets/exercises/squat.png";
 import lungeImg from "../../../../assets/exercises/lunge.png";
+import plankImg from "../../../../assets/exercises/plank.png";
 
 export interface WorkoutExerciseConfig {
   id: string;
@@ -9,6 +10,7 @@ export interface WorkoutExerciseConfig {
   analysisName: string;
   iconSrc: string;
   targetCount: number;
+  isTimeBased?: boolean;
   idleFeedback: string;
   calibrationTitle: string;
   calibrationIntro: string;
@@ -56,6 +58,21 @@ export const WORKOUT_EXERCISES: Record<string, WorkoutExerciseConfig> = {
     calibrationActiveTop: "측면으로 서서 시작 자세를 유지해주세요.",
     calibrationActiveBottom: "앞무릎을 굽혀 통증 없는 범위까지 내려가 주세요.",
   },
+  plank: {
+    id: "plank",
+    backendExerciseId: 4,
+    name: "플랭크",
+    analysisName: "플랭크 AI 분석",
+    iconSrc: plankImg,
+    targetCount: 60,
+    isTimeBased: true,
+    idleFeedback: "카메라를 시작하면 실시간 플랭크 피드백을 제공합니다.",
+    calibrationTitle: "플랭크 자세 설정",
+    calibrationIntro: "측면으로 플랭크 자세를 취하면 자동으로 3초간 측정합니다.",
+    calibrationActiveTop: "측면으로 플랭크 자세를 유지해주세요.",
+    calibrationActiveBottom: "",
+  },
 };
 
 export const PUSHUP_KCAL_PER_REP = 0.4;
+export const PLANK_KCAL_PER_SECOND = 0.06;
