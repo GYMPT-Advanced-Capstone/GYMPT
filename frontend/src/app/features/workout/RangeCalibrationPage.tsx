@@ -10,6 +10,7 @@ import { usePoseLandmarker } from "./hooks/usePoseLandmarker";
 import { usePushupCalibration } from "./hooks/usePushupCalibration";
 import { useLungeCalibration } from "./hooks/useLungeCalibration";
 import { useSquatCalibration } from "./hooks/useSquatCalibration";
+import { usePlankCalibration } from "./hooks/usePlankCalibration";
 
 function CalibrationCompleteStage({ isPushup }: { isPushup: boolean }) {
   return (
@@ -47,7 +48,8 @@ export function RangeCalibrationPage() {
   const exercise = WORKOUT_EXERCISES[resolvedExerciseId] ?? WORKOUT_EXERCISES.squat;
   const isPushup = resolvedExerciseId === "pushup";
   const isLunge = resolvedExerciseId === "lunge";
-  const isSquat = !isPushup && !isLunge;
+  const isPlank = resolvedExerciseId === "plank";
+  const isSquat = !isPushup && !isLunge && !isPlank;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -81,7 +83,6 @@ export function RangeCalibrationPage() {
 
   const {
     step: squatStep,
-    phase: squatPhase,
     capturedSide: squatCapturedSide,
     calibrationError: squatCalibrationError,
     isSavingCalibration: isSavingSquatCalibration,
@@ -119,13 +120,40 @@ export function RangeCalibrationPage() {
     },
   });
 
-  const activeStep = isPushup ? pushupStep : (isLunge ? lungeStep : squatStep);
-  const activePhase = isPushup ? pushupPhase : (isLunge ? lungePhase : squatPhase);
-  const activeCapturedSide = isPushup ? pushupCapturedSide : (isLunge ? lungeCapturedSide : squatCapturedSide);
-  const calibrationError = isPushup ? pushupCalibrationError : (isLunge ? lungeCalibrationError : squatCalibrationError);
-  const isSavingCalibration = isPushup ? isSavingPushupCalibration : (isLunge ? isSavingLungeCalibration : isSavingSquatCalibration);
-  const calibrationComplete = isPushup ? isPushupCalibrationComplete : (isLunge ? isLungeCalibrationComplete : isSquatCalibrationComplete);
-  const activeNoticeMessage = isPushup ? pushupNoticeMessage : (isLunge ? lungeNoticeMessage : squatNoticeMessage);
+  const {
+    step: plankStep,
+    capturedSide: plankCapturedSide,
+    calibrationError: plankCalibrationError,
+    isSavingCalibration: isSavingPlankCalibration,
+    isCalibrationComplete: isPlankCalibrationComplete,
+    noticeMessage: plankNoticeMessage,
+    onPoseLandmarks: onPlankPoseLandmarks,
+    startCalibration: startPlankCalibration,
+    resetCalibration: resetPlankCalibration,
+  } = usePlankCalibration({
+    enabled: isStreaming && isPlank,
+    exerciseId: exercise.backendExerciseId,
+    onSuccess: () => {
+      markCalibrated(resolvedExerciseId);
+      stopCamera();
+    },
+  });
+
+  const activeStep = isPushup ? pushupStep : isLunge ? lungeStep : isPlank ? plankStep : squatStep;
+  const activePhase = isPushup ? pushupPhase : isLunge ? lungePhase : "top";
+  const activeCapturedSide = isPushup ? pushupCapturedSide : isLunge ? lungeCapturedSide : isPlank ? plankCapturedSide : squatCapturedSide;
+  const calibrationError = isPushup ? pushupCalibrationError : isLunge ? lungeCalibrationError : isPlank ? plankCalibrationError : squatCalibrationError;
+  const isSavingCalibration = isPushup ? isSavingPushupCalibration : isLunge ? isSavingLungeCalibration : isPlank ? isSavingPlankCalibration : isSavingSquatCalibration;
+  const calibrationComplete = isPushup ? isPushupCalibrationComplete : isLunge ? isLungeCalibrationComplete : isPlank ? isPlankCalibrationComplete : isSquatCalibrationComplete;
+  const activeNoticeMessage = isPushup ? pushupNoticeMessage : isLunge ? lungeNoticeMessage : isPlank ? plankNoticeMessage : squatNoticeMessage;
+
+  const activePoseLandmarksHandler = isPushup
+    ? onPushupPoseLandmarks
+    : isLunge
+    ? onLungePoseLandmarks
+    : isPlank
+    ? onPlankPoseLandmarks
+    : onSquatPoseLandmarks;
 
   const {
     poseStatus,
@@ -135,11 +163,11 @@ export function RangeCalibrationPage() {
     enabled: isStreaming && !calibrationComplete,
     videoRef,
     canvasRef,
-    onPoseLandmarks: isPushup ? onPushupPoseLandmarks : (isLunge ? onLungePoseLandmarks : onSquatPoseLandmarks),
+    onPoseLandmarks: activePoseLandmarksHandler,
   });
 
   const isPoseError = poseStatus === "error";
-  const isCapturing = activeStep === "top_counting" || activeStep === "bottom_counting";
+  const isCapturing = activeStep === "top_counting" || activeStep === "bottom_counting" || activeStep === "counting";
 
   let noticeMessage = exercise.calibrationIntro;
   if (activeNoticeMessage) {
@@ -176,6 +204,9 @@ export function RangeCalibrationPage() {
       } else if (isLunge) {
         resetLungeCalibration();
         startLungeCalibration();
+      } else if (isPlank) {
+        resetPlankCalibration();
+        startPlankCalibration();
       } else {
         resetSquatCalibration();
         startSquatCalibration();
@@ -188,6 +219,8 @@ export function RangeCalibrationPage() {
         startPushupCalibration();
       } else if (isLunge) {
         startLungeCalibration();
+      } else if (isPlank) {
+        startPlankCalibration();
       } else {
         startSquatCalibration();
       }
@@ -214,6 +247,8 @@ export function RangeCalibrationPage() {
     if (activeStep === "transition_to_bottom") {
       return "다음 단계 안내 중...";
     }
+    if (activeStep === "waiting") return "플랭크 자세 자동 측정 중...";
+    if (activeStep === "counting") return "플랭크 자세 측정 중... (3초 유지)";
     if (activeStep === "top_waiting" || activeStep === "top_counting") {
       return isPushup ? "탑 자세 자동 측정 중..." : "시작 자세 자동 측정 중...";
     }
@@ -230,6 +265,8 @@ export function RangeCalibrationPage() {
     || activeStep === "top_counting"
     || activeStep === "bottom_waiting"
     || activeStep === "bottom_counting"
+    || activeStep === "waiting"
+    || activeStep === "counting"
   );
 
   return (
@@ -261,7 +298,7 @@ export function RangeCalibrationPage() {
 
           <div className="rounded-full border-2 border-[#39F4D3] bg-[#102C28] px-4 py-[4px]">
             <span className="text-[13px] font-bold text-[#3FFDD4]">
-              {`${activePhase === "top" ? "1" : "2"}/2 단계`}
+              {isPlank ? "1/1 단계" : `${activePhase === "top" ? "1" : "2"}/2 단계`}
             </span>
           </div>
         </header>

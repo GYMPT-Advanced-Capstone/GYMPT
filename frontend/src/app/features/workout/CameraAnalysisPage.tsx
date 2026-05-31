@@ -7,12 +7,13 @@ import type { ExerciseRecordRepRequest } from "../../api/workoutApi";
 import { useGoal } from "../../context/GoalContext";
 import { CameraStage } from "./components/CameraStage";
 import { WorkoutHeader } from "./components/WorkoutHeader";
-import { PUSHUP_KCAL_PER_REP, WORKOUT_EXERCISES } from "./config/exercises";
+import { PUSHUP_KCAL_PER_REP, PLANK_KCAL_PER_SECOND, WORKOUT_EXERCISES } from "./config/exercises";
 import { useCameraPreview } from "./hooks/useCameraPreview";
 import { usePoseLandmarker } from "./hooks/usePoseLandmarker";
 import { usePushupAnalysis } from "./hooks/usePushupAnalysis";
 import { useLungeAnalysis } from "./hooks/useLungeAnalysis";
 import { useSquatAnalysis } from "./hooks/useSquatAnalysis";
+import { usePlankAnalysis } from "./hooks/usePlankAnalysis";
 import { useWorkoutVoiceCoach } from "./hooks/useWorkoutVoiceCoach";
 import type { NormalizedLandmark } from "./types/pose";
 import { buildPushupObservation } from "./utils/pushup";
@@ -97,7 +98,8 @@ export function CameraAnalysisPage() {
   const exercise = WORKOUT_EXERCISES[resolvedExerciseId] ?? WORKOUT_EXERCISES.squat;
   const isPushup = resolvedExerciseId === "pushup";
   const isLunge = resolvedExerciseId === "lunge";
-  const isSquat = !isPushup && !isLunge;
+  const isPlank = resolvedExerciseId === "plank";
+  const isSquat = !isPushup && !isLunge && !isPlank;
   const targetCount = goal.exerciseCounts[resolvedExerciseId as keyof typeof goal.exerciseCounts] ?? exercise.targetCount;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -152,6 +154,12 @@ export function CameraAnalysisPage() {
     goalCount: targetCount,
     calibrationMetrics: (calibration?.metrics as Record<string, unknown> | null) ?? null,
   });
+
+  const { analysis: plankAnalysis, onPoseLandmarks: onPlankPoseLandmarks } = usePlankAnalysis({
+    enabled: isStreaming && isPlank && calibrationStatus === "ready",
+    goalCount: targetCount,
+    calibrationMetrics: (calibration?.metrics as Record<string, unknown> | null) ?? null,
+  });
   const { analysis: lungeAnalysis, onPoseLandmarks: onLungePoseLandmarks } = useLungeAnalysis({
     enabled: isStreaming && isLunge && calibrationStatus === "ready",
     goalCount: targetCount,
@@ -177,9 +185,23 @@ export function CameraAnalysisPage() {
         onLungePoseLandmarks(landmarks, timestampMs);
         return;
       }
+      if (isPlank) {
+        onPlankPoseLandmarks(landmarks, timestampMs);
+        return;
+      }
       onSquatPoseLandmarks(landmarks, timestampMs);
     };
-  }, [isLunge, isPushup, onLungePoseLandmarks, onSquatPoseLandmarks, onTrackedLandmarks]);
+  }, [isLunge, isPushup, isPlank, onLungePoseLandmarks, onPlankPoseLandmarks, onSquatPoseLandmarks, onTrackedLandmarks]);
+
+  // 플랭크 목표 시간 도달 시 자동 종료
+  const plankAutoEndedRef = useRef(false);
+  useEffect(() => {
+    if (isPlank && plankAnalysis.isComplete && !plankAutoEndedRef.current && isStreaming) {
+      plankAutoEndedRef.current = true;
+      void handleEndWorkout();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlank, plankAnalysis.isComplete, isStreaming]);
 
   const {
     poseStatus,
@@ -192,12 +214,14 @@ export function CameraAnalysisPage() {
     onPoseLandmarks,
   });
 
-  const currentAnalysis = isPushup ? pushupAnalysis : (isLunge ? lungeAnalysis : squatAnalysis);
-  const repSummaries = currentAnalysis.repSummaries;
+  const currentAnalysis = isPushup ? pushupAnalysis : isLunge ? lungeAnalysis : isPlank ? { ...plankAnalysis, fullRepCount: plankAnalysis.elapsedSeconds, repSummaries: [] as never[], lastRepEvent: null, warningCode: plankAnalysis.warningCode } : squatAnalysis;
+  const repSummaries = isPlank ? [] : currentAnalysis.repSummaries;
   const estimatedCalories = isPushup
     ? (currentAnalysis.fullRepCount * PUSHUP_KCAL_PER_REP).toFixed(2)
     : isLunge
       ? (currentAnalysis.fullRepCount * LUNGE_KCAL_PER_REP).toFixed(2)
+    : isPlank
+      ? (plankAnalysis.elapsedSeconds * PLANK_KCAL_PER_SECOND).toFixed(2)
     : (currentAnalysis.fullRepCount * SQUAT_KCAL_PER_REP).toFixed(2);
   const { noticeMessageOverride } = useWorkoutVoiceCoach({
     enabled: isStreaming && calibrationStatus === "ready",
@@ -246,30 +270,51 @@ export function CameraAnalysisPage() {
       exerciseId: resolvedExerciseId,
       name: exercise.name,
       targetCount,
-      completedCount: currentAnalysis.fullRepCount,
+      completedCount: isPlank ? plankAnalysis.elapsedSeconds : currentAnalysis.fullRepCount,
       durationSeconds,
       durationLabel: formatDuration(durationSeconds),
       calories: estimatedCalories,
       retryPath: `/workout/camera/${resolvedExerciseId}`,
     };
 
-    if (currentAnalysis.fullRepCount <= 0) {
+    const completedCount = isPlank ? plankAnalysis.elapsedSeconds : currentAnalysis.fullRepCount;
+    if (completedCount <= 0) {
       navigate("/post-workout", { state: fallbackState });
       return;
     }
 
     try {
       setIsSavingResult(true);
-      const bestRepMetrics = pickBestRepMetrics(resolvedExerciseId, repSummaries);
-      const analysis = buildRepAnalysis(resolvedExerciseId, repSummaries);
+      const bestRepMetrics = isPlank
+        ? (plankAnalysis.sessionMetrics
+            ? {
+                bodyLineAngle: plankAnalysis.sessionMetrics.bodyLineAngle,
+                elbowAngle: plankAnalysis.sessionMetrics.elbowAngle,
+                holdDurationSeconds: plankAnalysis.sessionMetrics.holdDurationSeconds,
+              }
+            : null)
+        : pickBestRepMetrics(resolvedExerciseId, repSummaries);
+      const analysis = isPlank ? undefined : buildRepAnalysis(resolvedExerciseId, repSummaries);
+
+      // 플랭크: analysis를 warningCodes 기반으로 생성해서 AI 피드백 받기
+      const plankAnalysis_ = isPlank && plankAnalysis.sessionMetrics
+        ? {
+            exercise_type: "plank",
+            reps: (plankAnalysis.sessionMetrics.warningCodes ?? []).map((code, i) => ({
+              rep_index: i + 1,
+              metrics: {},
+              representative_feedback_code: code ?? "good",
+            })),
+          }
+        : undefined;
 
       const response = await workoutApi.createExerciseRecord({
         exercise_id: exercise.backendExerciseId,
-        count: currentAnalysis.fullRepCount,
-        duration: durationSeconds,
+        count: isPlank ? 1 : currentAnalysis.fullRepCount,
+        duration: isPlank ? plankAnalysis.elapsedSeconds : durationSeconds,
         calories: estimatedCalories,
         completed_at: new Date().toISOString(),
-        analysis,
+        analysis: isPlank ? (plankAnalysis_?.reps?.length ? plankAnalysis_ : undefined) : analysis,
         best_rep_metrics: bestRepMetrics,
       });
 
@@ -297,12 +342,13 @@ export function CameraAnalysisPage() {
         {/* 세로: 일반 헤더 */}
         <div className="mob-land:hidden">
           <WorkoutHeader
-            currentCount={currentAnalysis.fullRepCount}
+            currentCount={isPlank ? plankAnalysis.elapsedSeconds : currentAnalysis.fullRepCount}
             exercise={{
               id: exercise.id,
               name: exercise.analysisName,
               iconSrc: exercise.iconSrc,
               targetCount,
+              isTimeBased: exercise.isTimeBased,
             }}
           />
         </div>
