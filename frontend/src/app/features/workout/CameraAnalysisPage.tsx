@@ -286,7 +286,13 @@ export function CameraAnalysisPage() {
     try {
       setIsSavingResult(true);
       const bestRepMetrics = isPlank
-        ? (plankAnalysis.sessionMetrics ?? null)
+        ? (plankAnalysis.sessionMetrics
+            ? {
+                bodyLineAngle: plankAnalysis.sessionMetrics.bodyLineAngle,
+                elbowAngle: plankAnalysis.sessionMetrics.elbowAngle,
+                holdDurationSeconds: plankAnalysis.sessionMetrics.holdDurationSeconds,
+              }
+            : null)
         : pickBestRepMetrics(resolvedExerciseId, repSummaries);
       const analysis = isPlank ? undefined : buildRepAnalysis(resolvedExerciseId, repSummaries);
 
