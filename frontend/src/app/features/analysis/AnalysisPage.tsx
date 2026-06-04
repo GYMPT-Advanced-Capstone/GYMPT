@@ -39,7 +39,11 @@ interface ExerciseRecord {
     topKneeAngle?: number;
     topElbowAngle?: number;
     [key: string]: number | undefined;
+    elbowAngle?: number;          
+    holdDurationSeconds?: number; 
   } | null;
+
+  
 }
 
 interface UserGoal {
@@ -235,13 +239,26 @@ export function AnalysisPage() {
     newDate.setMonth(newDate.getMonth() + offset);
     setCurrentDate(newDate);
     setSelectedDate(1);
+
+    setDailyRecords([]);
+    setFiveDaysRecords({});
+    setIsDrawerOpen(false);
   };
 
   // 💡 [핵심 변경] 수집된 +-2일 진짜 데이터를 바탕으로 진짜 '일평균 각도' 계산 후 차트 바인딩
   const chartDataList = useMemo(() => {
     if (!Array.isArray(dailyRecords)) return [];
 
-    return dailyRecords.map((record) => {
+    const uniqueRecords = Array.from(
+      new Map(
+        dailyRecords.map((r) => [
+          getKoreanName(r.exercise_name),
+          r,
+        ])
+      ).values()
+    );
+
+    return uniqueRecords.map((record) => {
       const koName = getKoreanName(record.exercise_name);
 
       const COLORS = {
@@ -263,8 +280,8 @@ export function AnalysisPage() {
         ];
       } else if (koName === "플랭크") {
         bars = [
-          { key: "userAngle", name: "나의 엉덩이 각도", fill: COLORS.hip.user },
-          { key: "idealAngle", name: "권장 엉덩이 각도", fill: COLORS.hip.ideal },
+          { key: "userAngle", name: "나의 팔꿈치 각도", fill: COLORS.elbow.user,},
+          { key: "idealAngle", name: "권장 팔꿈치 각도", fill: COLORS.elbow.ideal, },
         ];
       } else if (koName === "스쿼트" || koName === "런지") {
         bars = [
@@ -276,7 +293,8 @@ export function AnalysisPage() {
       const pushupIdealElbow = 55;
       const squatIdealKnee = 85;
       const lungeIdealKnee = 90;
-      const plankIdealHip = 180;
+      // const plankIdealHip = 180;
+      const plankIdealElbow = 90;
 
       const centerDateObj = new Date(viewYear, viewMonth - 1, selectedDate);
 
@@ -306,7 +324,9 @@ export function AnalysisPage() {
             } else if (koName === "스쿼트" || koName === "런지") {
               userAngle = Math.round(bm.bottomKneeAngle ?? 0);
             } else if (koName === "플랭크") {
-              userAngle = Math.round(bm.bodyLineAngle ?? 0);
+              userAngle = Math.round(
+                Number(bm.elbowAngle ?? 0)
+              );
             }
           }
         }
@@ -321,9 +341,9 @@ export function AnalysisPage() {
               ? squatIdealKnee
               : koName === "런지"
               ? lungeIdealKnee
-              : plankIdealHip,
+              : plankIdealElbow,
           userAngle2: userAngle2,
-          idealAngle2: koName === "푸쉬업" ? plankIdealHip : 0,
+          idealAngle2: koName === "푸쉬업" ? plankIdealElbow : 0,
         };
       });
 
@@ -401,7 +421,17 @@ export function AnalysisPage() {
       freq: Math.min(Math.round((weeklyExercisedCount / weeklyTarget) * 100), 100),
       count:
         dailyRecords.length > 0
-          ? Math.min(Math.round((dailyRecords[0].count / 20) * 100), 100)
+          ? Math.min(
+              Math.round(
+                (
+                  dailyRecords.reduce(
+                    (sum, record) => sum + record.count,
+                    0
+                  ) / 20
+                ) * 100
+              ),
+              100
+            )
           : 0,
       accuracy:
         dailyRecords.length > 0
@@ -420,11 +450,11 @@ export function AnalysisPage() {
                   const bodyScore = 100 - Math.abs((metrics.bodyLineAngle || 0) - 180);
                   score = (elbowScore + bodyScore) / 2;
                 } else if (koName === "스쿼트") {
-                  score = 100 - Math.abs((metrics.bottomElbowAngle || 0) - 85);
+                  score = 100 - Math.abs((metrics.bottomKneeAngle || 0) - 85);
                 } else if (koName === "런지") {
-                  score = 100 - Math.abs((metrics.bottomElbowAngle || 0) - 90);
+                  score = 100 - Math.abs((metrics.bottomKneeAngle || 0) - 90);
                 } else if (koName === "플랭크") {
-                  score = 100 - Math.abs((metrics.bodyLineAngle || 0) - 180);
+                  score = 100 - Math.abs((metrics.elbowAngle || 0) - 90);
                 }
                 return acc + Math.max(0, score);
               }, 0) / dailyRecords.length
@@ -728,7 +758,7 @@ export function AnalysisPage() {
                               ? " 무릎 각도 85°"
                               : exercise.name === "런지"
                               ? " 무릎 각도 90°"
-                              : " 엉덩이 각도 180°"}
+                              : " 팔꿈치 각도 90°"}
                           </p>
                         </div>
                       </div>
