@@ -281,10 +281,21 @@ export function useSquatAnalysis({
         const nextCount = feedback.fullRepCount ?? prev.fullRepCount;
         const nextStatus = isSquatAnalysisStatus(feedback.status) ? feedback.status : prev.status;
         const nextTimestamp = feedback.timestampMs ?? performance.now();
+        const countIncreased = nextCount > prev.fullRepCount;
+        const shouldShowImmediateFeedback = nextStatus === "insufficient_visibility";
 
         let nextRepSummaries = prev.repSummaries;
         let nextLastRepEvent = prev.lastRepEvent;
+        let nextFeedbackMessage = prev.feedbackMessage;
+
+        if (shouldShowImmediateFeedback) {
+          nextFeedbackMessage = nextMessage;
+        } else if (prev.status === "insufficient_visibility" && nextStatus === "tracking") {
+          nextFeedbackMessage = prev.lastRepEvent?.feedbackMessage ?? "";
+        }
+
         if (feedback.repCompleted && feedback.repSummary) {
+          const representativeMessage = feedback.representativeFeedbackMessage ?? nextMessage;
           nextRepSummaries = [
             ...prev.repSummaries,
             {
@@ -296,19 +307,21 @@ export function useSquatAnalysis({
           ];
           nextLastRepEvent = {
             count: nextCount,
-            feedbackMessage: feedback.representativeFeedbackMessage ?? nextMessage,
+            feedbackMessage: representativeMessage,
             feedbackCode: feedback.representativeFeedbackCode ?? null,
           };
-        } else if (nextCount > prev.fullRepCount) {
+          nextFeedbackMessage = representativeMessage;
+        } else if (countIncreased) {
           nextLastRepEvent = {
             count: nextCount,
             feedbackMessage: nextMessage,
             feedbackCode: feedback.warningCode ?? prev.lastRepEvent?.feedbackCode ?? null,
           };
+          nextFeedbackMessage = nextMessage;
         }
 
         if (
-          nextMessage === prev.feedbackMessage
+          nextFeedbackMessage === prev.feedbackMessage
           && nextCount === prev.fullRepCount
           && nextStatus === prev.status
           && nextRepSummaries === prev.repSummaries
@@ -320,7 +333,7 @@ export function useSquatAnalysis({
           ...prev,
           timestampMs: nextTimestamp,
           status: nextStatus,
-          feedbackMessage: nextMessage,
+          feedbackMessage: nextFeedbackMessage,
           fullRepCount: nextCount,
           repSummaries: nextRepSummaries,
           warningCode: feedback.warningCode ?? prev.warningCode,
