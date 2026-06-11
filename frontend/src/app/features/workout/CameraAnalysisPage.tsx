@@ -80,6 +80,7 @@ const TEXT = {
   modelLoading: "AI 자세 모델을 불러오는 중입니다...",
   modelError: "AI 자세 분석을 시작할 수 없습니다.",
   detecting: "랜드마크를 기반으로 자세를 분석 중입니다.",
+  squatGuide: "발은 어깨너비로, 엉덩이를 뒤로 빼며 천천히 앉았다 일어나세요.",
   searching: "화면에서 자세를 찾고 있습니다.",
   calibrationLoading: "초기 범위 데이터를 불러오는 중입니다.",
 } as const;
@@ -238,8 +239,7 @@ export function CameraAnalysisPage() {
       !isPushup
       && currentAnalysis.fullRepCount === 0
       && currentAnalysis.status === "tracking"
-      && currentAnalysis.feedbackMessage
-        ? currentAnalysis.feedbackMessage
+        ? currentAnalysis.feedbackMessage || (isSquat ? TEXT.squatGuide : null)
         : null,
     repEvent: currentAnalysis.lastRepEvent,
   });
@@ -253,7 +253,8 @@ export function CameraAnalysisPage() {
   } else if (poseStatus === "error") {
     noticeMessage = poseErrorMessage ?? TEXT.modelError;
   } else if (hasPoseLandmarks) {
-    noticeMessage = isPushup ? TEXT.detecting : (currentAnalysis.feedbackMessage || TEXT.detecting);
+    const readyGuide = isSquat ? TEXT.squatGuide : TEXT.detecting;
+    noticeMessage = isPushup ? TEXT.detecting : (currentAnalysis.feedbackMessage || readyGuide);
   }
   if (noticeMessageOverride) {
     noticeMessage = noticeMessageOverride;
