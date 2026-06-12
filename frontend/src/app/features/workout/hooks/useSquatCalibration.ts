@@ -8,6 +8,7 @@ import { cancelSpeech, speakKorean } from "../utils/speech";
 const HOLD_DURATION_MS = 2000;
 const TRANSITION_DELAY_MS = 1000;
 const COMPLETE_REDIRECT_DELAY_MS = 1200;
+const UNSTABLE_FRAME_TOLERANCE = 8;
 
 export type SquatCalibrationStep =
   | "idle"
@@ -63,6 +64,7 @@ export function useSquatCalibration({
   const [isSavingCalibration, setIsSavingCalibration] = useState(false);
   const [isCalibrationComplete, setIsCalibrationComplete] = useState(false);
   const captureStartedAtRef = useRef<number | null>(null);
+  const unstableFrameCountRef = useRef(0);
   const transitionTimeoutRef = useRef<number | null>(null);
   const completeTimeoutRef = useRef<number | null>(null);
   const lastSpokenStepRef = useRef<SquatCalibrationStep | null>(null);
@@ -78,6 +80,7 @@ export function useSquatCalibration({
   const resetCalibration = useCallback(() => {
     samplesRef.current = { top: [], bottom: [] };
     captureStartedAtRef.current = null;
+    unstableFrameCountRef.current = 0;
     setPhase("top");
     setStep("idle");
     setCapturedSide(null);
@@ -98,6 +101,7 @@ export function useSquatCalibration({
   const startCalibration = useCallback(() => {
     samplesRef.current = { top: [], bottom: [] };
     captureStartedAtRef.current = null;
+    unstableFrameCountRef.current = 0;
     setPhase("top");
     setStep("top_waiting");
     setCapturedSide(null);
@@ -126,24 +130,21 @@ export function useSquatCalibration({
   }, []);
 
   useEffect(() => {
-    if (!enabled || lastSpokenStepRef.current === step) {
+    if (!enabled) {
       return;
     }
 
     const messages: Partial<Record<SquatCalibrationStep, string>> = {
-      top_waiting: "정면이 아닌 측면으로 서서 선 자세를 유지해주세요.",
-      top_counting: "좋습니다. 선 자세 측정을 시작합니다. 2초만 유지해주세요.",
-      transition_to_bottom: "좋습니다. 이제 앉은 자세를 측정합니다. 천천히 내려가 유지해주세요.",
-      bottom_waiting: "앉은 자세를 유지해주세요. 안정되면 자동으로 2초간 측정합니다.",
-      bottom_counting: "앉은 자세 측정을 시작합니다. 2초만 유지해주세요.",
-      saving: "스쿼트 기준 범위를 저장하고 있습니다.",
-      complete: "스쿼트 기준 범위 설정이 완료되었습니다. 운동을 시작합니다.",
+      top_waiting: "정면이 아닌 측면으로 서서 무릎과 허리를 편 일자 선 자세를 유지해주세요.",
+      bottom_waiting: "엉덩이를 뒤로 빼고 무릎을 굽혀 스쿼트로 앉은 자세를 유지해주세요.",
+      complete: "기준 범위 설정을 완료했습니다. 운동을 시작합니다.",
     };
-    lastSpokenStepRef.current = step;
     const message = messages[step];
-    if (message) {
-      speak(message);
+    if (!message || lastSpokenStepRef.current === step) {
+      return;
     }
+    lastSpokenStepRef.current = step;
+    speak(message);
   }, [enabled, speak, step]);
 
   const onPoseLandmarks = useCallback((landmarks: NormalizedLandmark[] | null, timestampMs: number) => {
@@ -160,6 +161,7 @@ export function useSquatCalibration({
 
     const observation = buildSquatObservation(landmarks);
     if (!observation) {
+      unstableFrameCountRef.current = 0;
       captureStartedAtRef.current = null;
       if (step === "top_counting") {
         samplesRef.current.top = [];
@@ -176,6 +178,11 @@ export function useSquatCalibration({
     setCapturedSide(observation.trackedLandmarks.side);
 
     if (!stable) {
+      unstableFrameCountRef.current += 1;
+      if (unstableFrameCountRef.current <= UNSTABLE_FRAME_TOLERANCE) {
+        return;
+      }
+      unstableFrameCountRef.current = 0;
       captureStartedAtRef.current = null;
       samplesRef.current[activePhase] = [];
       if (activePhase === "top" && step === "top_counting") {
@@ -186,6 +193,8 @@ export function useSquatCalibration({
       }
       return;
     }
+
+    unstableFrameCountRef.current = 0;
 
     samplesRef.current[activePhase].push({
       phase: activePhase,
@@ -205,14 +214,15 @@ export function useSquatCalibration({
     captureStartedAtRef.current = null;
 
     if (activePhase === "top") {
+      if (transitionTimeoutRef.current !== null) {
+        return;
+      }
       setPhase("bottom");
       setStep("transition_to_bottom");
-      if (transitionTimeoutRef.current !== null) {
-        window.clearTimeout(transitionTimeoutRef.current);
-      }
       transitionTimeoutRef.current = window.setTimeout(() => {
         samplesRef.current.bottom = [];
         setStep("bottom_waiting");
+        transitionTimeoutRef.current = null;
       }, TRANSITION_DELAY_MS);
       return;
     }
@@ -251,13 +261,13 @@ export function useSquatCalibration({
 
   let noticeMessage: string | null = null;
   if (step === "top_waiting") {
-    noticeMessage = "측면으로 서서 선 자세를 유지해주세요. 안정되면 자동으로 2초간 측정합니다.";
+    noticeMessage = "측면으로 서서 무릎과 허리를 편 일자 선 자세를 유지해주세요.";
   } else if (step === "top_counting") {
     noticeMessage = "선 자세 측정 중입니다. 2초만 그대로 유지해주세요.";
   } else if (step === "transition_to_bottom") {
     noticeMessage = "좋습니다. 이제 앉은 자세를 측정합니다. 천천히 내려가 유지해주세요.";
   } else if (step === "bottom_waiting") {
-    noticeMessage = "앉은 자세를 유지해주세요. 안정되면 자동으로 2초간 측정합니다.";
+    noticeMessage = "엉덩이를 뒤로 빼고 무릎을 굽혀 스쿼트로 앉은 자세를 유지해주세요.";
   } else if (step === "bottom_counting") {
     noticeMessage = "앉은 자세 측정 중입니다. 2초만 그대로 유지해주세요.";
   } else if (step === "saving") {

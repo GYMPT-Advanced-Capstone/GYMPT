@@ -7,7 +7,7 @@ from typing import Any
 SQUAT_VIEW_MESSAGE = "몸의 측면 관절이 보이도록 카메라와 몸을 맞춰주세요."
 SQUAT_GOOD_MESSAGE = "좋은 자세예요."
 SQUAT_DEPTH_MESSAGE = "스쿼트 깊이가 조금 부족해요. 조금 더 내려가 주세요."
-SQUAT_TOO_DEEP_MESSAGE = "스쿼트 깊이가 너무 깊어요."
+SQUAT_TOO_DEEP_MESSAGE = "스쿼트 깊이가 너무 깊어요. 조금 덜 내려가 주세요"
 SQUAT_TORSO_LEAN_MESSAGE = "상체가 너무 숙여졌어요. 가슴을 세워주세요."
 SQUAT_KNEE_TRACK_MESSAGE = "무릎이 발끝 방향과 같은 방향을 향하게 해주세요."
 SQUAT_BOTTOM_GOOD_DEPTH = 0.55
